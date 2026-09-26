@@ -5,8 +5,9 @@ import { ModSlotBadge } from './ModSlotBadge';
 import { StatHexagon } from '../charts/StatHexagon';
 import { StrainTimeline } from '../charts/StrainTimeline';
 import { PatternTimelineVisualizer } from '../charts/PatternTimelineVisualizer';
+import { PatternPlayfieldVisualizer } from '../visualizer/PatternPlayfieldVisualizer';
 import { formatTimestamp } from '../../engine/strains';
-import { ExternalLink, Radio, Hexagon, ListFilter } from 'lucide-react';
+import { ExternalLink, Radio, Hexagon, ListFilter, Play } from 'lucide-react';
 
 interface LazerWedgeProps {
   map: BeatmapAnalysisResult | null;
@@ -19,7 +20,15 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   poolAverageSkills,
   onSlotChange,
 }) => {
-  const [activeWedgeTab, setActiveWedgeTab] = useState<'radar' | 'patterns'>('radar');
+  const [activeWedgeTab, setActiveWedgeTab] = useState<'radar' | 'patterns' | 'visualizer'>('radar');
+  const [visualizerTimeMs, setVisualizerTimeMs] = useState<number | undefined>(undefined);
+  const [visualizerPatternId, setVisualizerPatternId] = useState<string | undefined>(undefined);
+
+  const handleSelectTimestamp = (timeMs: number, patternId?: string) => {
+    setVisualizerTimeMs(timeMs);
+    setVisualizerPatternId(patternId);
+    setActiveWedgeTab('visualizer');
+  };
 
   if (!map) {
     return (
@@ -144,7 +153,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
           </div>
         </div>
 
-        {/* Sub-tab Navigation (Radar vs Patterns) */}
+        {/* Sub-tab Navigation (Radar vs Patterns vs Playfield Visualizer) */}
         <div className="flex items-center gap-2 border-b border-white/10 pb-2">
           <button
             type="button"
@@ -174,10 +183,23 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
               {patterns.length}
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveWedgeTab('visualizer')}
+            className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
+              activeWedgeTab === 'visualizer'
+                ? 'bg-osu-pink text-white shadow-glowPink ring-1 ring-osu-pink'
+                : 'bg-white/5 text-white/60 hover:text-white'
+            }`}
+          >
+            <Play className="w-3.5 h-3.5 fill-current text-osu-cyan" />
+            <span>Visualizador ao Vivo</span>
+          </button>
         </div>
 
         {/* View 1: Stat Hexagon (Radar) with Pool Comparison */}
-        {activeWedgeTab === 'radar' ? (
+        {activeWedgeTab === 'radar' && (
           <div className="flex flex-col items-center bg-[#13081a]/80 p-3 rounded-xl border border-white/5">
             <div className="w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider text-white/70 mb-1">
               <span>Hexágono de Atributos</span>
@@ -191,19 +213,34 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
               showLegend={true}
             />
           </div>
-        ) : (
-          /* View 2: Detailed Pattern Visualizer with Timestamps */
+        )}
+
+        {/* View 2: Detailed Pattern Visualizer with Timestamps */}
+        {activeWedgeTab === 'patterns' && (
           <PatternTimelineVisualizer
             patterns={patterns}
             durationMs={stats.durationMs}
+            onSelectTimestamp={(timeMs, p) => handleSelectTimestamp(timeMs, p?.id)}
           />
         )}
 
-        {/* Continuous Strain Timeline ("Pontos de Tensão") */}
+        {/* View 3: Real-Time Playfield Visualizer (Avançar e Voltar com Física ao Vivo) */}
+        {activeWedgeTab === 'visualizer' && (
+          <PatternPlayfieldVisualizer
+            hitObjects={map.hitObjects}
+            difficulty={difficulty}
+            patterns={patterns}
+            initialTimeMs={visualizerTimeMs}
+            initialPatternId={visualizerPatternId}
+          />
+        )}
+
+        {/* Continuous Strain Timeline ("Pontos de Tensão" - Click to Seek) */}
         <div className="mb-3">
           <StrainTimeline
             timeline={timeline}
             height={130}
+            onSelectTimestamp={(timeMs) => handleSelectTimestamp(timeMs)}
           />
         </div>
       </div>

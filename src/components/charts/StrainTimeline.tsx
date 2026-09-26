@@ -4,11 +4,13 @@ import { StrainPoint } from '../../engine/types';
 interface StrainTimelineProps {
   timeline: StrainPoint[];
   height?: number;
+  onSelectTimestamp?: (timeMs: number) => void;
 }
 
 export const StrainTimeline: React.FC<StrainTimelineProps> = ({
   timeline,
   height = 140,
+  onSelectTimestamp,
 }) => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -20,7 +22,6 @@ export const StrainTimeline: React.FC<StrainTimelineProps> = ({
       </div>
     );
   }
-
 
   const maxStrain = Math.max(1, ...timeline.map((p) => p.totalStrain));
   const count = timeline.length;
@@ -35,6 +36,12 @@ export const StrainTimeline: React.FC<StrainTimelineProps> = ({
 
   const handleMouseLeave = () => {
     setHoverIndex(null);
+  };
+
+  const handleClick = () => {
+    if (hoverIndex !== null && timeline[hoverIndex] && onSelectTimestamp) {
+      onSelectTimestamp(timeline[hoverIndex].timeMs);
+    }
   };
 
   const activePoint = hoverIndex !== null ? timeline[hoverIndex] : null;
@@ -53,13 +60,13 @@ export const StrainTimeline: React.FC<StrainTimelineProps> = ({
             <span className="text-yellow-400 font-bold">
               Tensão: {activePoint.totalStrain.toFixed(1).replace('.', ',')}%
             </span>
-            <span className="text-white/50 text-[10px] hidden sm:inline">
-              (Aim: {(activePoint.snapStrain + activePoint.flowStrain).toFixed(1)} | Spd: {(activePoint.speedStrain + activePoint.staminaStrain).toFixed(1)})
+            <span className="text-osu-pink text-[10px] font-semibold hidden sm:inline">
+              (Clique para ver ao vivo)
             </span>
           </div>
         ) : (
           <span className="text-[10px] text-white/40">
-            Passe o mouse para inspecionar
+            Clique em qualquer ponto para ver o padrão ao vivo
           </span>
         )}
       </div>
@@ -69,6 +76,7 @@ export const StrainTimeline: React.FC<StrainTimelineProps> = ({
         ref={containerRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
         className="relative w-full bg-[#1b2126] border border-[#2c333a] rounded-lg overflow-hidden cursor-crosshair group"
         style={{ height }}
       >

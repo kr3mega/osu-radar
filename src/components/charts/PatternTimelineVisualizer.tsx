@@ -5,7 +5,7 @@ import { Copy, Check, Filter, Zap, Target, Waves, Activity } from 'lucide-react'
 interface PatternTimelineVisualizerProps {
   patterns: DetectedPattern[];
   durationMs: number;
-  onSelectTimestamp?: (timeMs: number) => void;
+  onSelectTimestamp?: (timeMs: number, pattern?: DetectedPattern) => void;
 }
 
 const SEVERITY_BADGES: Record<PatternSeverity, { bg: string; text: string; border: string }> = {
@@ -102,13 +102,13 @@ export const PatternTimelineVisualizer: React.FC<PatternTimelineVisualizerProps>
               key={p.id}
               onClick={() => {
                 setSelectedPatternId(p.id);
-                if (onSelectTimestamp) onSelectTimestamp(p.startTimeMs);
+                if (onSelectTimestamp) onSelectTimestamp(p.startTimeMs, p);
               }}
               style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
               className={`absolute h-5 rounded-sm cursor-pointer transition-all duration-150 ${barColor} ${
                 isHighlight ? 'ring-2 ring-white scale-y-125 z-20' : 'opacity-70 hover:opacity-100 hover:scale-y-110 z-10'
               }`}
-              title={`${p.label} [${p.startTimestamp}]`}
+              title={`${p.label} [${p.startTimestamp}] — Clique para visualizar ao vivo`}
             />
           );
         })}
@@ -126,7 +126,7 @@ export const PatternTimelineVisualizer: React.FC<PatternTimelineVisualizerProps>
                 key={p.id}
                 onClick={() => {
                   setSelectedPatternId(p.id);
-                  if (onSelectTimestamp) onSelectTimestamp(p.startTimeMs);
+                  if (onSelectTimestamp) onSelectTimestamp(p.startTimeMs, p);
                 }}
                 className={`p-2.5 rounded-lg border transition-all duration-150 flex items-start justify-between gap-3 cursor-pointer ${
                   isSelected
