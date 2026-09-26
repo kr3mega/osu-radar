@@ -11,6 +11,7 @@ import { SkillAttributes } from './engine/types';
 import { SlidersHorizontal, UploadCloud, X } from 'lucide-react';
 import { extractOsuFilesFromZip } from './utils/unzip';
 import { analyzeBeatmap } from './engine/analyzer';
+import { extractQuickOsuMeta, matchOsuFileToTournamentEntry } from './utils/sheetParser';
 
 const MOD_FILTERS = ['ALL', 'NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
 
@@ -44,6 +45,7 @@ export const App: React.FC = () => {
     addBeatmaps,
     setIsAnalyzing,
     setProgress,
+    activeTournamentFilter,
   } = usePoolStore();
 
   const [activeTab, setActiveTab] = useState<'select' | 'overview'>('select');
@@ -140,15 +142,50 @@ export const App: React.FC = () => {
         }
       }
 
+      // Filter non-pool difficulties if active tournament filter is set
+      let filesToAnalyze: Array<{
+        fileName: string;
+        text: string;
+        bytes?: Uint8Array;
+        officialSr?: number;
+        officialBpm?: number;
+        modSlot?: string;
+      }> = [];
+
+      if (activeTournamentFilter && activeTournamentFilter.entries.length > 0) {
+        const requiredEntries = activeTournamentFilter.entries;
+        for (const item of pendingOsuFiles) {
+          const meta = extractQuickOsuMeta(item.text);
+          const matched = matchOsuFileToTournamentEntry(meta, requiredEntries);
+          if (matched) {
+            filesToAnalyze.push({
+              fileName: item.fileName,
+              text: item.text,
+              bytes: item.bytes,
+              officialSr: matched.sr,
+              officialBpm: matched.bpm,
+              modSlot: matched.slot,
+            });
+          }
+        }
+      } else {
+        filesToAnalyze = pendingOsuFiles;
+      }
+
       const results = [];
-      for (let i = 0; i < pendingOsuFiles.length; i++) {
-        const item = pendingOsuFiles[i];
-        setProgress({ current: i + 1, total: pendingOsuFiles.length, fileName: item.fileName });
-        const res = await analyzeBeatmap(item.text, item.fileName, item.bytes);
+      for (let i = 0; i < filesToAnalyze.length; i++) {
+        const item = filesToAnalyze[i];
+        setProgress({ current: i + 1, total: filesToAnalyze.length, fileName: item.fileName });
+        const res = await analyzeBeatmap(item.text, item.fileName, item.bytes, item.officialSr);
+        if (item.modSlot) res.modSlot = item.modSlot;
+        if (item.officialSr) res.stats.starRating = item.officialSr;
+        if (item.officialBpm) res.stats.bpmMode = item.officialBpm;
         results.push(res);
       }
 
-      await addBeatmaps(results);
+      if (results.length > 0) {
+        await addBeatmaps(results);
+      }
     } finally {
       setIsAnalyzing(false);
       setProgress(null);

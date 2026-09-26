@@ -37,7 +37,7 @@ export function integrateTopStrains(strains: number[], decay: number = 0.95): nu
 
 /**
  * Calculates continuous difficulty timeline using rolling time windows (2.0s with 50% overlap).
- * Aggregates peak strains into normalized 0-100 skill scores.
+ * Aggregates peak strains into sincere, calibrated 0-100 skill scores.
  */
 export function calculateRollingStrains(
   hitObjects: HitObject[],
@@ -125,58 +125,64 @@ export function calculateRollingStrains(
           }
         }
 
-        // Snap Aim: high velocity + sharp angle change (deflection > 100°)
-        if (turnAngle >= 100) {
-          snapLocal += vel * (dist / 100) * 1.5;
-        } else if (turnAngle <= 65 && dist > 20) {
+        // 1. Snap Aim vs Flow Aim
+        // Snap Aim: requires genuine jump spacing (> 50px) and fast motion
+        if (turnAngle >= 90 && dist > 50) {
+          snapLocal += vel * (dist / 110) * 1.4;
+        } else if (turnAngle <= 60 && dist > 30) {
           // Flow Aim: continuous speed along smooth arc
-          flowLocal += vel * (dist / 90);
-        } else {
-          // Neutral jumps
-          snapLocal += vel * (dist / 140) * 0.8;
+          flowLocal += vel * (dist / 100);
+        } else if (dist > 70) {
+          // Neutral wide jumps
+          snapLocal += vel * (dist / 140) * 0.9;
         }
 
-        // Speed: fast tapping (dt <= 85ms is >= 180 BPM in 1/4)
-        if (dt <= 85) {
+        // 2. Speed & Stamina: true stream tapping (dt <= 95ms is >= 158 BPM 1/4)
+        if (dt <= 95) {
           consecutiveFastNotes++;
-          const speedFactor = Math.pow(85 / Math.max(30, dt), 1.6);
-          speedLocal += speedFactor * 1.4;
+          const sf = Math.pow(95 / Math.max(30, dt), 1.6);
+          speedLocal += sf * 1.5;
 
           // Stamina: exponential scaling for sustained high-frequency tapping
           if (consecutiveFastNotes > 6) {
-            staminaLocal += (consecutiveFastNotes - 5) * speedFactor * 0.9;
+            staminaLocal += (consecutiveFastNotes - 5) * sf * 1.1;
           }
         } else {
           consecutiveFastNotes = 0;
         }
 
-        // Tech: complex sliders & visual overlaps
-        if (p2.type === 'slider') {
-          if (p2.pixelLength && p2.points && p2.points.length > 2) {
-            const straight = Math.hypot(
-              p2.points[p2.points.length - 1].x - p2.points[0].x,
-              p2.points[p2.points.length - 1].y - p2.points[0].y
-            );
-            if (straight > 0 && p2.pixelLength / straight > 1.3) {
-              techLocal += 2.5;
-            }
+        // 3. Tech: complex multi-point sliders or visual overlapping stacks
+        if (p2.type === 'slider' && p2.pixelLength && p2.points && p2.points.length >= 4) {
+          const straight = Math.hypot(
+            p2.points[p2.points.length - 1].x - p2.points[0].x,
+            p2.points[p2.points.length - 1].y - p2.points[0].y
+          );
+          if (straight > 0 && p2.pixelLength / straight > 1.6) {
+            techLocal += 3.0 * (p2.pixelLength / straight);
           }
         }
 
-        // Overlap reading gimmick
-        if (dist < 30 && dt > 120 && dt < preempt) {
-          techLocal += 3.0;
+        // Visual overlap reading gimmick (stacked notes under approach circle)
+        if (dist < 25 && dt > 140 && dt < preempt * 0.7) {
+          techLocal += 2.0;
         }
       }
 
-      // Finger Control: Variance in Delta-T
+      // 4. Finger Control: rhythm variations in fast tapping bursts (dt <= 240ms)
       if (deltasT.length >= 3) {
-        const avgDt = deltasT.reduce((a, b) => a + b, 0) / deltasT.length;
-        const varDt = Math.sqrt(
-          deltasT.reduce((s, d) => s + Math.pow(d - avgDt, 2), 0) / deltasT.length
-        );
-        // High variation in delta T within a short burst indicates rhythm transitions
-        fingerLocal = (varDt / Math.max(20, avgDt)) * deltasT.length * 1.8;
+        for (let k = 1; k < deltasT.length; k++) {
+          const dt1 = deltasT[k - 1];
+          const dt2 = deltasT[k];
+          // Only triggers if at least one note is fast tapping
+          if (dt1 <= 240 || dt2 <= 240) {
+            const ratio = Math.max(dt1, dt2) / Math.min(dt1, dt2);
+            // Non-uniform snapping: 1/4 to 1/3, 1/4 to 1/2, or syncopated off-beat
+            if (ratio >= 1.28 && ratio <= 2.5) {
+              const tappingSpeed = 220 / Math.min(dt1, dt2);
+              fingerLocal += Math.pow(ratio - 1, 1.2) * tappingSpeed * 1.6;
+            }
+          }
+        }
       }
     }
 
@@ -212,21 +218,21 @@ export function calculateRollingStrains(
   const rawFinger = integrateTopStrains(fingerSeries);
   const rawTech = integrateTopStrains(techSeries);
 
-  // Normalization to 0-100 scale using calibrated log-linear scaling
+  // Normalization to 0-100 scale using sincere power-law scaling against peak 10★ benchmarks
   const normalize = (val: number, refMax: number): number => {
     if (val <= 0) return 0;
-    // Logarithmic curve to avoid clipping high-end maps while rewarding mid-high density
-    const score = (Math.log10(1 + val) / Math.log10(1 + refMax)) * 100;
+    const ratio = Math.min(1.2, val / refMax);
+    const score = Math.pow(ratio, 0.88) * 100;
     return Math.min(100, Math.max(0, Math.round(score * 10) / 10));
   };
 
   const skills: SkillAttributes = {
-    snapAim: normalize(rawSnap, 320),
-    flowAim: normalize(rawFlow, 260),
-    speed: normalize(rawSpeed, 240),
-    stamina: normalize(rawStamina, 280),
-    fingerControl: normalize(rawFinger, 190),
-    readingTech: normalize(rawTech, 210),
+    snapAim: normalize(rawSnap, 850),
+    flowAim: normalize(rawFlow, 750),
+    speed: normalize(rawSpeed, 800),
+    stamina: normalize(rawStamina, 950),
+    fingerControl: normalize(rawFinger, 600),
+    readingTech: normalize(rawTech, 650),
   };
 
   return {

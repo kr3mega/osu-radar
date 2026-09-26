@@ -6,6 +6,7 @@ import { analyzeAngularChannel } from './channels/angular';
 import { analyzeTechChannel } from './channels/tech';
 import { calculateRollingStrains } from './strains';
 import { detectBeatmapPatterns } from './patterns';
+import { calculateStarRating } from './starRating';
 
 /**
  * Calculates a fast 32-bit hash from string content for unique beatmap identification.
@@ -27,7 +28,8 @@ export function simpleHash(str: string): string {
 export async function analyzeBeatmap(
   rawText: string,
   fileName: string = 'beatmap.osu',
-  fileBytes?: Uint8Array
+  _fileBytes?: Uint8Array,
+  officialStarRating?: number
 ): Promise<BeatmapAnalysisResult> {
   const parsed = parseOsuBeatmap(rawText);
   const { metadata, difficulty, timingPoints, hitObjects } = parsed;
@@ -59,24 +61,14 @@ export async function analyzeBeatmap(
     }
   }
 
-  // 4. Try calculating official Star Rating via rosu-pp-js (WASM) if available
+  // 4. Calculate canonical Star Rating
+  // Priority: 1. Official tournament sheet SR if provided -> 2. Native TypeScript algorithm
   let calculatedStarRating = 0;
-  try {
-    const rosu = await import('rosu-pp-js');
-    const content = fileBytes || rawText;
-    const beatmap = new rosu.Beatmap(content);
-    const diffCalc = new rosu.Difficulty();
-    const attrs = diffCalc.calculate(beatmap);
-    calculatedStarRating = Math.round(attrs.stars * 100) / 100;
-    beatmap.free();
-    diffCalc.free();
-  } catch {
-    // Fallback heuristic estimation if WASM fails or in non-WASM test environment
-    const spatialSummary = analyzeSpatialChannel(hitObjects);
-    const temporalSummary = analyzeTemporalChannel(hitObjects, timingPoints);
-    calculatedStarRating = Math.round(
-      Math.min(10, Math.max(1, (spatialSummary.avgVelocity * 1.5 + (temporalSummary.avgStreamBpm / 200) * 2.5) * (difficulty.cs / 4))) * 100
-    ) / 100;
+  if (officialStarRating && officialStarRating > 0) {
+    calculatedStarRating = Math.round(officialStarRating * 100) / 100;
+  } else {
+    const srResult = calculateStarRating(hitObjects, difficulty, timingPoints);
+    calculatedStarRating = srResult.starRating;
   }
 
   const stats: BeatmapStats = {

@@ -224,28 +224,50 @@ export function parseMappoolCsv(csvText: string): SheetStageGroup[] {
     }
 
     if (slotIndex !== -1 && slotValue) {
-      // Find Map ID (number with 5 to 8 digits)
+      // Detect Beatmap ID, SR, BPM and attributes in the row
       let beatmapId = 0;
       let songInfo = '';
+      let sr: number | undefined;
+      let bpm: number | undefined;
+      let cs: number | undefined;
+      let ar: number | undefined;
+      let od: number | undefined;
 
       // The song title is usually adjacent to the slot
       if (row[slotIndex + 1] && row[slotIndex + 1].length > 3) {
         songInfo = row[slotIndex + 1];
       }
 
-      // Find beatmap ID in the row
       for (let c = slotIndex + 1; c < row.length; c++) {
         const cell = row[c].trim();
-        // Check for standalone 5 to 8 digit number
-        if (/^\d{5,8}$/.test(cell)) {
-          beatmapId = parseInt(cell, 10);
-          break;
+        if (!cell) continue;
+
+        // Check for Star Rating (e.g. "5.53★" or "5.53")
+        if (cell.includes('★') || /^\d+[.,]\d{1,2}$/.test(cell)) {
+          const num = parseFloat(cell.replace('★', '').replace(',', '.').trim());
+          if (!isNaN(num) && num >= 1.0 && num <= 12.0 && !sr) {
+            sr = Math.round(num * 100) / 100;
+            continue;
+          }
         }
-        // Check for osu link (e.g. osu.ppy.sh/b/123456 or #osu/123456)
+
+        // Check for Beatmap ID or link
         const linkMatch = cell.match(/(?:osu\.ppy\.sh\/(?:b|beatmaps)\/(\d+)|#osu\/(\d+))/);
         if (linkMatch) {
           beatmapId = parseInt(linkMatch[1] || linkMatch[2], 10);
-          break;
+          continue;
+        } else if (/^\d{5,8}$/.test(cell) && !cell.includes(':')) {
+          beatmapId = parseInt(cell, 10);
+          continue;
+        }
+
+        // Check for BPM (e.g. 130, 220)
+        if (/^\d{2,3}$/.test(cell)) {
+          const num = parseInt(cell, 10);
+          if (num >= 60 && num <= 420 && !bpm) {
+            bpm = num;
+            continue;
+          }
         }
       }
 
@@ -255,6 +277,11 @@ export function parseMappoolCsv(csvText: string): SheetStageGroup[] {
           stage: currentStageName,
           songInfo: songInfo || `Beatmap #${beatmapId}`,
           beatmapId,
+          sr,
+          bpm,
+          cs,
+          ar,
+          od,
         });
       }
     }
@@ -276,6 +303,7 @@ export function parseMappoolCsv(csvText: string): SheetStageGroup[] {
  */
 export async function fetchOsuFileById(beatmapId: number): Promise<string> {
   const mirrors = [
+    `https://osu.ppy.sh/osu/${beatmapId}`,
     `https://catboy.best/osu/${beatmapId}`,
     `https://osu.direct/api/osu/${beatmapId}`,
     `https://api.nerinyan.moe/osu/${beatmapId}`,
@@ -337,3 +365,42 @@ export function extractQuickOsuMeta(osuText: string): {
 
   return { beatmapId, beatmapSetId, title, artist, version };
 }
+
+/**
+ * Matches an .osu file's quick metadata against a list of tournament pool entries.
+ * Returns the matching entry if found, or undefined if the difficulty does not belong to the pool.
+ */
+export function matchOsuFileToTournamentEntry(
+  meta: { beatmapId: number; title: string; artist: string; version: string },
+  entries: SheetBeatmapEntry[]
+): SheetBeatmapEntry | undefined {
+  if (entries.length === 0) return undefined;
+
+  // 1. Direct match by BeatmapID
+  if (meta.beatmapId > 0) {
+    const byId = entries.find((e) => e.beatmapId === meta.beatmapId);
+    if (byId) return byId;
+  }
+
+  // 2. Fuzzy match by Difficulty / Version and Song Title
+  if (!meta.version) return undefined;
+  const versionNorm = meta.version.trim().toLowerCase();
+  const titleNorm = meta.title.trim().toLowerCase();
+
+  return entries.find((entry) => {
+    const songNorm = entry.songInfo.toLowerCase();
+    // Does songInfo include the exact diff name like "[collab expurrt *.+^]" or "collab expurrt"?
+    const matchesDiff =
+      songNorm.includes(`[${versionNorm}]`) ||
+      songNorm.includes(versionNorm) ||
+      versionNorm.includes(songNorm.slice(songNorm.lastIndexOf('[') + 1, songNorm.lastIndexOf(']')));
+
+    if (matchesDiff) {
+      if (!titleNorm || songNorm.includes(titleNorm) || titleNorm.includes(songNorm.slice(0, 12))) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+

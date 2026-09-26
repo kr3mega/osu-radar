@@ -3,6 +3,12 @@ import { BeatmapAnalysisResult, Mappool, SkillAttributes } from '../engine/types
 import { cacheBeatmaps, clearAllData, db } from '../db';
 
 import { TournamentTier } from '../engine/bws';
+import { SheetBeatmapEntry } from '../utils/sheetParser';
+
+export interface ActiveTournamentFilter {
+  stageName: string;
+  entries: SheetBeatmapEntry[];
+}
 
 export type SortOption =
   | 'slot'
@@ -26,6 +32,7 @@ interface PoolState {
   progress: { current: number; total: number; fileName: string } | null;
   isMatchSimulatorOpen: boolean;
   expandedSetKey: string | null;
+  activeTournamentFilter: ActiveTournamentFilter | null;
 
   // Actions
   addBeatmaps: (results: BeatmapAnalysisResult[]) => Promise<void>;
@@ -38,6 +45,7 @@ interface PoolState {
   setTournamentTier: (tier: TournamentTier) => void;
   setIsMatchSimulatorOpen: (open: boolean) => void;
   setExpandedSetKey: (key: string | null) => void;
+  setActiveTournamentFilter: (filter: ActiveTournamentFilter | null) => void;
   setPoolMetadata: (name: string, stage?: string) => void;
   clearPool: () => void;
   resetAllData: () => Promise<void>;
@@ -67,10 +75,12 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   progress: null,
   isMatchSimulatorOpen: false,
   expandedSetKey: null,
+  activeTournamentFilter: null,
 
   setTournamentTier: (tournamentTier) => set({ tournamentTier }),
   setIsMatchSimulatorOpen: (isMatchSimulatorOpen) => set({ isMatchSimulatorOpen }),
   setExpandedSetKey: (expandedSetKey) => set({ expandedSetKey }),
+  setActiveTournamentFilter: (activeTournamentFilter) => set({ activeTournamentFilter }),
 
   addBeatmaps: async (results) => {
     // Avoid duplicate maps by ID

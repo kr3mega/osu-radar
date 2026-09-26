@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, FolderUp, FileText, AlertCircle, Loader2, Link2, Upload } from 'lucide-react';
+import { UploadCloud, FolderUp, FileText, AlertCircle, Loader2, Link2, Upload, Filter } from 'lucide-react';
 import { extractOsuFilesFromZip } from '../../utils/unzip';
 import { analyzeBeatmap } from '../../engine/analyzer';
 import { usePoolStore } from '../../store/usePoolStore';
 import { BeatmapAnalysisResult } from '../../engine/types';
+import { extractQuickOsuMeta, matchOsuFileToTournamentEntry } from '../../utils/sheetParser';
 import { PoolSheetSync } from './PoolSheetSync';
 
 export const PoolUploader: React.FC = () => {
@@ -13,7 +14,7 @@ export const PoolUploader: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
-  const { addBeatmaps, isAnalyzing, setIsAnalyzing, progress, setProgress } = usePoolStore();
+  const { addBeatmaps, isAnalyzing, setIsAnalyzing, progress, setProgress, activeTournamentFilter } = usePoolStore();
 
   const processFiles = async (fileList: FileList | File[]) => {
     setErrorMessage(null);
@@ -54,10 +55,49 @@ export const PoolUploader: React.FC = () => {
         return;
       }
 
-      const total = pendingOsuFiles.length;
+      // Filter non-pool difficulties if active tournament filter is set
+      let filesToAnalyze: Array<{
+        fileName: string;
+        text: string;
+        bytes?: Uint8Array;
+        officialSr?: number;
+        officialBpm?: number;
+        modSlot?: string;
+      }> = [];
+
+      if (activeTournamentFilter && activeTournamentFilter.entries.length > 0) {
+        const requiredEntries = activeTournamentFilter.entries;
+        for (const item of pendingOsuFiles) {
+          const meta = extractQuickOsuMeta(item.text);
+          const matched = matchOsuFileToTournamentEntry(meta, requiredEntries);
+          if (matched) {
+            filesToAnalyze.push({
+              fileName: item.fileName,
+              text: item.text,
+              bytes: item.bytes,
+              officialSr: matched.sr,
+              officialBpm: matched.bpm,
+              modSlot: matched.slot,
+            });
+          }
+          // Non-matching difficulties are strictly ignored!
+        }
+
+        if (filesToAnalyze.length === 0) {
+          setErrorMessage(
+            `Nenhuma das dificuldades selecionadas pertence à etapa ativa "${activeTournamentFilter.stageName}". As dificuldades avulsas fora da pool foram ignoradas.`
+          );
+          setIsAnalyzing(false);
+          return;
+        }
+      } else {
+        filesToAnalyze = pendingOsuFiles;
+      }
+
+      const total = filesToAnalyze.length;
 
       for (let i = 0; i < total; i++) {
-        const item = pendingOsuFiles[i];
+        const item = filesToAnalyze[i];
         setProgress({
           current: i + 1,
           total,
@@ -66,7 +106,10 @@ export const PoolUploader: React.FC = () => {
 
         await new Promise((resolve) => setTimeout(resolve, 5));
 
-        const analysis = await analyzeBeatmap(item.text, item.fileName, item.bytes);
+        const analysis = await analyzeBeatmap(item.text, item.fileName, item.bytes, item.officialSr);
+        if (item.modSlot) analysis.modSlot = item.modSlot;
+        if (item.officialSr) analysis.stats.starRating = item.officialSr;
+        if (item.officialBpm) analysis.stats.bpmMode = item.officialBpm;
         results.push(analysis);
       }
 
@@ -135,6 +178,15 @@ export const PoolUploader: React.FC = () => {
       {/* Tab 2: Manual Drag & Drop */}
       {activeTab === 'files' && (
         <div className="w-full flex flex-col gap-3">
+          {activeTournamentFilter && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-osu-cyan/10 border border-osu-cyan/30 text-xs text-osu-cyan">
+              <Filter className="w-4 h-4 shrink-0" />
+              <span>
+                <strong>Filtro de Torneio Ativo:</strong> {activeTournamentFilter.stageName} ({activeTournamentFilter.entries.length} mapas). Dificuldades fora da pool serão ignoradas automaticamente durante a importação.
+              </span>
+            </div>
+          )}
+
           <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}

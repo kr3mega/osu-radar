@@ -5,6 +5,7 @@ import {
   parseMappoolCsv,
   fetchOsuFileById,
   extractQuickOsuMeta,
+  matchOsuFileToTournamentEntry,
   SheetStageGroup,
   SheetBeatmapEntry,
 } from '../../utils/sheetParser';
@@ -38,7 +39,19 @@ export const PoolSheetSync: React.FC = () => {
   const [processProgress, setProcessProgress] = useState<{ current: number; total: number; label: string } | null>(null);
 
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const { addBeatmaps, setPoolMetadata } = usePoolStore();
+  const { addBeatmaps, setPoolMetadata, setActiveTournamentFilter } = usePoolStore();
+
+  const selectedStage = stages.find((s) => s.stageName === selectedStageName) || stages[0];
+
+  // Keep active tournament filter in store synced whenever stage changes
+  React.useEffect(() => {
+    if (selectedStage && selectedStage.entries.length > 0) {
+      setActiveTournamentFilter({
+        stageName: selectedStage.stageName,
+        entries: selectedStage.entries,
+      });
+    }
+  }, [selectedStage, setActiveTournamentFilter]);
 
   const handleFetchSheet = async () => {
     setErrorMessage(null);
@@ -60,6 +73,10 @@ export const PoolSheetSync: React.FC = () => {
 
       setStages(parsedStages);
       setSelectedStageName(parsedStages[0].stageName);
+      setActiveTournamentFilter({
+        stageName: parsedStages[0].stageName,
+        entries: parsedStages[0].entries,
+      });
       setStatusMessage(`Planilha carregada com sucesso! ${parsedStages.length} etapas encontradas.`);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : String(err));
@@ -67,8 +84,6 @@ export const PoolSheetSync: React.FC = () => {
       setIsLoadingSheet(false);
     }
   };
-
-  const selectedStage = stages.find((s) => s.stageName === selectedStageName) || stages[0];
 
   // 1. Process files from selected local osu!/Songs folder
   const handleLocalFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,16 +127,7 @@ export const PoolSheetSync: React.FC = () => {
 
         const text = await file.text();
         const meta = extractQuickOsuMeta(text);
-
-        let matched = idToEntry.get(meta.beatmapId);
-        if (!matched && meta.title && meta.version) {
-          matched = requiredEntries.find(
-            (entry) =>
-              entry.songInfo.toLowerCase().includes(meta.version.toLowerCase()) &&
-              (entry.songInfo.toLowerCase().includes(meta.title.toLowerCase()) ||
-                meta.title.toLowerCase().includes(entry.songInfo.toLowerCase()))
-          );
-        }
+        const matched = matchOsuFileToTournamentEntry(meta, requiredEntries);
 
         if (matched && !foundIds.has(matched.beatmapId)) {
           foundIds.add(matched.beatmapId);
@@ -146,15 +152,7 @@ export const PoolSheetSync: React.FC = () => {
           const extracted = await extractOsuFilesFromZip(buf);
           for (const item of extracted) {
             const meta = extractQuickOsuMeta(item.text);
-            let matched = idToEntry.get(meta.beatmapId);
-            if (!matched && meta.title && meta.version) {
-              matched = requiredEntries.find(
-                (entry) =>
-                  entry.songInfo.toLowerCase().includes(meta.version.toLowerCase()) &&
-                  (entry.songInfo.toLowerCase().includes(meta.title.toLowerCase()) ||
-                    meta.title.toLowerCase().includes(entry.songInfo.toLowerCase()))
-              );
-            }
+            const matched = matchOsuFileToTournamentEntry(meta, requiredEntries);
             if (matched && !foundIds.has(matched.beatmapId)) {
               foundIds.add(matched.beatmapId);
               matchedOsuItems.push({ text: item.text, fileName: item.fileName, entry: matched });
@@ -169,7 +167,7 @@ export const PoolSheetSync: React.FC = () => {
         );
       }
 
-      // Analyze matched beatmaps and assign their sheet slots
+      // Analyze matched beatmaps and assign their sheet slots and official metadata
       const results: BeatmapAnalysisResult[] = [];
       for (let i = 0; i < matchedOsuItems.length; i++) {
         const item = matchedOsuItems[i];
@@ -180,8 +178,10 @@ export const PoolSheetSync: React.FC = () => {
         });
         await new Promise((r) => setTimeout(r, 5));
 
-        const analysis = await analyzeBeatmap(item.text, item.fileName);
+        const analysis = await analyzeBeatmap(item.text, item.fileName, undefined, item.entry.sr);
         analysis.modSlot = item.entry.slot;
+        if (item.entry.sr) analysis.stats.starRating = item.entry.sr;
+        if (item.entry.bpm) analysis.stats.bpmMode = item.entry.bpm;
         results.push(analysis);
       }
 
@@ -222,8 +222,10 @@ export const PoolSheetSync: React.FC = () => {
 
         try {
           const osuText = await fetchOsuFileById(entry.beatmapId);
-          const analysis = await analyzeBeatmap(osuText, `${entry.slot}_${entry.beatmapId}.osu`);
+          const analysis = await analyzeBeatmap(osuText, `${entry.slot}_${entry.beatmapId}.osu`, undefined, entry.sr);
           analysis.modSlot = entry.slot;
+          if (entry.sr) analysis.stats.starRating = entry.sr;
+          if (entry.bpm) analysis.stats.bpmMode = entry.bpm;
           results.push(analysis);
         } catch {
           errors.push(entry.slot);
