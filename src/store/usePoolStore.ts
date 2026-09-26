@@ -232,46 +232,17 @@ export const usePoolStore = create<PoolState>((set, get) => ({
 }));
 
 /**
- * Helper to auto-assign tournament mod slots (NM1, NM2, HD1, etc.) if unspecified.
+ * Sets default mod slot strictly to 'NM'.
+ * No automatic mod guessing is performed; all maps default to 'NM'.
  */
 function assignDefaultModSlots(
-  existingMaps: BeatmapAnalysisResult[],
+  _existingMaps: BeatmapAnalysisResult[],
   newMaps: BeatmapAnalysisResult[]
 ): BeatmapAnalysisResult[] {
-  const counts: Record<string, number> = {
-    NM: 0,
-    HD: 0,
-    HR: 0,
-    DT: 0,
-    FM: 0,
-    TB: 0,
-  };
-
-  // Tally existing
-  for (const m of existingMaps) {
-    if (m.modSlot) {
-      const prefix = m.modSlot.slice(0, 2);
-      if (counts[prefix] !== undefined) counts[prefix]++;
-    }
-  }
-
-  return newMaps.map((m) => {
-    if (m.modSlot) return m;
-
-    // Guess mod based on top skills or filename
-    let category = 'NM';
-    if (m.topSkills.includes('readingTech')) {
-      category = counts.HD < 3 ? 'HD' : 'FM';
-    } else if (m.topSkills.includes('speed') || m.topSkills.includes('stamina')) {
-      category = counts.DT < 4 ? 'DT' : 'NM';
-    } else if (m.topSkills.includes('snapAim') && m.difficulty.cs >= 5) {
-      category = counts.HR < 3 ? 'HR' : 'NM';
-    }
-
-    counts[category]++;
-    const slot = `${category}${counts[category]}`;
-    return { ...m, modSlot: slot };
-  });
+  return newMaps.map((m) => ({
+    ...m,
+    modSlot: m.modSlot || 'NM',
+  }));
 }
 
 /**

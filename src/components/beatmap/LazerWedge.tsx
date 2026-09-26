@@ -44,11 +44,11 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   const starTextColor = getStarRatingTextColor(stats.starRating);
 
   const modSlotOptions = [
-    'NM1', 'NM2', 'NM3', 'NM4', 'NM5', 'NM6',
-    'HD1', 'HD2', 'HD3',
-    'HR1', 'HR2', 'HR3',
-    'DT1', 'DT2', 'DT3', 'DT4',
-    'FM1', 'FM2', 'FM3',
+    'NM', 'NM1', 'NM2', 'NM3', 'NM4', 'NM5', 'NM6',
+    'HD', 'HD1', 'HD2', 'HD3',
+    'HR', 'HR1', 'HR2', 'HR3',
+    'DT', 'DT1', 'DT2', 'DT3', 'DT4',
+    'FM', 'FM1', 'FM2', 'FM3',
     'TB',
   ];
 
@@ -199,9 +199,14 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
           />
         )}
 
-        {/* Continuous Strain Timeline ("Eletrocardiograma") */}
-        <div className="bg-[#13081a]/80 p-3 rounded-xl border border-white/5 mb-3">
-          <StrainTimeline timeline={timeline} height={100} />
+        {/* Continuous Strain Timeline ("Pontos de Falha") */}
+        <div className="mb-3">
+          <StrainTimeline
+            timeline={timeline}
+            starRating={stats.starRating}
+            hp={difficulty.hp}
+            height={130}
+          />
         </div>
       </div>
     </div>
