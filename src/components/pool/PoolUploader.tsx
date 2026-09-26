@@ -33,7 +33,12 @@ export const PoolUploader: React.FC = () => {
     const results: BeatmapAnalysisResult[] = [];
 
     try {
-      const pendingOsuFiles: Array<{ fileName: string; text: string; bytes?: Uint8Array }> = [];
+      const pendingOsuFiles: Array<{
+        fileName: string;
+        text: string;
+        bytes?: Uint8Array;
+        audioBlob?: Blob;
+      }> = [];
 
       for (const file of files) {
         const lowerName = file.name.toLowerCase();
@@ -60,6 +65,7 @@ export const PoolUploader: React.FC = () => {
         fileName: string;
         text: string;
         bytes?: Uint8Array;
+        audioBlob?: Blob;
         officialSr?: number;
         officialBpm?: number;
         modSlot?: string;
@@ -75,6 +81,7 @@ export const PoolUploader: React.FC = () => {
               fileName: item.fileName,
               text: item.text,
               bytes: item.bytes,
+              audioBlob: item.audioBlob,
               officialSr: matched.sr,
               officialBpm: matched.bpm,
               modSlot: matched.slot,
@@ -106,7 +113,13 @@ export const PoolUploader: React.FC = () => {
 
         await new Promise((resolve) => setTimeout(resolve, 5));
 
-        const analysis = await analyzeBeatmap(item.text, item.fileName, item.bytes, item.officialSr);
+        const analysis = await analyzeBeatmap(
+          item.text,
+          item.fileName,
+          item.bytes,
+          item.officialSr,
+          item.audioBlob
+        );
         if (item.modSlot) analysis.modSlot = item.modSlot;
         if (item.officialSr) analysis.stats.starRating = item.officialSr;
         if (item.officialBpm) analysis.stats.bpmMode = item.officialBpm;

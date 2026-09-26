@@ -15,6 +15,7 @@ import {
   Sliders,
   Radio,
   Layers,
+  Music,
 } from 'lucide-react';
 import {
   OsuPreviewController,
@@ -57,6 +58,17 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [selectedPatternId, setSelectedPatternId] = useState<string | undefined>(initialPatternId);
   const [isLoopEnabled, setIsLoopEnabled] = useState<boolean>(false);
+  const [hasAudioTrack, setHasAudioTrack] = useState<boolean>(false);
+
+  // Determine beatmap song audio source
+  const audioSource = useMemo(() => {
+    if (map.audioUrl) return map.audioUrl;
+    if (map.audioBlob) return map.audioBlob;
+    if (map.metadata.beatmapSetId && map.metadata.beatmapSetId > 0) {
+      return `https://b.ppy.sh/preview/${map.metadata.beatmapSetId}.mp3`;
+    }
+    return undefined;
+  }, [map]);
 
   // Sorted patterns list for the YouTube-style chapters
   const sortedPatterns = useMemo(() => {
@@ -91,14 +103,24 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     return fallbackList;
   }, [patterns, map.stats.durationMs]);
 
-  // Identify active pattern in real-time
-  const activePattern = useMemo(() => {
+  // 1. Identify active pattern currently playing live
+  const livePattern = useMemo(() => {
     return (
       sortedPatterns.find(
         (p) => currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs
       ) || null
     );
   }, [sortedPatterns, currentTimeMs]);
+
+  // 2. Identify currently playing OR most recently completed pattern waiting for the next one
+  const currentOrRecentPattern = useMemo(() => {
+    if (livePattern) return livePattern;
+    const pastPatterns = sortedPatterns.filter((p) => currentTimeMs >= p.startTimeMs);
+    if (pastPatterns.length > 0) {
+      return pastPatterns[pastPatterns.length - 1];
+    }
+    return sortedPatterns.find((p) => p.id === selectedPatternId) || null;
+  }, [sortedPatterns, currentTimeMs, livePattern, selectedPatternId]);
 
   // Initialize OsuPreviewController
   useEffect(() => {
@@ -108,7 +130,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     controllerRef.current = controller;
 
     const rawText = getOrReconstructBeatmapText(map);
-    controller.init(rawText, initialTimeMs).then(() => {
+    controller.init(rawText, initialTimeMs, audioSource).then(() => {
       controller.setVolume(volume);
       controller.setBackgroundDim(bgDim);
     });
@@ -118,6 +140,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       setDurationMs(state.durationMs);
       setIsPlaying(state.isPlaying);
       setPlaybackRate(state.playbackRate);
+      setHasAudioTrack(state.hasAudioTrack);
     });
 
     const handleResize = () => {
@@ -135,9 +158,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
 
   // Auto-scroll list to active chapter (like YouTube sections)
   useEffect(() => {
-    if (activePattern && isPlaying && sectionsListRef.current) {
+    const targetToScroll = livePattern || currentOrRecentPattern;
+    if (targetToScroll && isPlaying && sectionsListRef.current) {
       const container = sectionsListRef.current;
-      const activeEl = document.getElementById(`section-row-${activePattern.id}`);
+      const activeEl = document.getElementById(`section-row-${targetToScroll.id}`);
       if (activeEl) {
         const containerRect = container.getBoundingClientRect();
         const elementRect = activeEl.getBoundingClientRect();
@@ -152,7 +176,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
         }
       }
     }
-  }, [activePattern?.id, isPlaying]);
+  }, [livePattern?.id, currentOrRecentPattern?.id, isPlaying]);
 
   // Jump to pattern / section (Like clicking a YouTube chapter)
   const jumpToPattern = useCallback(
@@ -177,7 +201,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     if (controllerRef.current) {
       if (next) {
         const target =
-          activePattern ||
+          livePattern ||
+          currentOrRecentPattern ||
           sortedPatterns.find((p) => p.id === selectedPatternId) ||
           sortedPatterns[0];
         if (target) {
@@ -317,6 +342,15 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
           <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-osu-pink/20 text-osu-pink border border-osu-pink/30 uppercase tracking-wider">
             {map.modSlot || 'NM'}
           </span>
+          {hasAudioTrack && (
+            <span
+              title="Áudio da música sincronizado via AudioContext no ritmo do beatmap"
+              className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-500/15 text-green-400 border border-green-500/30"
+            >
+              <Music className="w-2.5 h-2.5" />
+              <span>Áudio Sincronizado</span>
+            </span>
+          )}
         </div>
 
         {/* Mod Buttons & Fullscreen */}
@@ -379,10 +413,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
           )}
 
           {/* Mini active pattern floating pill inside visor */}
-          {activePattern && (
+          {livePattern && (
             <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-md border border-white/15 text-[10px] font-bold text-white flex items-center gap-1.5 shadow-md">
               <span className="w-1.5 h-1.5 rounded-full bg-osu-pink animate-ping" />
-              <span className="truncate max-w-[140px]">{activePattern.label}</span>
+              <span className="truncate max-w-[140px]">{livePattern.label}</span>
             </div>
           )}
         </div>
@@ -577,12 +611,17 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               <span>{isLoopEnabled ? 'Loop: Ativado' : 'Loop: Desativado'}</span>
             </button>
 
-            {activePattern && (
-              <div className="hidden sm:flex items-center gap-1.5 text-[10px] text-osu-pink font-semibold bg-osu-pink/10 px-2 py-0.5 rounded-full border border-osu-pink/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-osu-pink animate-pulse" />
-                <span className="truncate max-w-[120px]">{activePattern.label}</span>
+            {livePattern ? (
+              <div className="hidden sm:flex items-center gap-1.5 text-[10px] text-osu-pink font-semibold bg-osu-pink/10 px-2 py-0.5 rounded-full border border-osu-pink/20 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-osu-pink" />
+                <span className="truncate max-w-[120px]">Agora: {livePattern.label}</span>
               </div>
-            )}
+            ) : currentOrRecentPattern ? (
+              <div className="hidden sm:flex items-center gap-1.5 text-[10px] text-osu-pink/80 font-medium bg-osu-pink/5 px-2 py-0.5 rounded-full border border-osu-pink/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-osu-pink/60" />
+                <span className="truncate max-w-[120px]">Último: {currentOrRecentPattern.label}</span>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -592,12 +631,13 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
           className="flex flex-col gap-1.5 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar scroll-smooth"
         >
           {sortedPatterns.map((p) => {
-            const isActive =
-              (currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs) ||
+            const isLive = currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs;
+            const isWaitingSelected =
+              (!livePattern && currentOrRecentPattern?.id === p.id) ||
               selectedPatternId === p.id;
 
             // Section completion percentage
-            const sectionProgress = isActive
+            const sectionProgress = isLive
               ? clamp(0, (currentTimeMs - p.startTimeMs) / Math.max(1, p.endTimeMs - p.startTimeMs), 1) * 100
               : currentTimeMs > p.endTimeMs
               ? 100
@@ -618,8 +658,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                 id={`section-row-${p.id}`}
                 onClick={() => jumpToPattern(p)}
                 className={`relative group shrink-0 min-h-[46px] rounded-lg p-2 transition-all duration-200 cursor-pointer overflow-hidden border ${
-                  isActive
+                  isLive
                     ? 'bg-gradient-to-r from-osu-pink/25 via-osu-pink/10 to-white/5 border-osu-pink shadow-glowPink ring-1 ring-osu-pink/40'
+                    : isWaitingSelected
+                    ? 'bg-osu-pink/[0.08] hover:bg-osu-pink/[0.12] border-osu-pink/40 ring-1 ring-osu-pink/20 shadow-sm'
                     : 'bg-white/[0.02] hover:bg-white/[0.06] border-white/5 hover:border-white/15'
                 }`}
               >
@@ -630,8 +672,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                     {/* Timestamp pill */}
                     <span
                       className={`font-mono text-[11px] px-1.5 py-0.5 rounded font-bold transition-colors ${
-                        isActive
+                        isLive
                           ? 'bg-osu-pink text-white shadow-sm'
+                          : isWaitingSelected
+                          ? 'bg-osu-pink/20 text-osu-pink border border-osu-pink/35'
                           : 'bg-black/50 text-osu-cyan group-hover:text-white'
                       }`}
                     >
@@ -643,16 +687,25 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                       <div className="flex items-center gap-1.5">
                         <span
                           className={`font-semibold truncate transition-colors ${
-                            isActive ? 'text-white font-bold' : 'text-white/80 group-hover:text-white'
+                            isLive
+                              ? 'text-white font-bold'
+                              : isWaitingSelected
+                              ? 'text-white/95 font-semibold'
+                              : 'text-white/80 group-hover:text-white'
                           }`}
                         >
                           {p.label}
                         </span>
 
-                        {isActive && (
+                        {isLive && (
                           <span className="flex items-center gap-1 text-[9px] font-black uppercase text-osu-pink bg-osu-pink/20 px-1 rounded tracking-wider">
                             <Radio className="w-2.5 h-2.5 animate-pulse" />
                             <span>AO VIVO</span>
+                          </span>
+                        )}
+                        {isWaitingSelected && !isLive && (
+                          <span className="flex items-center gap-1 text-[9px] font-bold text-osu-pink/80 bg-osu-pink/10 px-1 rounded border border-osu-pink/20">
+                            <span>SELECIONADO</span>
                           </span>
                         )}
                       </div>
@@ -693,13 +746,18 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                   </div>
                 </div>
 
-                {/* Live Section Progress Bar at the bottom of active card */}
-                {isActive && (
+                {/* Progress Bar at the bottom of active card */}
+                {isLive && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/40 overflow-hidden">
                     <div
                       className="h-full bg-osu-pink shadow-glowPink transition-all duration-100"
                       style={{ width: `${sectionProgress}%` }}
                     />
+                  </div>
+                )}
+                {isWaitingSelected && !isLive && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/40 overflow-hidden">
+                    <div className="h-full bg-osu-pink/35 w-full" />
                   </div>
                 )}
               </div>

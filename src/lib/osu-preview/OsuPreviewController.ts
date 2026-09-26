@@ -1,7 +1,7 @@
 import { OsuPreviewRenderer, RenderOptions } from './render';
 import { parseBeatmapText, applyBeatmapCalculations } from './beatmap';
 import { loadDefaultSkin } from './skin';
-import { HitsoundPlayer } from './audio';
+import { HitsoundPlayer, MusicPlayer } from './audio';
 import { PreviewBeatmap, OsuSkin, OsuMod } from './types';
 import { clamp } from './functions';
 
@@ -10,12 +10,16 @@ export type TickCallback = (state: {
   durationMs: number;
   isPlaying: boolean;
   playbackRate: number;
+  hasAudioTrack: boolean;
 }) => void;
 
 export class OsuPreviewController {
   private renderer: OsuPreviewRenderer;
   private beatmap: PreviewBeatmap | null = null;
   private skin: OsuSkin | null = null;
+  private audioCtx: AudioContext | null = null;
+  private masterGain: GainNode | null = null;
+  private musicPlayer: MusicPlayer;
   private hitsoundPlayer: HitsoundPlayer;
 
   private currentTimeMs: number = 0;
@@ -38,20 +42,40 @@ export class OsuPreviewController {
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new OsuPreviewRenderer(canvas);
+    this.musicPlayer = new MusicPlayer();
     this.hitsoundPlayer = new HitsoundPlayer();
   }
 
-  public async init(rawBeatmapText: string, initialTimeMs: number = 0): Promise<void> {
-    this.hitsoundPlayer.init();
+  public async init(
+    rawBeatmapText: string,
+    initialTimeMs: number = 0,
+    audioSource?: Blob | ArrayBuffer | string
+  ): Promise<void> {
+    // 1. Initialize Unified Audio Engine
+    this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    this.masterGain = this.audioCtx.createGain();
+    this.masterGain.connect(this.audioCtx.destination);
+
+    this.musicPlayer.init(this.audioCtx, this.masterGain);
+    this.hitsoundPlayer.init(this.audioCtx, this.masterGain);
+
+    // 2. Load Beatmap & Skin
     this.skin = await loadDefaultSkin('/skin/default');
     this.beatmap = parseBeatmapText(rawBeatmapText, this.activeMods);
 
+    // 3. Load Song Audio
+    const fallbackSec = (this.beatmap.duration + 1000) / 1000;
+    await this.musicPlayer.loadAudio(audioSource, fallbackSec);
+
+    // 4. Set Initial Position
     this.currentTimeMs = clamp(0, initialTimeMs, this.beatmap.duration);
+    this.musicPlayer.seek(this.currentTimeMs);
     this.lastPlayedNoteIndex = this.findLastNoteIndexBefore(this.currentTimeMs);
 
     this.renderer.resize();
     this.startLoop();
     this.drawCurrentFrame();
+    this.notifyState();
   }
 
   public subscribe(cb: TickCallback): () => void {
@@ -67,23 +91,32 @@ export class OsuPreviewController {
         durationMs: duration,
         isPlaying: this.isPlaying,
         playbackRate: this.playbackRate,
+        hasAudioTrack: this.musicPlayer.hasRealAudio,
       });
     }
   }
 
   public play(): void {
     if (this.isPlaying) return;
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume().catch(() => {});
+    }
+
     if (this.beatmap && this.currentTimeMs >= this.beatmap.duration) {
       this.currentTimeMs = 0;
+      this.musicPlayer.seek(0);
       this.lastPlayedNoteIndex = -1;
     }
+
     this.isPlaying = true;
+    this.musicPlayer.play(this.currentTimeMs);
     this.lastRafTime = performance.now();
     this.notifyState();
   }
 
   public pause(): void {
     this.isPlaying = false;
+    this.musicPlayer.pause();
     this.notifyState();
   }
 
@@ -95,6 +128,7 @@ export class OsuPreviewController {
   public seek(timeMs: number): void {
     if (!this.beatmap) return;
     this.currentTimeMs = clamp(0, timeMs, this.beatmap.duration);
+    this.musicPlayer.seek(this.currentTimeMs);
     this.lastPlayedNoteIndex = this.findLastNoteIndexBefore(this.currentTimeMs);
     this.drawCurrentFrame();
     this.notifyState();
@@ -102,6 +136,7 @@ export class OsuPreviewController {
 
   public setSpeed(rate: number): void {
     this.playbackRate = clamp(0.25, rate, 3.0);
+    this.musicPlayer.setSpeed(this.playbackRate);
     this.notifyState();
   }
 
@@ -126,10 +161,12 @@ export class OsuPreviewController {
   }
 
   public setVolume(vol: number): void {
+    this.musicPlayer.setVolume(vol);
     this.hitsoundPlayer.setVolume(vol);
   }
 
   public setMuted(muted: boolean): void {
+    this.musicPlayer.setMuted(muted);
     this.hitsoundPlayer.setMuted(muted);
   }
 
@@ -183,15 +220,22 @@ export class OsuPreviewController {
       this.rafId = requestAnimationFrame(loop);
       if (!this.isPlaying) return;
 
-      const deltaMs = (now - this.lastRafTime) * this.playbackRate;
-      this.lastRafTime = now;
-
       const prevTime = this.currentTimeMs;
-      this.currentTimeMs += deltaMs;
+
+      // Primary clock: hardware AudioContext currentTime for 100% sample-accurate sync
+      if (this.musicPlayer.hasRealAudio) {
+        this.currentTimeMs = this.musicPlayer.currentTimeMs;
+      } else {
+        // High-precision delta fallback
+        const deltaMs = (now - this.lastRafTime) * this.playbackRate;
+        this.currentTimeMs += deltaMs;
+      }
+      this.lastRafTime = now;
 
       // Section Looping support
       if (this.loopRange && this.currentTimeMs >= this.loopRange.endMs) {
         this.currentTimeMs = this.loopRange.startMs;
+        this.musicPlayer.seek(this.currentTimeMs);
         this.lastPlayedNoteIndex = this.findLastNoteIndexBefore(this.currentTimeMs);
       } else if (this.beatmap && this.currentTimeMs >= this.beatmap.duration) {
         this.currentTimeMs = this.beatmap.duration;
@@ -222,6 +266,13 @@ export class OsuPreviewController {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
+    }
+    this.musicPlayer.destroy();
+    if (this.audioCtx) {
+      try {
+        this.audioCtx.close();
+      } catch {}
+      this.audioCtx = null;
     }
     this.tickCallbacks.clear();
   }

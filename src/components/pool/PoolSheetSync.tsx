@@ -110,7 +110,12 @@ export const PoolSheetSync: React.FC = () => {
         label: `Escaneando ${osuFiles.length} arquivos .osu na pasta...`,
       });
 
-      const matchedOsuItems: Array<{ text: string; fileName: string; entry: SheetBeatmapEntry }> = [];
+      const matchedOsuItems: Array<{
+        text: string;
+        fileName: string;
+        entry: SheetBeatmapEntry;
+        audioBlob?: Blob;
+      }> = [];
       const foundIds = new Set<number>();
 
       // Scan .osu files
@@ -131,7 +136,23 @@ export const PoolSheetSync: React.FC = () => {
 
         if (matched && !foundIds.has(matched.beatmapId)) {
           foundIds.add(matched.beatmapId);
-          matchedOsuItems.push({ text, fileName: file.name, entry: matched });
+
+          // Attempt to find companion audio file in same folder
+          const dirPath = (file as any).webkitRelativePath
+            ? (file as any).webkitRelativePath.split('/').slice(0, -1).join('/')
+            : '';
+          let audioBlob: Blob | undefined;
+          if (dirPath) {
+            const companionAudio = files.find((f: any) => {
+              const fDir = f.webkitRelativePath ? f.webkitRelativePath.split('/').slice(0, -1).join('/') : '';
+              return fDir === dirPath && (f.name.endsWith('.mp3') || f.name.endsWith('.ogg'));
+            });
+            if (companionAudio) {
+              audioBlob = new Blob([await companionAudio.arrayBuffer()], { type: 'audio/mpeg' });
+            }
+          }
+
+          matchedOsuItems.push({ text, fileName: file.name, entry: matched, audioBlob });
         }
 
         // If we found all maps in the stage, stop early!
@@ -155,7 +176,12 @@ export const PoolSheetSync: React.FC = () => {
             const matched = matchOsuFileToTournamentEntry(meta, requiredEntries);
             if (matched && !foundIds.has(matched.beatmapId)) {
               foundIds.add(matched.beatmapId);
-              matchedOsuItems.push({ text: item.text, fileName: item.fileName, entry: matched });
+              matchedOsuItems.push({
+                text: item.text,
+                fileName: item.fileName,
+                entry: matched,
+                audioBlob: item.audioBlob,
+              });
             }
           }
         }
@@ -178,7 +204,7 @@ export const PoolSheetSync: React.FC = () => {
         });
         await new Promise((r) => setTimeout(r, 5));
 
-        const analysis = await analyzeBeatmap(item.text, item.fileName, undefined, item.entry.sr);
+        const analysis = await analyzeBeatmap(item.text, item.fileName, undefined, item.entry.sr, item.audioBlob);
         analysis.modSlot = item.entry.slot;
         if (item.entry.sr) analysis.stats.starRating = item.entry.sr;
         if (item.entry.bpm) analysis.stats.bpmMode = item.entry.bpm;

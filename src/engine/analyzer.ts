@@ -29,7 +29,8 @@ export async function analyzeBeatmap(
   rawText: string,
   fileName: string = 'beatmap.osu',
   _fileBytes?: Uint8Array,
-  officialStarRating?: number
+  officialStarRating?: number,
+  audioBlob?: Blob
 ): Promise<BeatmapAnalysisResult> {
   const parsed = parseOsuBeatmap(rawText);
   const { metadata, difficulty, timingPoints, hitObjects } = parsed;
@@ -109,6 +110,7 @@ export async function analyzeBeatmap(
   modSlot = matchSlot(fileName) || matchSlot(metadata.version) || matchSlot(metadata.title);
 
   const id = metadata.beatmapId ? metadata.beatmapId.toString() : simpleHash(rawText);
+  const audioUrl = audioBlob ? URL.createObjectURL(audioBlob) : undefined;
 
   return {
     id,
@@ -121,6 +123,8 @@ export async function analyzeBeatmap(
     patterns,
     hitObjects,
     rawText,
+    audioBlob,
+    audioUrl,
     topSkills,
     modSlot,
     calculatedAt: Date.now(),
