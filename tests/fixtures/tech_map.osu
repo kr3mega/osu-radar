@@ -1,0 +1,38 @@
+osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+AudioLeadIn: 0
+Mode: 0
+
+[Metadata]
+Title: Camellia Tech Gimmick
+Artist: Antigravity
+Creator: Tester
+Version: TB Tech Fixture
+BeatmapID: 100003
+BeatmapSetID: 50003
+
+[Difficulty]
+HPDrainRate:6.5
+CircleSize:4.5
+OverallDifficulty:8.5
+ApproachRate:8.0
+SliderMultiplier:1.8
+SliderTickRate:1
+
+[TimingPoints]
+0,352.94,4,2,0,100,1,0
+1000,-50,4,2,0,100,0,0
+2000,-150,4,2,0,100,0,0
+3000,-35,4,2,0,100,0,0
+
+[HitObjects]
+256,192,1000,2,0,B|200:150|256:100|320:150|256:192,1,280
+256,192,1352,2,0,B|150:250|256:300|350:250|256:192,1,320
+200,200,1705,1,0,0:0:0:0:
+210,205,1822,1,0,0:0:0:0:
+220,210,1940,1,0,0:0:0:0:
+256,192,2058,2,0,B|300:100|180:150|320:250|256:192,2,380
+256,192,2764,1,0,0:0:0:0:
+256,192,3000,2,0,B|400:100|100:150|400:300|256:192,1,450
