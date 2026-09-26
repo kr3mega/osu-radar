@@ -2,7 +2,7 @@
 
 > **A client-side beatmap skill analyzer and tournament pool auditing tool built with WebAssembly, TypeScript, and React.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-pink.svg)](https://opensource.org/licenses/MIT)
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-Proprietary-red.svg?style=for-the-badge" alt="License: Proprietary" /></a>
 [![Node.js](https://img.shields.io/badge/Node.js-v24.x-221c29?logo=node.js)](https://nodejs.org/)
 [![React 19](https://img.shields.io/badge/React-19.x-00d8ff?logo=react)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
@@ -128,7 +128,12 @@ firebase deploy --only hosting
 
 ---
 
-## 📜 Licença
+## ⚖️ Licença e Direitos Autorais
 
-Distribuído sob a licença MIT. Veja `LICENSE` para mais detalhes.
-Criado com foco em arquitetura determinística de alta performance para a comunidade global de *osu!*.
+Este projeto é protegido sob termos de **Licença Proprietária Estrita** (Todos os direitos reservados). Consulte o arquivo [LICENSE](LICENSE) para ler o texto integral do acordo legal.
+
+### Resumo dos Termos:
+- **Permissão para Recrutadores e Avaliadores Técnicos**: É expressamente permitida a leitura, auditoria de código e inspeção do repositório para fins de avaliação de habilidades profissionais em processos seletivos.
+- **Uso Pessoal e Acadêmico**: É permitida a clonagem e execução local privada exclusivamente para estudo e pesquisa sem redistribuição.
+- **Proibição Comercial Total**: É terminantemente proibida qualquer exploração comercial (direta ou indireta), monetização, revenda, sublicenciamento ou disponibilização deste software como serviço (SaaS/plataforma em nuvem) sem consentimento prévio e por escrito do autor.
+- **Isenção Total de Garantia e Responsabilidade ("AS IS")**: O software é fornecido no estado em que se encontra, sem garantias de qualquer natureza. O autor fica isento de qualquer responsabilidade jurídica por danos diretos, indiretos ou consequenciais decorrentes do uso ou compilação do código.
