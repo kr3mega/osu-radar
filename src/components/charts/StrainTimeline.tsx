@@ -3,15 +3,11 @@ import { StrainPoint } from '../../engine/types';
 
 interface StrainTimelineProps {
   timeline: StrainPoint[];
-  starRating?: number;
-  hp?: number;
   height?: number;
 }
 
 export const StrainTimeline: React.FC<StrainTimelineProps> = ({
   timeline,
-  starRating = 5.0,
-  hp = 6.0,
   height = 140,
 }) => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -25,16 +21,6 @@ export const StrainTimeline: React.FC<StrainTimelineProps> = ({
     );
   }
 
-  // Realistic success rate model based on Star Rating & HP Drain (matches official osu! web stats)
-  const sr = Math.max(1, starRating);
-  const hpVal = Math.max(1, hp);
-  const successRate = Math.max(4.5, Math.min(88.0, 95.5 - (sr * 12.3) - (hpVal * 2.2)));
-  const totalPlays = Math.round(45000 + (sr * 8500));
-  const passes = Math.round(totalPlays * (successRate / 100));
-
-  const successRateStr = successRate.toFixed(1).replace('.', ',');
-  const passesStr = passes.toLocaleString('pt-BR');
-  const totalPlaysStr = totalPlays.toLocaleString('pt-BR');
 
   const maxStrain = Math.max(1, ...timeline.map((p) => p.totalStrain));
   const count = timeline.length;
@@ -54,31 +40,11 @@ export const StrainTimeline: React.FC<StrainTimelineProps> = ({
   const activePoint = hoverIndex !== null ? timeline[hoverIndex] : null;
 
   return (
-    <div className="w-full flex flex-col items-center bg-[#20262c] border border-[#2d353e] rounded-xl p-4 shadow-xl select-none">
-      {/* 1. Header: Taxa de Sucesso */}
-      <div className="w-full max-w-sm flex flex-col items-center mb-3">
-        <h4 className="text-[12px] font-bold text-white tracking-wide mb-1.5">
-          Taxa de Sucesso
-        </h4>
-
-        {/* Lime-green progress bar (matching osu! web) */}
-        <div className="w-full h-2 bg-[#2d353e] rounded-sm overflow-hidden shadow-inner">
-          <div
-            className="h-full bg-[#8cb811] transition-all duration-300"
-            style={{ width: `${successRate}%` }}
-          />
-        </div>
-
-        {/* Statistics text with PT-BR formatting */}
-        <span className="text-[11px] font-semibold text-white/80 mt-1.5">
-          {successRateStr}% ({passesStr} de {totalPlaysStr} jogadas)
-        </span>
-      </div>
-
-      {/* 2. Subtitle: Pontos de Falha */}
-      <div className="w-full flex items-center justify-between px-1 mb-1.5">
+    <div className="w-full flex flex-col items-center bg-[#20262c] border border-[#2d353e] rounded-xl p-3 shadow-xl select-none">
+      {/* Header: Pontos de Tensão */}
+      <div className="w-full flex items-center justify-between px-1 mb-2">
         <h3 className="text-[13px] font-extrabold text-white tracking-wide">
-          Pontos de Falha
+          Pontos de Tensão
         </h3>
 
         {activePoint ? (

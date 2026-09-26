@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { usePoolStore } from '../../store/usePoolStore';
-import { ArrowLeft, Download, Upload, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Download, Upload, PlusCircle, Link2 } from 'lucide-react';
 import { formatTimestamp } from '../../engine/strains';
 
 interface LazerBottomBarProps {
@@ -77,6 +77,17 @@ export const LazerBottomBar: React.FC<LazerBottomBarProps> = ({
         >
           <PlusCircle className="w-3.5 h-3.5 text-osu-pink" />
           <span>Importar Beatmaps</span>
+        </button>
+
+        {/* Sync Google Sheets Button */}
+        <button
+          type="button"
+          onClick={onOpenUpload}
+          className="px-3 py-1.5 rounded bg-[#132338] hover:bg-[#1b3250] border border-osu-cyan/40 hover:border-osu-cyan text-osu-cyan text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+          title="Sincronizar e filtrar mapas via Google Sheets"
+        >
+          <Link2 className="w-3.5 h-3.5" />
+          <span className="hidden md:inline">Planilha (Google Sheets)</span>
         </button>
       </div>
 

@@ -284,7 +284,7 @@ export const App: React.FC = () => {
           onClick={() => setIsUploaderOpen(false)}
         >
           <div
-            className="relative w-full max-w-xl bg-[#1b0f24] border border-osu-pink/40 rounded-xl p-6 shadow-2xl"
+            className="relative w-full max-w-3xl bg-[#1b0f24] border border-osu-pink/40 rounded-xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">

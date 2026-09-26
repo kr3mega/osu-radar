@@ -220,12 +220,10 @@ export const BeatmapDetailModal: React.FC<BeatmapDetailModalProps> = ({ onClose 
             </div>
           </div>
 
-          {/* Strain Timeline Chart (Pontos de Falha) */}
+          {/* Strain Timeline Chart (Pontos de Tensão) */}
           <div className="rounded-card overflow-hidden">
             <StrainTimeline
               timeline={timeline}
-              starRating={stats.starRating}
-              hp={difficulty.hp}
               height={140}
             />
           </div>

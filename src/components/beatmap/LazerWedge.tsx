@@ -199,12 +199,10 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
           />
         )}
 
-        {/* Continuous Strain Timeline ("Pontos de Falha") */}
+        {/* Continuous Strain Timeline ("Pontos de Tensão") */}
         <div className="mb-3">
           <StrainTimeline
             timeline={timeline}
-            starRating={stats.starRating}
-            hp={difficulty.hp}
             height={130}
           />
         </div>
