@@ -251,7 +251,7 @@ export const App: React.FC = () => {
               </div>
 
               {/* The Carousel List: Individual Beatmap Difficulty Cards (no parent card) */}
-              <div className="flex flex-col gap-1.5 max-h-[calc(100vh-170px)] overflow-y-auto overflow-x-hidden pr-1 w-full min-w-0 max-w-full">
+              <div className="flex flex-col gap-2 max-h-[calc(100vh-170px)] overflow-y-auto overflow-x-hidden p-0.5 pr-1.5 w-full min-w-0 max-w-full">
                 {filteredMaps.length > 0 ? (
                   filteredMaps.map((map) => (
                     <LazerCarouselItem
