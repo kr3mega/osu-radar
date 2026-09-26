@@ -4,7 +4,7 @@ import { TrianglesBackground } from './components/common/TrianglesBackground';
 import { LazerToolbar } from './components/layout/LazerToolbar';
 import { LazerBottomBar } from './components/layout/LazerBottomBar';
 import { LazerWedge } from './components/beatmap/LazerWedge';
-import { LazerCarouselItem } from './components/beatmap/LazerCarouselItem';
+import { LazerCarouselSet, groupBeatmapsBySet } from './components/beatmap/LazerCarouselSet';
 import { PoolOverview } from './components/pool/PoolOverview';
 import { PoolUploader } from './components/pool/PoolUploader';
 import { SkillAttributes } from './engine/types';
@@ -30,6 +30,8 @@ export const App: React.FC = () => {
   const {
     currentPool,
     selectedMapId,
+    expandedSetKey,
+    setExpandedSetKey,
     filterMod,
     searchQuery,
     sortBy,
@@ -54,9 +56,29 @@ export const App: React.FC = () => {
 
   const maps = currentPool.maps;
   const filteredMaps = getFilteredAndSortedMaps(maps, filterMod, searchQuery, sortBy);
+  const groupedSets = groupBeatmapsBySet(filteredMaps);
 
   // Selected map
   const activeMap = maps.find((m) => m.id === selectedMapId) || maps[0] || null;
+
+  // Auto-expand the set containing active map if nothing is expanded
+  useEffect(() => {
+    if (activeMap && !expandedSetKey) {
+      const parentGroup = groupedSets.find((g) => g.maps.some((m) => m.id === activeMap.id));
+      if (parentGroup) {
+        setExpandedSetKey(parentGroup.key);
+      }
+    }
+  }, [activeMap, expandedSetKey, groupedSets, setExpandedSetKey]);
+
+  const handleToggleSet = (key: string) => {
+    // Accordion: clicking any other card immediately closes the previous one and opens the new one
+    if (expandedSetKey === key) {
+      setExpandedSetKey(null);
+    } else {
+      setExpandedSetKey(key);
+    }
+  };
 
   // Calculate pool average skills for comparison in the Wedge
   const avgSkills: SkillAttributes = {
@@ -164,9 +186,9 @@ export const App: React.FC = () => {
             </div>
 
             {/* Right Column: Beatmap Carousel & Mod Filters */}
-            <div className="lg:col-span-7 xl:col-span-7 flex flex-col gap-3">
+            <div className="lg:col-span-7 xl:col-span-7 flex flex-col gap-3 min-w-0 max-w-full overflow-hidden">
               {/* Filter and Sort Toolbar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-[#1b0f24]/90 border border-white/10 rounded-lg backdrop-blur-md shadow-md">
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-[#1b0f24]/90 border border-white/10 rounded-lg backdrop-blur-md shadow-md min-w-0 max-w-full">
                 {/* Mod Category Tabs */}
                 <div className="flex items-center gap-1 flex-wrap">
                   {MOD_FILTERS.map((mod) => {
@@ -197,7 +219,7 @@ export const App: React.FC = () => {
                 </div>
 
                 {/* Sort Option Dropdown */}
-                <div className="flex items-center gap-1.5 bg-[#150a1d] border border-white/10 rounded px-2.5 py-1">
+                <div className="flex items-center gap-1.5 bg-[#150a1d] border border-white/10 rounded px-2.5 py-1 shrink-0">
                   <SlidersHorizontal className="w-3.5 h-3.5 text-osu-cyan" />
                   <select
                     value={sortBy}
@@ -213,23 +235,28 @@ export const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* The Carousel List (Slanted ppy/osu style cards) */}
-              <div className="flex flex-col gap-2 max-h-[calc(100vh-170px)] overflow-y-auto pr-1">
-                {filteredMaps.length > 0 ? (
-                  filteredMaps.map((map) => (
-                    <LazerCarouselItem
-                      key={map.id}
-                      map={map}
-                      isSelected={activeMap?.id === map.id}
-                      onSelect={() => selectMap(map.id)}
-                      onRemove={() => removeBeatmap(map.id)}
+              {/* The Carousel List (Grouped Set Cards + Accordion Difficulty Cards) */}
+              <div className="flex flex-col gap-1.5 max-h-[calc(100vh-170px)] overflow-y-auto overflow-x-hidden pr-1 w-full min-w-0 max-w-full">
+                {groupedSets.length > 0 ? (
+                  groupedSets.map((group) => (
+                    <LazerCarouselSet
+                      key={group.key}
+                      group={group}
+                      isExpanded={expandedSetKey === group.key}
+                      selectedMapId={selectedMapId}
+                      onToggleExpand={() => handleToggleSet(group.key)}
+                      onSelectMap={(id) => {
+                        selectMap(id);
+                        setExpandedSetKey(group.key);
+                      }}
+                      onRemoveMap={(id) => removeBeatmap(id)}
                     />
                   ))
                 ) : (
                   <div className="p-12 bg-[#1b0f24]/80 border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center text-center gap-3 text-white/50 backdrop-blur-md">
-                    <p className="text-sm font-bold text-white">Carrossel de Beatmaps Vazio</p>
+                    <p className="text-sm font-bold text-white">Nenhum beatmap importado ainda</p>
                     <p className="text-xs max-w-sm">
-                      Arraste qualquer pacote <span className="text-osu-pink">.osz</span> ou arquivo <span className="text-osu-cyan">.osu</span> para a tela, ou clique em &ldquo;Demos&rdquo; na barra superior.
+                      Arraste qualquer pacote <span className="text-osu-pink">.osz</span> ou arquivo <span className="text-osu-cyan">.osu</span> para a tela, ou clique em &ldquo;Importar .osz / .osu&rdquo; na barra inferior.
                     </p>
                   </div>
                 )}

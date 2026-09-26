@@ -177,7 +177,7 @@ export const BeatmapDetailModal: React.FC<BeatmapDetailModalProps> = ({ onClose 
                 <div className="p-2.5 bg-osu-surface/60 rounded border border-osu-border flex flex-col gap-1">
                   <div className="flex justify-between font-bold">
                     <span className="text-osu-cyan">Canal 1: Ritmo & Frequência</span>
-                    <span className="text-osu-pink">Finger Ctrl: {skills.fingerControl.toFixed(1)}</span>
+                    <span className="text-osu-pink">Finger Ctrl: {skills.fingerControl.toFixed(1).replace('.', ',')}%</span>
                   </div>
                   <p className="text-[11px] text-osu-text-muted">
                     Avalia cadência de batida, transições de snapping (1/2, 1/4, 1/3) e entropia temporal para isolar alternância pura.
@@ -188,7 +188,7 @@ export const BeatmapDetailModal: React.FC<BeatmapDetailModalProps> = ({ onClose 
                 <div className="p-2.5 bg-osu-surface/60 rounded border border-osu-border flex flex-col gap-1">
                   <div className="flex justify-between font-bold">
                     <span className="text-osu-cyan">Canal 2: Espaçamento & Velocidade</span>
-                    <span className="text-osu-pink">Aim Strain: {(skills.snapAim + skills.flowAim).toFixed(1)}</span>
+                    <span className="text-osu-pink">Aim Strain: {((skills.snapAim + skills.flowAim) / 2).toFixed(1).replace('.', ',')}%</span>
                   </div>
                   <p className="text-[11px] text-osu-text-muted">
                     Mede deslocamento físico em pixels e velocidade instantânea do cursor (px/ms) entre notas sucessivas.
@@ -199,7 +199,7 @@ export const BeatmapDetailModal: React.FC<BeatmapDetailModalProps> = ({ onClose 
                 <div className="p-2.5 bg-osu-surface/60 rounded border border-osu-border flex flex-col gap-1">
                   <div className="flex justify-between font-bold">
                     <span className="text-osu-cyan">Canal 3: Deflexão Angular (θ)</span>
-                    <span className="text-osu-pink">Snap: {skills.snapAim.toFixed(1)} | Flow: {skills.flowAim.toFixed(1)}</span>
+                    <span className="text-osu-pink">Snap: {skills.snapAim.toFixed(1).replace('.', ',')}% | Flow: {skills.flowAim.toFixed(1).replace('.', ',')}%</span>
                   </div>
                   <p className="text-[11px] text-osu-text-muted">
                     Diferencia saltos agudos com parada brusca (&theta; &gt; 100°) de arcos circulares contínuos (&theta; &le; 65°).
@@ -210,7 +210,7 @@ export const BeatmapDetailModal: React.FC<BeatmapDetailModalProps> = ({ onClose 
                 <div className="p-2.5 bg-osu-surface/60 rounded border border-osu-border flex flex-col gap-1">
                   <div className="flex justify-between font-bold">
                     <span className="text-osu-cyan">Canal 4: Sliders & Leitura Visual</span>
-                    <span className="text-osu-pink">Tech / Reading: {skills.readingTech.toFixed(1)}</span>
+                    <span className="text-osu-pink">Tech / Reading: {skills.readingTech.toFixed(1).replace('.', ',')}%</span>
                   </div>
                   <p className="text-[11px] text-osu-text-muted">
                     Mapeia variações bruscas de Slider Velocity (&Delta;SV), curvatura de sliders e sobreposições dentro da janela de AR.

@@ -79,7 +79,7 @@ export const PoolOverview: React.FC = () => {
           mapValue: val,
           avgValue: avg,
           ratio,
-          description: `O slot ${m.modSlot || 'escolhido'} possui ${ratio}% a mais de exigência em ${label} do que a média geral da pool (${val.toFixed(0)} vs ${avg.toFixed(0)}).`,
+          description: `O slot ${m.modSlot || 'escolhido'} possui ${ratio}% a mais de exigência em ${label} do que a média geral da pool (${val.toFixed(1).replace('.', ',')}% vs ${avg.toFixed(1).replace('.', ',')}%).`,
         });
       }
     }

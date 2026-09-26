@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { BeatmapAnalysisResult, Mappool, SkillAttributes } from '../engine/types';
-import { cacheBeatmaps, db } from '../db';
+import { cacheBeatmaps, clearAllData, db } from '../db';
+
+import { TournamentTier } from '../engine/bws';
 
 export type SortOption =
   | 'slot'
@@ -19,8 +21,11 @@ interface PoolState {
   filterMod: string; // 'ALL', 'NM', 'HD', 'HR', 'DT', 'FM', 'TB'
   searchQuery: string;
   sortBy: SortOption;
+  tournamentTier: TournamentTier;
   isAnalyzing: boolean;
   progress: { current: number; total: number; fileName: string } | null;
+  isMatchSimulatorOpen: boolean;
+  expandedSetKey: string | null;
 
   // Actions
   addBeatmaps: (results: BeatmapAnalysisResult[]) => Promise<void>;
@@ -30,8 +35,12 @@ interface PoolState {
   setFilterMod: (mod: string) => void;
   setSearchQuery: (query: string) => void;
   setSortBy: (sort: SortOption) => void;
+  setTournamentTier: (tier: TournamentTier) => void;
+  setIsMatchSimulatorOpen: (open: boolean) => void;
+  setExpandedSetKey: (key: string | null) => void;
   setPoolMetadata: (name: string, stage?: string) => void;
   clearPool: () => void;
+  resetAllData: () => Promise<void>;
   setIsAnalyzing: (analyzing: boolean) => void;
   setProgress: (progress: { current: number; total: number; fileName: string } | null) => void;
   exportPoolJson: () => string;
@@ -42,8 +51,8 @@ interface PoolState {
 export const usePoolStore = create<PoolState>((set, get) => ({
   currentPool: {
     id: 'default-pool',
-    name: 'Torneio osu! Community Showcase',
-    stage: 'Semifinals Mappool',
+    name: 'Mappool de Torneio',
+    stage: 'Etapa Competitiva',
     description: 'Auditoria de habilidades e tensões físicas de beatmaps',
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -53,8 +62,15 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   filterMod: 'ALL',
   searchQuery: '',
   sortBy: 'slot',
+  tournamentTier: 'open_rank',
   isAnalyzing: false,
   progress: null,
+  isMatchSimulatorOpen: false,
+  expandedSetKey: null,
+
+  setTournamentTier: (tournamentTier) => set({ tournamentTier }),
+  setIsMatchSimulatorOpen: (isMatchSimulatorOpen) => set({ isMatchSimulatorOpen }),
+  setExpandedSetKey: (expandedSetKey) => set({ expandedSetKey }),
 
   addBeatmaps: async (results) => {
     // Avoid duplicate maps by ID
@@ -131,7 +147,25 @@ export const usePoolStore = create<PoolState>((set, get) => ({
         updatedAt: Date.now(),
       },
       selectedMapId: null,
+      expandedSetKey: null,
     })),
+
+  resetAllData: async () => {
+    try {
+      await clearAllData();
+    } catch (e) {
+      console.warn('Could not clear IndexedDB:', e);
+    }
+    set((state) => ({
+      currentPool: {
+        ...state.currentPool,
+        maps: [],
+        updatedAt: Date.now(),
+      },
+      selectedMapId: null,
+      expandedSetKey: null,
+    }));
+  },
 
   setIsAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
   setProgress: (progress) => set({ progress }),
@@ -162,12 +196,33 @@ export const usePoolStore = create<PoolState>((set, get) => ({
     try {
       const allCached = await db.beatmaps.toArray();
       if (allCached && allCached.length > 0) {
+        // Exclude and purge any demo/sample maps (100001, 100002, 100003 or Tester/Antigravity)
+        const demoIds = ['100001', '100002', '100003'];
+        const userMaps = allCached.filter(
+          (m) =>
+            !demoIds.includes(m.id) &&
+            m.metadata?.creator !== 'Tester' &&
+            m.metadata?.artist !== 'Antigravity'
+        );
+
+        if (userMaps.length !== allCached.length) {
+          const toDelete = allCached
+            .filter(
+              (m) =>
+                demoIds.includes(m.id) ||
+                m.metadata?.creator === 'Tester' ||
+                m.metadata?.artist === 'Antigravity'
+            )
+            .map((m) => m.id);
+          await db.beatmaps.bulkDelete(toDelete);
+        }
+
         set((state) => ({
           currentPool: {
             ...state.currentPool,
-            maps: allCached,
+            maps: userMaps,
           },
-          selectedMapId: allCached[0].id,
+          selectedMapId: userMaps.length > 0 ? userMaps[0].id : null,
         }));
       }
     } catch (e) {

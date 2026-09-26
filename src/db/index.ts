@@ -47,3 +47,12 @@ export async function saveMappool(pool: Mappool): Promise<void> {
 export async function loadAllMappools(): Promise<Mappool[]> {
   return await db.mappools.toArray();
 }
+
+/**
+ * Completely clears all cached beatmaps and mappools from IndexedDB.
+ */
+export async function clearAllData(): Promise<void> {
+  await db.beatmaps.clear();
+  await db.mappools.clear();
+}
+

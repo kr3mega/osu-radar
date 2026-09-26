@@ -113,7 +113,7 @@ export const LazerBottomBar: React.FC<LazerBottomBarProps> = ({
 
         <div className="flex items-center gap-1.5 text-white/70">
           <span>Média:</span>
-          <strong className="text-yellow-400 font-bold">★ {avgSr.toFixed(2)}</strong>
+          <strong className="text-yellow-400 font-bold">★ {avgSr.toFixed(2).replace('.', ',')}</strong>
         </div>
 
         <div className="hidden md:flex items-center gap-1.5 text-white/70">

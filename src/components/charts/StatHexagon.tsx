@@ -143,7 +143,7 @@ export const StatHexagon: React.FC<StatHexagonProps> = ({
                   dominantBaseline="middle"
                   className="text-[10px] font-mono font-bold fill-osu-cyan"
                 >
-                  {val.toFixed(1)}
+                  {val.toFixed(1).replace('.', ',')}%
                 </text>
               </g>
             );
@@ -161,15 +161,17 @@ export const StatHexagon: React.FC<StatHexagonProps> = ({
                 key={axis.key}
                 className="bg-osu-surface/60 border border-osu-border rounded-card p-2 flex flex-col justify-between"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-osu-text-secondary font-medium">{axis.label}</span>
-                  <span className="text-xs font-mono font-bold text-osu-pink">{score.toFixed(1)}</span>
+                <div className="flex items-center justify-between gap-2 min-w-0">
+                  <span className="text-xs text-osu-text-secondary font-medium truncate">{axis.label}</span>
+                  <span className="text-xs font-mono font-bold text-osu-pink shrink-0">
+                    {score.toFixed(1).replace('.', ',')}%
+                  </span>
                 </div>
                 {/* Progress bar */}
                 <div className="w-full bg-osu-base h-1.5 rounded-full overflow-hidden mt-1.5">
                   <div
                     className="bg-gradient-to-r from-osu-pink to-osu-cyan h-full rounded-full transition-all duration-300"
-                    style={{ width: `${score}%` }}
+                    style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
                   />
                 </div>
               </div>

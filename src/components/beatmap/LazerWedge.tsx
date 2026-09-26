@@ -104,7 +104,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
             style={{ backgroundColor: starColor, color: starTextColor }}
           >
             <span>★</span>
-            <span className="font-mono">{stats.starRating.toFixed(2)}</span>
+            <span className="font-mono">{stats.starRating.toFixed(2).replace('.', ',')}</span>
           </div>
         </div>
       </div>
@@ -135,10 +135,10 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
 
           {/* Difficulty Meters */}
           <div className="flex items-center gap-2.5 font-mono text-[11px] text-white/80">
-            <span>CS <strong className="text-white">{difficulty.cs.toFixed(1)}</strong></span>
-            <span>AR <strong className="text-white">{difficulty.ar.toFixed(1)}</strong></span>
-            <span>OD <strong className="text-white">{difficulty.od.toFixed(1)}</strong></span>
-            <span>HP <strong className="text-white">{difficulty.hp.toFixed(1)}</strong></span>
+            <span>CS <strong className="text-white">{difficulty.cs.toFixed(1).replace('.', ',')}</strong></span>
+            <span>AR <strong className="text-white">{difficulty.ar.toFixed(1).replace('.', ',')}</strong></span>
+            <span>OD <strong className="text-white">{difficulty.od.toFixed(1).replace('.', ',')}</strong></span>
+            <span>HP <strong className="text-white">{difficulty.hp.toFixed(1).replace('.', ',')}</strong></span>
             <span>BPM <strong className="text-white">{stats.bpmMode}</strong></span>
             <span>⏱ <strong className="text-white">{formatTimestamp(stats.drainTimeMs)}</strong></span>
           </div>
