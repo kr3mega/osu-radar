@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   Play,
   Pause,
   RotateCcw,
   SkipBack,
   SkipForward,
+  Repeat,
   Volume2,
   VolumeX,
   Maximize2,
@@ -12,13 +13,14 @@ import {
   Copy,
   Check,
   Sliders,
-  ChevronRight,
-  ListMusic,
+  Radio,
+  Layers,
 } from 'lucide-react';
 import {
   OsuPreviewController,
   getOrReconstructBeatmapText,
   OsuMod,
+  clamp,
 } from '../../lib/osu-preview';
 import { DetectedPattern, formatOsuEditorTimestamp } from '../../engine/patterns';
 import { BeatmapAnalysisResult } from '../../engine/types';
@@ -40,6 +42,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const sectionsListRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<OsuPreviewController | null>(null);
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -48,12 +51,54 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const [playbackRate, setPlaybackRate] = useState<number>(1.0);
   const [volume, setVolume] = useState<number>(0.8);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [bgDim, setBgDim] = useState<number>(0.8);
+  const [bgDim, setBgDim] = useState<number>(0.85);
   const [activeMods, setActiveMods] = useState<Set<OsuMod>>(new Set());
   const [copied, setCopied] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [selectedPatternId, setSelectedPatternId] = useState<string | undefined>(initialPatternId);
-  const [showPatternDrawer, setShowPatternDrawer] = useState<boolean>(false);
+  const [isLoopEnabled, setIsLoopEnabled] = useState<boolean>(false);
+
+  // Sorted patterns list for the YouTube-style chapters
+  const sortedPatterns = useMemo(() => {
+    if (patterns.length > 0) {
+      return [...patterns].sort((a, b) => a.startTimeMs - b.startTimeMs);
+    }
+    // Fallback: create sections based on duration if no discrete patterns were detected
+    const totalSec = Math.floor((map.stats.durationMs || 60000) / 1000);
+    const stepSec = Math.max(15, Math.floor(totalSec / 8));
+    const fallbackList: DetectedPattern[] = [];
+    for (let s = 0; s < totalSec; s += stepSec) {
+      const startMs = s * 1000;
+      const endMs = Math.min((s + stepSec) * 1000, map.stats.durationMs || 60000);
+      const min = Math.floor(s / 60);
+      const sec = s % 60;
+      const startStr = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+      fallbackList.push({
+        id: `section-${s}`,
+        type: 'flow_aim',
+        label: s === 0 ? 'Introdução do Mapa' : `Seção ${Math.floor(s / stepSec) + 1}`,
+        startTimeMs: startMs,
+        endTimeMs: endMs,
+        startTimestamp: startStr,
+        endTimestamp: startStr,
+        osuEditorTimestamp: `${startStr}:000`,
+        severity: 'medium',
+        noteCount: 16,
+        description: 'Trecho do mapa',
+        metrics: {},
+      });
+    }
+    return fallbackList;
+  }, [patterns, map.stats.durationMs]);
+
+  // Identify active pattern in real-time
+  const activePattern = useMemo(() => {
+    return (
+      sortedPatterns.find(
+        (p) => currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs
+      ) || null
+    );
+  }, [sortedPatterns, currentTimeMs]);
 
   // Initialize OsuPreviewController
   useEffect(() => {
@@ -75,7 +120,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       setPlaybackRate(state.playbackRate);
     });
 
-    // Resize observer
     const handleResize = () => {
       controller.resize();
     };
@@ -89,24 +133,61 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     };
   }, [map]);
 
-  // Jump to initial time if prop changes
+  // Auto-scroll list to active chapter (like YouTube sections)
   useEffect(() => {
-    if (initialTimeMs !== undefined && controllerRef.current) {
-      controllerRef.current.seek(initialTimeMs);
-    }
-  }, [initialTimeMs]);
+    if (activePattern && isPlaying && sectionsListRef.current) {
+      const container = sectionsListRef.current;
+      const activeEl = document.getElementById(`section-row-${activePattern.id}`);
+      if (activeEl) {
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = activeEl.getBoundingClientRect();
 
-  // Jump to pattern
+        // Only scroll if outside visible area of the list container
+        if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
+          const offsetTop = activeEl.offsetTop - container.offsetTop;
+          container.scrollTo({
+            top: Math.max(0, offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2),
+            behavior: 'smooth',
+          });
+        }
+      }
+    }
+  }, [activePattern?.id, isPlaying]);
+
+  // Jump to pattern / section (Like clicking a YouTube chapter)
   const jumpToPattern = useCallback(
     (p: DetectedPattern) => {
       setSelectedPatternId(p.id);
       if (controllerRef.current) {
         controllerRef.current.seek(p.startTimeMs);
         controllerRef.current.play();
+        if (isLoopEnabled) {
+          controllerRef.current.setLoopRange(p.startTimeMs, p.endTimeMs);
+        } else {
+          controllerRef.current.clearLoopRange();
+        }
       }
     },
-    []
+    [isLoopEnabled]
   );
+
+  const handleToggleLoop = () => {
+    const next = !isLoopEnabled;
+    setIsLoopEnabled(next);
+    if (controllerRef.current) {
+      if (next) {
+        const target =
+          activePattern ||
+          sortedPatterns.find((p) => p.id === selectedPatternId) ||
+          sortedPatterns[0];
+        if (target) {
+          controllerRef.current.setLoopRange(target.startTimeMs, target.endTimeMs);
+        }
+      } else {
+        controllerRef.current.clearLoopRange();
+      }
+    }
+  };
 
   // Playback controls
   const handleTogglePlay = useCallback(() => {
@@ -180,10 +261,9 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     setTimeout(() => setCopied(false), 1500);
   };
 
-  // Keyboard shortcuts (Space = Play/Pause, Arrows = Seek)
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
 
       if (e.code === 'Space') {
@@ -191,10 +271,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
         handleTogglePlay();
       } else if (e.code === 'ArrowLeft') {
         e.preventDefault();
-        handleStep(e.shiftKey ? -200 : -1000);
+        handleStep(e.shiftKey ? -250 : -1000);
       } else if (e.code === 'ArrowRight') {
         e.preventDefault();
-        handleStep(e.shiftKey ? 200 : 1000);
+        handleStep(e.shiftKey ? 250 : 1000);
       }
     };
 
@@ -202,7 +282,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleTogglePlay, currentTimeMs]);
 
-  // Toggle theater / fullscreen
+  // Fullscreen / Cinema mode
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
     if (!isFullscreen) {
@@ -221,25 +301,27 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col bg-[#0b0e14] border border-white/10 rounded-2xl overflow-hidden shadow-2xl transition-all ${
+      className={`flex flex-col bg-[#0b0e14] border border-white/10 rounded-xl overflow-hidden shadow-2xl transition-all ${
         isFullscreen ? 'fixed inset-0 z-50 rounded-none w-screen h-screen' : 'w-full'
       }`}
     >
-      {/* Top Header Bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[#121620] border-b border-white/10 text-xs select-none">
+      {/* Top Compact Header Bar */}
+      <div className="flex items-center justify-between px-3 py-2 bg-[#121620] border-b border-white/10 text-xs select-none">
         <div className="flex items-center gap-2 overflow-hidden">
-          <span className="font-bold text-white truncate max-w-[200px] sm:max-w-xs">
+          <span className="font-bold text-white truncate max-w-[180px] sm:max-w-xs">
             {map.metadata.title}
           </span>
-          <span className="text-white/40 hidden sm:inline">[{map.metadata.version}]</span>
-          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-osu-pink/20 text-osu-pink border border-osu-pink/30 uppercase tracking-wider">
+          <span className="text-white/40 hidden sm:inline text-[11px]">
+            [{map.metadata.version}]
+          </span>
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-osu-pink/20 text-osu-pink border border-osu-pink/30 uppercase tracking-wider">
             {map.modSlot || 'NM'}
           </span>
         </div>
 
-        {/* Mod Buttons & Speed */}
+        {/* Mod Buttons & Fullscreen */}
         <div className="flex items-center gap-1.5">
-          <div className="flex items-center bg-black/40 rounded-lg p-0.5 border border-white/10">
+          <div className="flex items-center bg-black/50 rounded-md p-0.5 border border-white/10">
             {(['ez', 'hr', 'dt', 'hd'] as OsuMod[]).map((modKey) => {
               const active = activeMods.has(modKey);
               return (
@@ -247,10 +329,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                   key={modKey}
                   type="button"
                   onClick={() => handleToggleMod(modKey)}
-                  className={`px-2 py-0.5 text-[10px] font-black uppercase rounded transition-all ${
+                  className={`px-1.5 py-0.5 text-[9px] font-black uppercase rounded transition-all ${
                     active
                       ? 'bg-osu-cyan text-black font-extrabold shadow-sm'
-                      : 'text-white/50 hover:text-white'
+                      : 'text-white/40 hover:text-white'
                   }`}
                 >
                   {modKey}
@@ -259,101 +341,57 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             })}
           </div>
 
-          <div className="h-4 w-px bg-white/10 mx-1 hidden sm:block" />
-
-          {/* Fullscreen Button */}
           <button
             type="button"
             onClick={toggleFullscreen}
-            title={isFullscreen ? 'Sair do Modo Cinema' : 'Modo Cinema Tela Cheia'}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all"
+            title={isFullscreen ? 'Sair do Modo Cinema' : 'Modo Cinema'}
+            className="p-1 rounded-md bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all ml-1"
           >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>
 
-      {/* Main Playfield Canvas Area */}
-      <div className="relative w-full flex-1 bg-black flex items-center justify-center min-h-[340px] sm:min-h-[440px] overflow-hidden group">
-        <canvas
-          ref={canvasRef}
+      {/* Visor do Preview (Compacto, Snug Fit sem bordas pretas gigantes) */}
+      <div
+        className={`flex items-center justify-center bg-[#07090e] border-b border-white/5 ${
+          isFullscreen ? 'flex-1 p-4' : 'py-2.5 px-3'
+        }`}
+      >
+        <div
+          className={`relative aspect-[512/384] bg-black rounded-lg overflow-hidden shadow-inner cursor-pointer group ${
+            isFullscreen ? 'w-full max-w-[800px]' : 'w-full max-w-[380px] sm:max-w-[420px]'
+          }`}
           onClick={handleTogglePlay}
-          className="w-full h-full max-h-[75vh] object-contain cursor-pointer"
-        />
+        >
+          <canvas ref={canvasRef} className="w-full h-full block cursor-pointer" />
 
-        {/* Big Play/Pause Center Splash Indicator */}
-        {!isPlaying && (
-          <div
-            onClick={handleTogglePlay}
-            className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 cursor-pointer group-hover:bg-black/30 transition-all"
-          >
-            <div className="w-16 h-16 rounded-full bg-osu-pink/90 text-white flex items-center justify-center shadow-glowPink ring-4 ring-osu-pink/30 hover:scale-110 transition-transform">
-              <Play className="w-8 h-8 fill-current ml-1" />
+          {/* Center Play Splash */}
+          {!isPlaying && (
+            <div className="absolute inset-0 bg-black/35 backdrop-blur-[1px] flex flex-col items-center justify-center gap-2 transition-all">
+              <div className="w-12 h-12 rounded-full bg-osu-pink/90 text-white flex items-center justify-center shadow-glowPink ring-2 ring-white/30 group-hover:scale-110 transition-transform">
+                <Play className="w-6 h-6 fill-current ml-0.5" />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/80 bg-black/60 px-2 py-0.5 rounded-full border border-white/10">
+                Clique para Jogar
+              </span>
             </div>
-            <span className="text-white/80 text-xs font-bold tracking-wider uppercase bg-black/60 px-3 py-1 rounded-full border border-white/10">
-              Clique ou Espaço para Reproduzir
-            </span>
-          </div>
-        )}
+          )}
 
-        {/* Patterns Overlay Drawer Button */}
-        {patterns.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowPatternDrawer(!showPatternDrawer)}
-            className="absolute top-3 left-3 px-2.5 py-1.5 rounded-lg bg-black/70 hover:bg-black/90 text-white/80 hover:text-white border border-white/10 backdrop-blur-md text-xs font-semibold flex items-center gap-1.5 shadow-lg transition-all"
-          >
-            <ListMusic className="w-3.5 h-3.5 text-osu-pink" />
-            <span>Padrões ({patterns.length})</span>
-          </button>
-        )}
-
-        {/* Patterns Quick Flyout Drawer */}
-        {showPatternDrawer && patterns.length > 0 && (
-          <div className="absolute top-12 left-3 w-72 max-h-[70%] bg-[#121620]/95 border border-white/15 rounded-xl backdrop-blur-xl shadow-2xl p-2.5 overflow-y-auto flex flex-col gap-1.5 z-30 animate-fadeIn">
-            <div className="flex items-center justify-between pb-2 border-b border-white/10 text-xs font-bold text-white/80">
-              <span>Padrões Detectados</span>
-              <button
-                type="button"
-                onClick={() => setShowPatternDrawer(false)}
-                className="text-white/40 hover:text-white"
-              >
-                ✕
-              </button>
+          {/* Mini active pattern floating pill inside visor */}
+          {activePattern && (
+            <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-md border border-white/15 text-[10px] font-bold text-white flex items-center gap-1.5 shadow-md">
+              <span className="w-1.5 h-1.5 rounded-full bg-osu-pink animate-ping" />
+              <span className="truncate max-w-[140px]">{activePattern.label}</span>
             </div>
-            {patterns.map((p) => {
-              const isSelected = p.id === selectedPatternId;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    jumpToPattern(p);
-                    setShowPatternDrawer(false);
-                  }}
-                  className={`flex items-center justify-between p-2 rounded-lg text-left text-xs transition-all ${
-                    isSelected
-                      ? 'bg-osu-pink text-white font-bold'
-                      : 'bg-white/5 hover:bg-white/10 text-white/70 hover:text-white'
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span className="font-semibold">{p.label}</span>
-                    <span className="text-[10px] opacity-75 font-mono">{p.startTimestamp}</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 opacity-50" />
-                </button>
-              );
-            })}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Transport Controls Bar */}
-      <div className="flex flex-col gap-2 p-3 bg-[#121620] border-t border-white/10 select-none">
-        {/* Scrubber Timeline */}
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] font-mono text-osu-cyan font-bold min-w-[55px]">
+      {/* Compact Scrubber Timeline Bar */}
+      <div className="px-3 py-2 bg-[#10141e] border-b border-white/10 flex flex-col gap-1.5 select-none">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono text-osu-cyan font-bold min-w-[50px]">
             {formatOsuEditorTimestamp(currentTimeMs)}
           </span>
 
@@ -364,65 +402,60 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               max={Math.max(1, durationMs)}
               value={currentTimeMs}
               onChange={(e) => handleSeek(parseFloat(e.target.value))}
-              className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-osu-pink hover:bg-white/20 transition-all"
+              className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-osu-pink hover:bg-white/20 transition-all"
             />
           </div>
 
-          <span className="text-[11px] font-mono text-white/50 min-w-[55px] text-right">
+          <span className="text-[10px] font-mono text-white/40 min-w-[50px] text-right">
             {formatOsuEditorTimestamp(durationMs)}
           </span>
 
-          {/* Copy Timestamp */}
           <button
             type="button"
             onClick={copyEditorTimestamp}
             title="Copiar Timestamp para o editor osu!"
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all flex items-center gap-1 text-[11px] font-mono"
+            className="p-1 rounded bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all flex items-center gap-1 text-[10px]"
           >
-            {copied ? (
-              <Check className="w-3.5 h-3.5 text-green-400" />
-            ) : (
-              <Copy className="w-3.5 h-3.5" />
-            )}
+            {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
           </button>
         </div>
 
         {/* Buttons Row */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          {/* Left: Playback controls */}
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between gap-1 pt-0.5 text-xs">
+          {/* Controls */}
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => handleSeek(0)}
               title="Reiniciar"
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all"
+              className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white/60 hover:text-white"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-3.5 h-3.5" />
             </button>
 
             <button
               type="button"
               onClick={() => handleStep(-1000)}
-              title="-1 segundo"
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all"
+              title="-1s"
+              className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white/60 hover:text-white"
             >
-              <SkipBack className="w-4 h-4" />
+              <SkipBack className="w-3.5 h-3.5" />
             </button>
 
             <button
               type="button"
               onClick={handleTogglePlay}
-              className="px-4 py-2 rounded-xl bg-osu-pink hover:bg-pink-600 text-white font-bold flex items-center gap-2 shadow-glowPink transition-all"
+              className="px-3 py-1 rounded-lg bg-osu-pink hover:bg-pink-600 text-white font-bold flex items-center gap-1.5 shadow-sm transition-all"
             >
               {isPlaying ? (
                 <>
-                  <Pause className="w-4 h-4 fill-current" />
-                  <span className="text-xs uppercase">Pausar</span>
+                  <Pause className="w-3.5 h-3.5 fill-current" />
+                  <span className="text-[10px] uppercase">Pausar</span>
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4 fill-current" />
-                  <span className="text-xs uppercase">Jogar</span>
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span className="text-[10px] uppercase">Jogar</span>
                 </>
               )}
             </button>
@@ -430,24 +463,42 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             <button
               type="button"
               onClick={() => handleStep(1000)}
-              title="+1 segundo"
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all"
+              title="+1s"
+              className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white/60 hover:text-white"
             >
-              <SkipForward className="w-4 h-4" />
+              <SkipForward className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Loop Toggle Button */}
+            <button
+              type="button"
+              onClick={handleToggleLoop}
+              title={
+                isLoopEnabled
+                  ? 'Loop de Seção Ativado (clique para desativar)'
+                  : 'Ativar Loop da Seção'
+              }
+              className={`p-1.5 rounded transition-all flex items-center gap-1 ${
+                isLoopEnabled
+                  ? 'bg-osu-pink/20 text-osu-pink border border-osu-pink/40 shadow-sm'
+                  : 'bg-white/5 hover:bg-white/10 text-white/50 hover:text-white'
+              }`}
+            >
+              <Repeat className={`w-3.5 h-3.5 ${isLoopEnabled ? 'stroke-[2.5]' : ''}`} />
             </button>
           </div>
 
-          {/* Center: Playback Speed Buttons */}
-          <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10">
-            {[0.25, 0.5, 0.75, 1.0, 1.5].map((speed) => (
+          {/* Speed */}
+          <div className="flex items-center gap-0.5 bg-black/40 p-0.5 rounded-lg border border-white/10">
+            {[0.5, 0.75, 1.0, 1.5].map((speed) => (
               <button
                 key={speed}
                 type="button"
                 onClick={() => handleSpeedChange(speed)}
-                className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
+                className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all ${
                   playbackRate === speed
-                    ? 'bg-osu-pink text-white shadow-sm'
-                    : 'text-white/50 hover:text-white'
+                    ? 'bg-osu-pink text-white'
+                    : 'text-white/40 hover:text-white'
                 }`}
               >
                 {speed}x
@@ -455,18 +506,18 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             ))}
           </div>
 
-          {/* Right: Audio Volume & Background Dim */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
+          {/* Volume & Dim */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={handleToggleMute}
-                className="text-white/60 hover:text-white"
+                className="text-white/50 hover:text-white"
               >
                 {isMuted || volume === 0 ? (
-                  <VolumeX className="w-4 h-4 text-red-400" />
+                  <VolumeX className="w-3.5 h-3.5 text-red-400" />
                 ) : (
-                  <Volume2 className="w-4 h-4" />
+                  <Volume2 className="w-3.5 h-3.5" />
                 )}
               </button>
               <input
@@ -476,14 +527,13 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                 step={0.05}
                 value={isMuted ? 0 : volume}
                 onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                className="w-16 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-osu-cyan"
-                title="Volume dos Hitsounds"
+                className="w-12 h-1 bg-white/10 rounded appearance-none cursor-pointer accent-osu-cyan"
+                title="Volume"
               />
             </div>
 
-            <div className="hidden sm:flex items-center gap-1.5 text-white/50 text-[10px]">
-              <Sliders className="w-3.5 h-3.5" />
-              <span>Dim:</span>
+            <div className="hidden sm:flex items-center gap-1 text-white/40 text-[9px]">
+              <Sliders className="w-3 h-3" />
               <input
                 type="range"
                 min={0}
@@ -491,11 +541,170 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                 step={0.05}
                 value={bgDim}
                 onChange={(e) => handleBgDimChange(parseFloat(e.target.value))}
-                className="w-12 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white/50"
+                className="w-10 h-1 bg-white/10 rounded appearance-none cursor-pointer accent-white/40"
                 title="Escurecimento do Fundo"
               />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Espaço Embaixo: Lista de Seções / Capítulos Estilo YouTube */}
+      <div className="flex flex-col bg-[#0b0e14] p-3 flex-1 select-none">
+        {/* Header da Lista de Capítulos */}
+        <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-xs">
+          <div className="flex items-center gap-2 font-bold text-white/80 uppercase tracking-wider text-[11px]">
+            <Layers className="w-3.5 h-3.5 text-osu-pink" />
+            <span>Capítulos e Padrões ({sortedPatterns.length})</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleToggleLoop}
+              title={
+                isLoopEnabled
+                  ? 'Repetição em Loop Ativada (Clique para desativar e reproduzir continuamente)'
+                  : 'Ativar Modo Loop para repetir a seção selecionada'
+              }
+              className={`flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full border transition-all ${
+                isLoopEnabled
+                  ? 'bg-osu-pink/20 text-osu-pink border-osu-pink/50 font-bold shadow-sm'
+                  : 'bg-white/5 text-white/50 border-white/10 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Repeat className="w-3 h-3" />
+              <span>{isLoopEnabled ? 'Loop: Ativado' : 'Loop: Desativado'}</span>
+            </button>
+
+            {activePattern && (
+              <div className="hidden sm:flex items-center gap-1.5 text-[10px] text-osu-pink font-semibold bg-osu-pink/10 px-2 py-0.5 rounded-full border border-osu-pink/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-osu-pink animate-pulse" />
+                <span className="truncate max-w-[120px]">{activePattern.label}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Scrollable Chapters List (Com Auto-scroll e Iluminação em Tempo Real) */}
+        <div
+          ref={sectionsListRef}
+          className="flex flex-col gap-1.5 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar scroll-smooth"
+        >
+          {sortedPatterns.map((p) => {
+            const isActive =
+              (currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs) ||
+              selectedPatternId === p.id;
+
+            // Section completion percentage
+            const sectionProgress = isActive
+              ? clamp(0, (currentTimeMs - p.startTimeMs) / Math.max(1, p.endTimeMs - p.startTimeMs), 1) * 100
+              : currentTimeMs > p.endTimeMs
+              ? 100
+              : 0;
+
+            const severityBadge =
+              p.severity === 'extreme'
+                ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                : p.severity === 'high'
+                ? 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                : p.severity === 'medium'
+                ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+
+            return (
+              <div
+                key={p.id}
+                id={`section-row-${p.id}`}
+                onClick={() => jumpToPattern(p)}
+                className={`relative group shrink-0 min-h-[46px] rounded-lg p-2 transition-all duration-200 cursor-pointer overflow-hidden border ${
+                  isActive
+                    ? 'bg-gradient-to-r from-osu-pink/25 via-osu-pink/10 to-white/5 border-osu-pink shadow-glowPink ring-1 ring-osu-pink/40'
+                    : 'bg-white/[0.02] hover:bg-white/[0.06] border-white/5 hover:border-white/15'
+                }`}
+              >
+                {/* Chapter Row Content */}
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  {/* Left: Index, Timestamp, and Label */}
+                  <div className="flex items-center gap-2.5 overflow-hidden">
+                    {/* Timestamp pill */}
+                    <span
+                      className={`font-mono text-[11px] px-1.5 py-0.5 rounded font-bold transition-colors ${
+                        isActive
+                          ? 'bg-osu-pink text-white shadow-sm'
+                          : 'bg-black/50 text-osu-cyan group-hover:text-white'
+                      }`}
+                    >
+                      {p.startTimestamp}
+                    </span>
+
+                    {/* Chapter Title */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`font-semibold truncate transition-colors ${
+                            isActive ? 'text-white font-bold' : 'text-white/80 group-hover:text-white'
+                          }`}
+                        >
+                          {p.label}
+                        </span>
+
+                        {isActive && (
+                          <span className="flex items-center gap-1 text-[9px] font-black uppercase text-osu-pink bg-osu-pink/20 px-1 rounded tracking-wider">
+                            <Radio className="w-2.5 h-2.5 animate-pulse" />
+                            <span>AO VIVO</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {p.description && (
+                        <span className="text-[10px] text-white/40 truncate max-w-[280px]">
+                          {p.description}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Metrics & Severity Badge */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {p.metrics.bpm && (
+                      <span className="text-[10px] font-mono text-white/40 hidden sm:inline">
+                        {p.metrics.bpm} BPM
+                      </span>
+                    )}
+
+                    {p.noteCount > 0 && (
+                      <span className="text-[10px] font-mono text-white/40 hidden sm:inline">
+                        {p.noteCount} notas
+                      </span>
+                    )}
+
+                    <span
+                      className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border ${severityBadge}`}
+                    >
+                      {p.severity === 'extreme'
+                        ? 'Extrema'
+                        : p.severity === 'high'
+                        ? 'Alta'
+                        : p.severity === 'medium'
+                        ? 'Média'
+                        : 'Baixa'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Live Section Progress Bar at the bottom of active card */}
+                {isActive && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/40 overflow-hidden">
+                    <div
+                      className="h-full bg-osu-pink shadow-glowPink transition-all duration-100"
+                      style={{ width: `${sectionProgress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

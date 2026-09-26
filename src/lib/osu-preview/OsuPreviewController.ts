@@ -34,6 +34,7 @@ export class OsuPreviewController {
 
   private lastPlayedNoteIndex: number = -1;
   private tickCallbacks: Set<TickCallback> = new Set();
+  private loopRange: { startMs: number; endMs: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new OsuPreviewRenderer(canvas);
@@ -137,6 +138,14 @@ export class OsuPreviewController {
     this.drawCurrentFrame();
   }
 
+  public setLoopRange(startMs: number, endMs: number): void {
+    this.loopRange = { startMs, endMs };
+  }
+
+  public clearLoopRange(): void {
+    this.loopRange = null;
+  }
+
   public resize(): void {
     this.renderer.resize();
     this.drawCurrentFrame();
@@ -180,7 +189,11 @@ export class OsuPreviewController {
       const prevTime = this.currentTimeMs;
       this.currentTimeMs += deltaMs;
 
-      if (this.beatmap && this.currentTimeMs >= this.beatmap.duration) {
+      // Section Looping support
+      if (this.loopRange && this.currentTimeMs >= this.loopRange.endMs) {
+        this.currentTimeMs = this.loopRange.startMs;
+        this.lastPlayedNoteIndex = this.findLastNoteIndexBefore(this.currentTimeMs);
+      } else if (this.beatmap && this.currentTimeMs >= this.beatmap.duration) {
         this.currentTimeMs = this.beatmap.duration;
         this.pause();
       }

@@ -26,7 +26,7 @@ export class OsuPreviewRenderer {
   private canvasSize: [number, number] = [512, 384];
   private fieldSize: [number, number] = [512, 384];
   private margins: [number, number] = [0, 0];
-  private minMargin: number = 20;
+  private minMargin: number = 4;
 
   private bezierSegmentMaxLengthSqrd: number = 100;
   private sliderGradientDivisions: number = 16;
@@ -172,11 +172,6 @@ export class OsuPreviewRenderer {
         ctx.stroke();
       }
     }
-
-    // Playfield outer bounding box
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.strokeRect(this.margins[0], this.margins[1], this.fieldSize[0], this.fieldSize[1]);
 
     // 4. Follow Points
     this.drawFollowPoints(time, beatmap, skin, isHardRock);
