@@ -4,7 +4,7 @@ import { TrianglesBackground } from './components/common/TrianglesBackground';
 import { LazerToolbar } from './components/layout/LazerToolbar';
 import { LazerBottomBar } from './components/layout/LazerBottomBar';
 import { LazerWedge } from './components/beatmap/LazerWedge';
-import { LazerCarouselSet, groupBeatmapsBySet } from './components/beatmap/LazerCarouselSet';
+import { LazerCarouselItem } from './components/beatmap/LazerCarouselItem';
 import { PoolOverview } from './components/pool/PoolOverview';
 import { PoolUploader } from './components/pool/PoolUploader';
 import { SkillAttributes } from './engine/types';
@@ -31,8 +31,6 @@ export const App: React.FC = () => {
   const {
     currentPool,
     selectedMapId,
-    expandedSetKey,
-    setExpandedSetKey,
     filterMod,
     searchQuery,
     sortBy,
@@ -58,29 +56,9 @@ export const App: React.FC = () => {
 
   const maps = currentPool.maps;
   const filteredMaps = getFilteredAndSortedMaps(maps, filterMod, searchQuery, sortBy);
-  const groupedSets = groupBeatmapsBySet(filteredMaps);
 
   // Selected map
   const activeMap = maps.find((m) => m.id === selectedMapId) || maps[0] || null;
-
-  // Auto-expand the set containing active map if nothing is expanded
-  useEffect(() => {
-    if (activeMap && !expandedSetKey) {
-      const parentGroup = groupedSets.find((g) => g.maps.some((m) => m.id === activeMap.id));
-      if (parentGroup) {
-        setExpandedSetKey(parentGroup.key);
-      }
-    }
-  }, [activeMap, expandedSetKey, groupedSets, setExpandedSetKey]);
-
-  const handleToggleSet = (key: string) => {
-    // Accordion: clicking any other card immediately closes the previous one and opens the new one
-    if (expandedSetKey === key) {
-      setExpandedSetKey(null);
-    } else {
-      setExpandedSetKey(key);
-    }
-  };
 
   // Calculate pool average skills for comparison in the Wedge
   const avgSkills: SkillAttributes = {
@@ -272,21 +250,16 @@ export const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* The Carousel List (Grouped Set Cards + Accordion Difficulty Cards) */}
+              {/* The Carousel List: Individual Beatmap Difficulty Cards (no parent card) */}
               <div className="flex flex-col gap-1.5 max-h-[calc(100vh-170px)] overflow-y-auto overflow-x-hidden pr-1 w-full min-w-0 max-w-full">
-                {groupedSets.length > 0 ? (
-                  groupedSets.map((group) => (
-                    <LazerCarouselSet
-                      key={group.key}
-                      group={group}
-                      isExpanded={expandedSetKey === group.key}
-                      selectedMapId={selectedMapId}
-                      onToggleExpand={() => handleToggleSet(group.key)}
-                      onSelectMap={(id) => {
-                        selectMap(id);
-                        setExpandedSetKey(group.key);
-                      }}
-                      onRemoveMap={(id) => removeBeatmap(id)}
+                {filteredMaps.length > 0 ? (
+                  filteredMaps.map((map) => (
+                    <LazerCarouselItem
+                      key={map.id}
+                      map={map}
+                      isSelected={map.id === selectedMapId}
+                      onSelect={() => selectMap(map.id)}
+                      onRemove={() => removeBeatmap(map.id)}
                     />
                   ))
                 ) : (

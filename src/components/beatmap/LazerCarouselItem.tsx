@@ -86,25 +86,25 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
 
         {/* Right Side: Skill Highlights + Canonical Star Rating Pill + Delete */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Dominant Skill Chips */}
+          {/* Dominant Skill Chips (Formatted with Brazilian Comma and Percentage: "63,5%") */}
           <div className="hidden sm:flex items-center gap-1">
             {topSkills.slice(0, 2).map((skillKey) => (
               <span
                 key={skillKey}
                 className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#13071b]/90 border border-white/10 text-osu-cyan font-mono"
               >
-                {skillKey}: {skills[skillKey].toFixed(0)}
+                {skillKey}: {skills[skillKey].toFixed(1).replace('.', ',')}%
               </span>
             ))}
           </div>
 
           {/* Star Rating Badge (ppy/osu Spectrum) */}
           <div
-            className="px-2.5 py-0.5 rounded-pill font-extrabold text-xs flex items-center gap-1 shadow-sm border border-black/30"
+            className="px-2.5 py-0.5 rounded-full font-extrabold text-xs flex items-center gap-1 shadow-sm border border-black/30"
             style={{ backgroundColor: starColor, color: starTextColor }}
           >
             <span className="text-[10px]">★</span>
-            <span className="font-mono">{stats.starRating.toFixed(2)}</span>
+            <span className="font-mono">{stats.starRating.toFixed(2).replace('.', ',')}</span>
           </div>
 
           {/* Remove Button */}
