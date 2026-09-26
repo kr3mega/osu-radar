@@ -16,7 +16,6 @@ import {
   Radio,
   Layers,
   Music,
-  Upload,
   Loader2,
 } from 'lucide-react';
 import {
@@ -400,22 +399,19 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
           ) : audioStatus.state === 'loading' ? (
             <span
               title={audioStatus.message}
-              className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 animate-pulse"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-bold bg-yellow-500/15 text-yellow-300 border border-yellow-500/30 animate-pulse shadow-sm"
             >
-              <Loader2 className="w-2.5 h-2.5 animate-spin" />
-              <span>{audioStatus.message}</span>
+              <Loader2 className="w-2.5 h-2.5 animate-spin text-yellow-400" />
+              <span>{audioStatus.message || 'Baixando música...'}</span>
             </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => audioInputRef.current?.click()}
-              title="Carregar arquivo .mp3 ou .ogg da música"
-              className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/10 transition-all cursor-pointer"
+          ) : audioStatus.state === 'error' ? (
+            <span
+              title={audioStatus.message}
+              className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/15 text-red-400 border border-red-500/30"
             >
-              <Upload className="w-2.5 h-2.5 text-osu-pink" />
-              <span>Carregar .MP3</span>
-            </button>
-          )}
+              <span>{audioStatus.message || 'Música offline'}</span>
+            </span>
+          ) : null}
 
           <input
             ref={audioInputRef}

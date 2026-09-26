@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { BeatmapAnalysisResult, Mappool, SkillAttributes } from '../engine/types';
 import { cacheBeatmaps, clearAllData, db } from '../db';
+import { startBackgroundPoolAudioSync, clearAudioCache as clearDbAudioCache } from '../lib/osu-preview';
 
 import { TournamentTier } from '../engine/bws';
 import { SheetBeatmapEntry } from '../utils/sheetParser';
@@ -21,6 +22,14 @@ export type SortOption =
   | 'fingerControl'
   | 'readingTech';
 
+export interface AudioSyncStatus {
+  isSyncing: boolean;
+  current: number;
+  total: number;
+  activeMapName?: string;
+  totalBytes: number;
+}
+
 interface PoolState {
   currentPool: Mappool;
   selectedMapId: string | null;
@@ -33,6 +42,7 @@ interface PoolState {
   isMatchSimulatorOpen: boolean;
   expandedSetKey: string | null;
   activeTournamentFilter: ActiveTournamentFilter | null;
+  audioSyncStatus: AudioSyncStatus | null;
 
   // Actions
   addBeatmaps: (results: BeatmapAnalysisResult[]) => Promise<void>;
@@ -51,6 +61,8 @@ interface PoolState {
   resetAllData: () => Promise<void>;
   setIsAnalyzing: (analyzing: boolean) => void;
   setProgress: (progress: { current: number; total: number; fileName: string } | null) => void;
+  startAudioSync: () => void;
+  clearAudioCache: () => Promise<void>;
   exportPoolJson: () => string;
   importPoolJson: (jsonStr: string) => Promise<boolean>;
   initFromDb: () => Promise<void>;
@@ -76,6 +88,7 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   isMatchSimulatorOpen: false,
   expandedSetKey: null,
   activeTournamentFilter: null,
+  audioSyncStatus: null,
 
   setTournamentTier: (tournamentTier) => set({ tournamentTier }),
   setIsMatchSimulatorOpen: (isMatchSimulatorOpen) => set({ isMatchSimulatorOpen }),
@@ -107,6 +120,11 @@ export const usePoolStore = create<PoolState>((set, get) => ({
     } catch (e) {
       console.warn('Could not cache to IndexedDB:', e);
     }
+
+    // Automatically download and cache audio for all maps in background
+    setTimeout(() => {
+      get().startAudioSync();
+    }, 150);
   },
 
   removeBeatmap: (id) => {
@@ -202,18 +220,74 @@ export const usePoolStore = create<PoolState>((set, get) => ({
     }
   },
 
+  startAudioSync: () => {
+    const maps = get().currentPool.maps;
+    if (maps.length === 0) return;
+    if (get().audioSyncStatus?.isSyncing) return;
+
+    set({
+      audioSyncStatus: {
+        isSyncing: true,
+        current: 0,
+        total: maps.length,
+        totalBytes: 0,
+      },
+    });
+
+    startBackgroundPoolAudioSync(maps, (prog) => {
+      set((state) => ({
+        audioSyncStatus: {
+          isSyncing: !prog.isCompleted,
+          current: prog.current,
+          total: prog.total,
+          activeMapName: prog.activeMapName,
+          totalBytes: prog.totalBytes,
+        },
+        currentPool: {
+          ...state.currentPool,
+          maps: [...state.currentPool.maps],
+        },
+      }));
+    });
+  },
+
+  clearAudioCache: async () => {
+    await clearDbAudioCache();
+    set((state) => ({
+      audioSyncStatus: null,
+      currentPool: {
+        ...state.currentPool,
+        maps: state.currentPool.maps.map((m) => ({
+          ...m,
+          audioBlob: undefined,
+          audioUrl: undefined,
+        })),
+      },
+    }));
+  },
+
   initFromDb: async () => {
     try {
       const allCached = await db.beatmaps.toArray();
       if (allCached && allCached.length > 0) {
         // Exclude and purge any demo/sample maps (100001, 100002, 100003 or Tester/Antigravity)
         const demoIds = ['100001', '100002', '100003'];
-        const userMaps = allCached.filter(
-          (m) =>
-            !demoIds.includes(m.id) &&
-            m.metadata?.creator !== 'Tester' &&
-            m.metadata?.artist !== 'Antigravity'
-        );
+        const userMaps = allCached
+          .filter(
+            (m) =>
+              !demoIds.includes(m.id) &&
+              m.metadata?.creator !== 'Tester' &&
+              m.metadata?.artist !== 'Antigravity'
+          )
+          .map((m) => {
+            // Restore fresh object URL from cached audioBlob
+            if (m.audioBlob instanceof Blob && (!m.audioUrl || !m.audioUrl.startsWith('blob:'))) {
+              try {
+                m.audioUrl = URL.createObjectURL(m.audioBlob);
+              } catch {}
+            }
+            return m;
+          });
 
         if (userMaps.length !== allCached.length) {
           const toDelete = allCached
@@ -234,6 +308,11 @@ export const usePoolStore = create<PoolState>((set, get) => ({
           },
           selectedMapId: userMaps.length > 0 ? userMaps[0].id : null,
         }));
+
+        // Kick off background audio sync for any missing maps
+        setTimeout(() => {
+          get().startAudioSync();
+        }, 300);
       }
     } catch (e) {
       console.warn('Failed to load from DB:', e);

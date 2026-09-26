@@ -48,7 +48,14 @@ export function parseOsuBeatmap(text: string): ParsedBeatmapRaw {
       continue;
     }
 
-    if (currentSection === 'Metadata') {
+    if (currentSection === 'General') {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx !== -1) {
+        const key = line.slice(0, colonIdx).trim();
+        const value = line.slice(colonIdx + 1).trim();
+        if (key === 'AudioFilename') metadata.audioFilename = value;
+      }
+    } else if (currentSection === 'Metadata') {
       const colonIdx = line.indexOf(':');
       if (colonIdx !== -1) {
         const key = line.slice(0, colonIdx).trim();

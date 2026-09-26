@@ -23,6 +23,7 @@ export interface BeatmapMetadata {
   tags?: string[];
   beatmapId?: number;
   beatmapSetId?: number;
+  audioFilename?: string;
 }
 
 export interface BeatmapDifficulty {

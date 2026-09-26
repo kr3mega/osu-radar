@@ -1,6 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { usePoolStore } from '../../store/usePoolStore';
-import { Search, RotateCcw, Volume2, AlertTriangle, X } from 'lucide-react';
+import {
+  Search,
+  RotateCcw,
+  Volume2,
+  AlertTriangle,
+  X,
+  Music,
+  Loader2,
+  CloudDownload,
+  Trash2,
+  HardDrive,
+} from 'lucide-react';
 
 interface LazerToolbarProps {
   activeTab: 'select' | 'overview';
@@ -8,10 +19,40 @@ interface LazerToolbarProps {
 }
 
 export const LazerToolbar: React.FC<LazerToolbarProps> = ({ activeTab, onTabChange }) => {
-  const { searchQuery, setSearchQuery, resetAllData } = usePoolStore();
+  const {
+    searchQuery,
+    setSearchQuery,
+    resetAllData,
+    currentPool,
+    audioSyncStatus,
+    startAudioSync,
+    clearAudioCache,
+  } = usePoolStore();
   const [pulse, setPulse] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [showAudioMenu, setShowAudioMenu] = useState(false);
+  const [isClearingAudio, setIsClearingAudio] = useState(false);
+  const audioMenuRef = useRef<HTMLDivElement>(null);
+
+  const maps = currentPool.maps;
+  const cachedAudioCount = maps.filter((m) => m.audioBlob).length;
+  const totalMaps = maps.length;
+  const cachedBytes = maps.reduce((acc, m) => acc + (m.audioBlob?.size || 0), 0);
+  const cachedMb = (cachedBytes / (1024 * 1024)).toFixed(1);
+
+  // Close audio menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (audioMenuRef.current && !audioMenuRef.current.contains(e.target as Node)) {
+        setShowAudioMenu(false);
+      }
+    };
+    if (showAudioMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAudioMenu]);
 
   const handleCookieClick = () => {
     setPulse(true);
@@ -25,6 +66,15 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({ activeTab, onTabChan
       setShowResetConfirm(false);
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  const handleClearAudio = async () => {
+    setIsClearingAudio(true);
+    try {
+      await clearAudioCache();
+    } finally {
+      setIsClearingAudio(false);
     }
   };
 
@@ -107,6 +157,90 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({ activeTab, onTabChan
               className="pl-8 pr-3 py-1 text-xs rounded-full bg-[#1e0e29] border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-osu-pink w-32 sm:w-48 transition-all"
             />
           </div>
+
+          {/* Audio Cache Manager Button & Popover */}
+          {totalMaps > 0 && (
+            <div className="relative" ref={audioMenuRef}>
+              <button
+                type="button"
+                onClick={() => setShowAudioMenu(!showAudioMenu)}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-bold transition-all border shadow-sm ${
+                  audioSyncStatus?.isSyncing
+                    ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-300 animate-pulse'
+                    : cachedAudioCount === totalMaps
+                    ? 'bg-green-500/15 border-green-500/30 text-green-300 hover:bg-green-500/20'
+                    : 'bg-osu-pink/15 border-osu-pink/30 text-osu-pink hover:bg-osu-pink/25'
+                }`}
+                title="Status do Cache de Áudio Offline (IndexedDB)"
+              >
+                {audioSyncStatus?.isSyncing ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-yellow-400" />
+                ) : (
+                  <Music className="w-3.5 h-3.5" />
+                )}
+                <span className="hidden sm:inline font-mono text-[11px]">
+                  {audioSyncStatus?.isSyncing
+                    ? `${audioSyncStatus.current}/${audioSyncStatus.total}`
+                    : `${cachedAudioCount}/${totalMaps} áudios`}
+                </span>
+              </button>
+
+              {/* Popover Dropdown */}
+              {showAudioMenu && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-[#120819] border border-white/15 rounded-xl shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                      <HardDrive className="w-3.5 h-3.5 text-osu-cyan" />
+                      <span>Cache de Áudio (IndexedDB)</span>
+                    </div>
+                    <span className="text-[10px] text-white/50 font-mono">
+                      {cachedMb} MB
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-white/60 leading-relaxed mb-3">
+                    Os áudios são baixados e descompactados automaticamente via mirrors online e salvos permanentemente no seu IndexedDB local.
+                  </p>
+
+                  <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-white/5 mb-3 border border-white/5">
+                    <span className="text-white/70">Músicas em cache:</span>
+                    <span className="font-bold text-white font-mono">
+                      {cachedAudioCount} / {totalMaps}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    {cachedAudioCount < totalMaps && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          startAudioSync();
+                          setShowAudioMenu(false);
+                        }}
+                        disabled={audioSyncStatus?.isSyncing}
+                        className="w-full py-1.5 px-2.5 rounded-lg bg-osu-pink hover:bg-osu-pink/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md disabled:opacity-50"
+                      >
+                        <CloudDownload className="w-3.5 h-3.5" />
+                        <span>Baixar Áudios Restantes</span>
+                      </button>
+                    )}
+
+                    {cachedAudioCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearAudio}
+                        disabled={isClearingAudio}
+                        className="w-full py-1.5 px-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        <span>{isClearingAudio ? 'Limpando...' : 'Liberar Espaço (Limpar Cache)'}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Music visualizer bars */}
           <div className="hidden lg:flex items-center gap-1 px-2 text-osu-cyan">

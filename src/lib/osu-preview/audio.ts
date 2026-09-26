@@ -44,7 +44,10 @@ export class MusicPlayer {
           arrayBuf = source;
         }
 
-        this.buffer = await this.ctx.decodeAudioData(arrayBuf);
+        const copyBuf = arrayBuf.slice(0);
+        this.buffer = await new Promise<AudioBuffer>((resolve, reject) => {
+          this.ctx!.decodeAudioData(copyBuf, resolve, reject);
+        });
         this._duration = this.buffer.duration;
         this._hasRealAudio = true;
         return true;
