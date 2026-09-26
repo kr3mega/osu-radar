@@ -78,6 +78,17 @@ export class OsuPreviewController {
     this.notifyState();
   }
 
+  public async loadAudioTrack(audioSource: Blob | ArrayBuffer | string): Promise<boolean> {
+    const fallbackSec = this.beatmap ? (this.beatmap.duration + 1000) / 1000 : 120;
+    const ok = await this.musicPlayer.loadAudio(audioSource, fallbackSec);
+    this.musicPlayer.seek(this.currentTimeMs);
+    if (this.isPlaying) {
+      this.musicPlayer.play(this.currentTimeMs);
+    }
+    this.notifyState();
+    return ok;
+  }
+
   public subscribe(cb: TickCallback): () => void {
     this.tickCallbacks.add(cb);
     return () => this.tickCallbacks.delete(cb);

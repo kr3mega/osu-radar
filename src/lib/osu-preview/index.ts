@@ -7,3 +7,4 @@ export * from './audio';
 export * from './beatmap';
 export * from './render';
 export * from './OsuPreviewController';
+export * from './audioResolver';

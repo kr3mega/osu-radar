@@ -16,15 +16,20 @@ import {
   Radio,
   Layers,
   Music,
+  Upload,
+  Loader2,
 } from 'lucide-react';
 import {
   OsuPreviewController,
   getOrReconstructBeatmapText,
   OsuMod,
   clamp,
+  resolveBeatmapAudio,
+  AudioResolveStatus,
 } from '../../lib/osu-preview';
 import { DetectedPattern, formatOsuEditorTimestamp } from '../../engine/patterns';
 import { BeatmapAnalysisResult } from '../../engine/types';
+import { db } from '../../db';
 
 interface OsuPreviewPlayerProps {
   map: BeatmapAnalysisResult;
@@ -45,6 +50,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sectionsListRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<OsuPreviewController | null>(null);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTimeMs, setCurrentTimeMs] = useState<number>(initialTimeMs);
@@ -59,16 +65,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const [selectedPatternId, setSelectedPatternId] = useState<string | undefined>(initialPatternId);
   const [isLoopEnabled, setIsLoopEnabled] = useState<boolean>(false);
   const [hasAudioTrack, setHasAudioTrack] = useState<boolean>(false);
-
-  // Determine beatmap song audio source
-  const audioSource = useMemo(() => {
-    if (map.audioUrl) return map.audioUrl;
-    if (map.audioBlob) return map.audioBlob;
-    if (map.metadata.beatmapSetId && map.metadata.beatmapSetId > 0) {
-      return `https://b.ppy.sh/preview/${map.metadata.beatmapSetId}.mp3`;
-    }
-    return undefined;
-  }, [map]);
+  const [audioStatus, setAudioStatus] = useState<AudioResolveStatus>({
+    state: 'idle',
+    message: '',
+  });
 
   // Sorted patterns list for the YouTube-style chapters
   const sortedPatterns = useMemo(() => {
@@ -130,7 +130,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     controllerRef.current = controller;
 
     const rawText = getOrReconstructBeatmapText(map);
-    controller.init(rawText, initialTimeMs, audioSource).then(() => {
+    controller.init(rawText, initialTimeMs, map.audioBlob || map.audioUrl).then(() => {
       controller.setVolume(volume);
       controller.setBackgroundDim(bgDim);
     });
@@ -141,6 +141,16 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       setIsPlaying(state.isPlaying);
       setPlaybackRate(state.playbackRate);
       setHasAudioTrack(state.hasAudioTrack);
+    });
+
+    // Auto-resolve or download full audio track if missing
+    let isCancelled = false;
+    resolveBeatmapAudio(map, (status) => {
+      if (!isCancelled) setAudioStatus(status);
+    }).then((blob) => {
+      if (blob && !isCancelled && controllerRef.current) {
+        controllerRef.current.loadAudioTrack(blob);
+      }
     });
 
     const handleResize = () => {
@@ -323,9 +333,45 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     }
   };
 
+  // Manual audio file selection and drag-and-drop
+  const handleAudioFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    map.audioBlob = file;
+    map.audioUrl = URL.createObjectURL(file);
+    try {
+      await db.beatmaps.update(map.id, { audioBlob: file, audioUrl: map.audioUrl });
+    } catch {}
+    if (controllerRef.current) {
+      await controllerRef.current.loadAudioTrack(file);
+    }
+    setAudioStatus({ state: 'ready', message: 'Música carregada manualmente' });
+  };
+
+  const handleAudioDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (
+      file &&
+      (file.name.endsWith('.mp3') || file.name.endsWith('.ogg') || file.name.endsWith('.wav'))
+    ) {
+      map.audioBlob = file;
+      map.audioUrl = URL.createObjectURL(file);
+      try {
+        await db.beatmaps.update(map.id, { audioBlob: file, audioUrl: map.audioUrl });
+      } catch {}
+      if (controllerRef.current) {
+        await controllerRef.current.loadAudioTrack(file);
+      }
+      setAudioStatus({ state: 'ready', message: 'Música importada com sucesso' });
+    }
+  };
+
   return (
     <div
       ref={containerRef}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleAudioDrop}
       className={`flex flex-col bg-[#0b0e14] border border-white/10 rounded-xl overflow-hidden shadow-2xl transition-all ${
         isFullscreen ? 'fixed inset-0 z-50 rounded-none w-screen h-screen' : 'w-full'
       }`}
@@ -342,15 +388,42 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
           <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-osu-pink/20 text-osu-pink border border-osu-pink/30 uppercase tracking-wider">
             {map.modSlot || 'NM'}
           </span>
-          {hasAudioTrack && (
+          {hasAudioTrack ? (
             <span
-              title="Áudio da música sincronizado via AudioContext no ritmo do beatmap"
-              className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-500/15 text-green-400 border border-green-500/30"
+              title="Música do beatmap ativa e sincronizada no ritmo via AudioContext"
+              className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-500/15 text-green-400 border border-green-500/30 shadow-sm"
             >
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
               <Music className="w-2.5 h-2.5" />
-              <span>Áudio Sincronizado</span>
+              <span>MÚSICA ATIVA</span>
             </span>
+          ) : audioStatus.state === 'loading' ? (
+            <span
+              title={audioStatus.message}
+              className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 animate-pulse"
+            >
+              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+              <span>{audioStatus.message}</span>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => audioInputRef.current?.click()}
+              title="Carregar arquivo .mp3 ou .ogg da música"
+              className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/10 transition-all cursor-pointer"
+            >
+              <Upload className="w-2.5 h-2.5 text-osu-pink" />
+              <span>Carregar .MP3</span>
+            </button>
           )}
+
+          <input
+            ref={audioInputRef}
+            type="file"
+            accept="audio/mp3,audio/ogg,audio/wav,audio/*"
+            className="hidden"
+            onChange={handleAudioFileSelect}
+          />
         </div>
 
         {/* Mod Buttons & Fullscreen */}
