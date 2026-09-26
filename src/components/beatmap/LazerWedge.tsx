@@ -5,7 +5,7 @@ import { ModSlotBadge } from './ModSlotBadge';
 import { StatHexagon } from '../charts/StatHexagon';
 import { StrainTimeline } from '../charts/StrainTimeline';
 import { PatternTimelineVisualizer } from '../charts/PatternTimelineVisualizer';
-import { PatternPlayfieldVisualizer } from '../visualizer/PatternPlayfieldVisualizer';
+import { OsuPreviewPlayer } from '../visualizer/OsuPreviewPlayer';
 import { formatTimestamp } from '../../engine/strains';
 import { ExternalLink, Radio, Hexagon, ListFilter, Play } from 'lucide-react';
 
@@ -224,11 +224,10 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
           />
         )}
 
-        {/* View 3: Real-Time Playfield Visualizer (Avançar e Voltar com Física ao Vivo) */}
+        {/* View 3: Authentic osu! Preview Player (100% clone of TechnoZamb/osu-preview) */}
         {activeWedgeTab === 'visualizer' && (
-          <PatternPlayfieldVisualizer
-            hitObjects={map.hitObjects}
-            difficulty={difficulty}
+          <OsuPreviewPlayer
+            map={map}
             patterns={patterns}
             initialTimeMs={visualizerTimeMs}
             initialPatternId={visualizerPatternId}

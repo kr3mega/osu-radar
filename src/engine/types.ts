@@ -86,6 +86,7 @@ export interface BeatmapAnalysisResult {
   timeline: StrainPoint[];
   patterns?: import('./patterns').DetectedPattern[];
   hitObjects?: HitObject[];
+  rawText?: string;
   topSkills: Array<keyof SkillAttributes>;
   modSlot?: string; // "NM1", "HD2", "HR1", "DT1", "FM1", "TB"
   calculatedAt: number;

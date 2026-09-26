@@ -120,6 +120,7 @@ export async function analyzeBeatmap(
     timeline,
     patterns,
     hitObjects,
+    rawText,
     topSkills,
     modSlot,
     calculatedAt: Date.now(),
