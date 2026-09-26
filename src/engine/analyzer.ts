@@ -5,6 +5,7 @@ import { analyzeSpatialChannel } from './channels/spatial';
 import { analyzeAngularChannel } from './channels/angular';
 import { analyzeTechChannel } from './channels/tech';
 import { calculateRollingStrains } from './strains';
+import { detectBeatmapPatterns } from './patterns';
 
 /**
  * Calculates a fast 32-bit hash from string content for unique beatmap identification.
@@ -99,6 +100,7 @@ export async function analyzeBeatmap(
   analyzeTechChannel(hitObjects, timingPoints, difficulty.ar);
 
   const { timeline, skills } = calculateRollingStrains(hitObjects, timingPoints, difficulty.ar);
+  const patterns = detectBeatmapPatterns(hitObjects, timingPoints);
 
   // 6. Identify Top Skills (the 2 highest scoring attributes)
   const skillEntries = Object.entries(skills) as Array<[keyof SkillAttributes, number]>;
@@ -124,6 +126,7 @@ export async function analyzeBeatmap(
     stats,
     skills,
     timeline,
+    patterns,
     topSkills,
     modSlot,
     calculatedAt: Date.now(),

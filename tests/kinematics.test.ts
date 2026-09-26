@@ -46,4 +46,23 @@ describe('osuRadar Kinematic Engine & Beatmap Analyzer', () => {
     expect(result.timeline[0].timestamp).toMatch(/^\d{2}:\d{2}$/);
     expect(typeof result.timeline[0].totalStrain).toBe('number');
   });
+
+  it('detects discrete patterns with exact timestamps and editor formats', async () => {
+    const jumpResult = await analyzeBeatmap(jumpMapText, 'jump_map.osu');
+    expect(jumpResult.patterns).toBeDefined();
+    expect(jumpResult.patterns!.length).toBeGreaterThan(0);
+    expect(jumpResult.patterns!.some((p) => p.type === 'snap_jumps')).toBe(true);
+
+    const streamResult = await analyzeBeatmap(streamMapText, 'stream_map.osu');
+    expect(streamResult.patterns).toBeDefined();
+    expect(streamResult.patterns!.some((p) => p.type === 'deathstream' || p.type === 'stream')).toBe(true);
+    const streamPattern = streamResult.patterns!.find((p) => p.type === 'deathstream' || p.type === 'stream')!;
+    expect(streamPattern.startTimestamp).toMatch(/^\d{2}:\d{2}$/);
+    expect(streamPattern.osuEditorTimestamp).toMatch(/^\d{2}:\d{2}:\d{3}$/);
+    expect(streamPattern.metrics.bpm).toBeGreaterThan(150);
+
+    const techResult = await analyzeBeatmap(techMapText, 'tech_map.osu');
+    expect(techResult.patterns).toBeDefined();
+    expect(techResult.patterns!.some((p) => p.type === 'sv_spike')).toBe(true);
+  });
 });
