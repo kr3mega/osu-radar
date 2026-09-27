@@ -27,3 +27,4 @@ dist-ssr
 # Firebase
 .firebase/
 firebase-debug.log*
+/ppy-osu-oficial-project-repository
