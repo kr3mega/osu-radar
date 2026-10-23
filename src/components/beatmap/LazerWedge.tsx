@@ -7,7 +7,7 @@ import { StrainTimeline } from '../charts/StrainTimeline';
 import { PatternTimelineVisualizer } from '../charts/PatternTimelineVisualizer';
 import { OsuPreviewPlayer } from '../visualizer/OsuPreviewPlayer';
 import { formatTimestamp } from '../../engine/strains';
-import { ExternalLink, Radio, Hexagon, ListFilter, Play } from 'lucide-react';
+import { ExternalLink, Radio, Hexagon, Play } from 'lucide-react';
 
 interface LazerWedgeProps {
   map: BeatmapAnalysisResult | null;
@@ -166,22 +166,6 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
           >
             <Hexagon className="w-3.5 h-3.5" />
             <span>Radar de Skills</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveWedgeTab('patterns')}
-            className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
-              activeWedgeTab === 'patterns'
-                ? 'bg-osu-pink text-white shadow-glowPink'
-                : 'bg-white/5 text-white/60 hover:text-white'
-            }`}
-          >
-            <ListFilter className="w-3.5 h-3.5" />
-            <span>Padrões & Timestamps</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/40 text-osu-cyan font-mono">
-              {patterns.length}
-            </span>
           </button>
 
           <button
