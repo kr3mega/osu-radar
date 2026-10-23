@@ -121,24 +121,27 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     }
   }, [map.id, map.modSlot, slotMod]);
 
-  // Authentic algorithm-detected patterns
+  // Authentic algorithm-detected patterns (always evaluated with rhythm-relative detector so cached maps also update)
   const detectedPatterns = useMemo<DetectedPattern[]>(() => {
+    const rateMultiplier = activeMods.has('dt') ? 1.5 : activeMods.has('ht') ? 0.75 : 1.0;
+    try {
+      const rawText = getOrReconstructBeatmapText(map);
+      const parsed = parseOsuBeatmap(rawText);
+      const computed = detectBeatmapPatterns(parsed.hitObjects, parsed.timingPoints, rateMultiplier);
+      if (computed.length > 0) {
+        return computed.sort((a, b) => a.startTimeMs - b.startTimeMs);
+      }
+    } catch (err) {
+      console.warn('Failed to detect patterns on the fly:', err);
+    }
     if (patterns && patterns.length > 0) {
       return [...patterns].sort((a, b) => a.startTimeMs - b.startTimeMs);
     }
     if (map.patterns && map.patterns.length > 0) {
       return [...map.patterns].sort((a, b) => a.startTimeMs - b.startTimeMs);
     }
-    try {
-      const rawText = getOrReconstructBeatmapText(map);
-      const parsed = parseOsuBeatmap(rawText);
-      const computed = detectBeatmapPatterns(parsed.hitObjects, parsed.timingPoints);
-      return computed.sort((a, b) => a.startTimeMs - b.startTimeMs);
-    } catch (err) {
-      console.warn('Failed to detect patterns on the fly:', err);
-      return [];
-    }
-  }, [patterns, map]);
+    return [];
+  }, [patterns, map.id, map.rawText, activeMods]);
 
   const filteredPatterns = useMemo(() => {
     return detectedPatterns.filter((p) => {

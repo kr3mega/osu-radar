@@ -371,7 +371,7 @@ export function getOrReconstructBeatmapText(map: any): string {
     `SliderTickRate:${diff.sliderTickRate ?? 1}`,
     '',
     '[TimingPoints]',
-    '0,500,4,2,0,100,1,0',
+    `0,${60000 / Math.max(30, map.stats?.bpmMode || 120)},4,2,0,100,1,0`,
     '',
     '[HitObjects]',
   ];

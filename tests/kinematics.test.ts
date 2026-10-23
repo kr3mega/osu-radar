@@ -3,6 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { analyzeBeatmap } from '../src/engine/analyzer';
 import { parseOsuBeatmap } from '../src/engine/parser';
+import { detectBeatmapPatterns } from '../src/engine/patterns';
+import { HitObject, TimingPoint } from '../src/engine/types';
 
 describe('osuRadar Kinematic Engine & Beatmap Analyzer', () => {
   const jumpMapText = fs.readFileSync(path.join(__dirname, 'fixtures', 'jump_map.osu'), 'utf-8');
@@ -63,5 +65,35 @@ describe('osuRadar Kinematic Engine & Beatmap Analyzer', () => {
     const techResult = await analyzeBeatmap(techMapText, 'tech_map.osu');
     expect(techResult.patterns).toBeDefined();
     expect(techResult.patterns!.some((p) => p.type === 'sv_spike')).toBe(true);
+  });
+
+  it('detects bursts, streams, and Insane-spacing jumps on lower base-BPM / DT maps (e.g. 115 BPM base -> 173 BPM DT)', () => {
+    // 115.38 BPM base -> beatLength = 520ms (1/4 = 130ms, 1/2 = 260ms)
+    const timingPoints: TimingPoint[] = [
+      { time: 0, beatLength: 520, meter: 4, uninherited: true },
+    ];
+
+    const hitObjects: HitObject[] = [
+      // 5-note 1/4 burst at 130ms intervals
+      { x: 100, y: 100, time: 1000, type: 'circle' },
+      { x: 120, y: 100, time: 1130, type: 'circle' },
+      { x: 140, y: 100, time: 1260, type: 'circle' },
+      { x: 160, y: 100, time: 1390, type: 'circle' },
+      { x: 180, y: 100, time: 1520, type: 'circle' },
+      // 5-note 1/2 Insane jumps (~145px spacing) at 260ms intervals
+      { x: 100, y: 200, time: 2500, type: 'circle' },
+      { x: 245, y: 200, time: 2760, type: 'circle' },
+      { x: 100, y: 200, time: 3020, type: 'circle' },
+      { x: 245, y: 200, time: 3280, type: 'circle' },
+      { x: 100, y: 200, time: 3540, type: 'circle' },
+    ];
+
+    const patterns = detectBeatmapPatterns(hitObjects, timingPoints, 1.5);
+    expect(patterns.length).toBeGreaterThanOrEqual(2);
+    expect(patterns.some((p) => p.type === 'burst')).toBe(true);
+    expect(patterns.some((p) => p.type === 'snap_jumps')).toBe(true);
+
+    const burst = patterns.find((p) => p.type === 'burst')!;
+    expect(burst.metrics.bpm).toBe(173); // 115.38 * 1.5 = 173 BPM with DT
   });
 });
