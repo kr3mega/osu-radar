@@ -218,10 +218,19 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     };
     window.addEventListener('resize', handleResize);
 
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && canvasRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        controller.resize();
+      });
+      resizeObserver.observe(canvasRef.current);
+    }
+
     return () => {
       isCancelled = true;
       unsubscribe();
       window.removeEventListener('resize', handleResize);
+      resizeObserver?.disconnect();
       controller.destroy();
       controllerRef.current = null;
     };

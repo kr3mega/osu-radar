@@ -243,12 +243,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #0e0b0d;
-    padding: 10px 15px;
+    background-color: #000;
+    padding: 0;
     border-bottom: 1px solid @osu-colour-b4;
 
     .osu-radar-player--fullscreen & {
       flex: 1;
+      background-color: #0e0b0d;
       padding: 20px;
     }
   }
@@ -256,16 +257,17 @@
   &__canvas-box {
     position: relative;
     width: 100%;
-    max-width: 420px;
+    max-width: 100%;
     aspect-ratio: 512 / 384;
     background-color: #000;
-    border-radius: 8px;
+    border-radius: 0;
     overflow: hidden;
     cursor: pointer;
-    .default-box-shadow();
 
     .osu-radar-player--fullscreen & {
       max-width: 860px;
+      border-radius: 8px;
+      .default-box-shadow();
     }
 
     canvas {
