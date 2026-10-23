@@ -73,6 +73,10 @@ export class OsuPreviewRenderer {
 
     this.canvasSize = [width, height];
 
+    // Artificially increase margins around 512x384 playfield so circles, slider borders,
+    // and approach circles near edges never clip or escape past the black canvas boundary
+    this.minMargin = Math.max(24, Math.round(Math.min(width, height) * 0.08));
+
     if (width / height > 512 / 384) {
       this.fieldSize[1] = height - this.minMargin * 2;
       this.fieldSize[0] = (this.fieldSize[1] / 384) * 512;

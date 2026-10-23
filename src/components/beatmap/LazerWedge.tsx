@@ -3,8 +3,6 @@ import { BeatmapAnalysisResult, SkillAttributes } from '../../engine/types';
 import { getStarRatingColor, getStarRatingTextColor } from '../../utils/osuColors';
 import { ModSlotBadge } from './ModSlotBadge';
 import { StatHexagon } from '../charts/StatHexagon';
-import { StrainTimeline } from '../charts/StrainTimeline';
-import { PatternTimelineVisualizer } from '../charts/PatternTimelineVisualizer';
 import { OsuPreviewPlayer } from '../visualizer/OsuPreviewPlayer';
 import { formatTimestamp } from '../../engine/strains';
 import { ExternalLink, Radio, Hexagon, Play } from 'lucide-react';
@@ -20,15 +18,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   poolAverageSkills,
   onSlotChange,
 }) => {
-  const [activeWedgeTab, setActiveWedgeTab] = useState<'radar' | 'patterns' | 'visualizer'>('radar');
-  const [visualizerTimeMs, setVisualizerTimeMs] = useState<number | undefined>(undefined);
-  const [visualizerPatternId, setVisualizerPatternId] = useState<string | undefined>(undefined);
-
-  const handleSelectTimestamp = (timeMs: number, patternId?: string) => {
-    setVisualizerTimeMs(timeMs);
-    setVisualizerPatternId(patternId);
-    setActiveWedgeTab('visualizer');
-  };
+  const [activeWedgeTab, setActiveWedgeTab] = useState<'radar' | 'visualizer'>('visualizer');
 
   if (!map) {
     return (
@@ -44,7 +34,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
     );
   }
 
-  const { metadata, stats, difficulty, skills, timeline, patterns = [], modSlot } = map;
+  const { metadata, stats, difficulty, skills, patterns = [], modSlot } = map;
   const coverUrl = metadata.beatmapSetId
     ? `https://assets.ppy.sh/beatmaps/${metadata.beatmapSetId}/covers/cover.jpg`
     : null;
@@ -199,33 +189,13 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
           </div>
         )}
 
-        {/* View 2: Detailed Pattern Visualizer with Timestamps */}
-        {activeWedgeTab === 'patterns' && (
-          <PatternTimelineVisualizer
-            patterns={patterns}
-            durationMs={stats.durationMs}
-            onSelectTimestamp={(timeMs, p) => handleSelectTimestamp(timeMs, p?.id)}
-          />
-        )}
-
-        {/* View 3: Authentic osu! Preview Player (100% clone of TechnoZamb/osu-preview) */}
+        {/* View 2: Authentic osu! Preview Player with Pattern Recognition */}
         {activeWedgeTab === 'visualizer' && (
           <OsuPreviewPlayer
             map={map}
             patterns={patterns}
-            initialTimeMs={visualizerTimeMs}
-            initialPatternId={visualizerPatternId}
           />
         )}
-
-        {/* Continuous Strain Timeline ("Pontos de Tensão" - Click to Seek) */}
-        <div className="mb-3">
-          <StrainTimeline
-            timeline={timeline}
-            height={130}
-            onSelectTimestamp={(timeMs) => handleSelectTimestamp(timeMs)}
-          />
-        </div>
       </div>
     </div>
   );

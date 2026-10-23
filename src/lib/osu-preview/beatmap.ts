@@ -145,9 +145,9 @@ export function applyBeatmapCalculations(
   // Sort timing points by time
   beatmap.TimingPoints.sort((a, b) => a[0] - b[0]);
 
-  // Radius (CS)
-  const isEZ = activeMods.has('ez');
+  // Radius (CS) - HR and EZ are strictly mutually exclusive
   const isHR = activeMods.has('hr');
+  const isEZ = !isHR && activeMods.has('ez');
   const effectiveCS = clamp(0, beatmap.Difficulty.CircleSize * (isEZ ? 0.5 : isHR ? 1.3 : 1), 10);
   beatmap.radius = 54.4 - 4.48 * effectiveCS;
 

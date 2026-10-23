@@ -14,9 +14,13 @@ import {
   Check,
   Sliders,
   Radio,
-  Layers,
   Music,
   Loader2,
+  Zap,
+  Waves,
+  Target,
+  Activity,
+  Filter,
 } from 'lucide-react';
 import {
   OsuPreviewController,
@@ -26,9 +30,70 @@ import {
   resolveBeatmapAudio,
   AudioResolveStatus,
 } from '../../lib/osu-preview';
-import { DetectedPattern, formatOsuEditorTimestamp } from '../../engine/patterns';
+import {
+  DetectedPattern,
+  PatternType,
+  PatternSeverity,
+  detectBeatmapPatterns,
+  formatOsuEditorTimestamp,
+} from '../../engine/patterns';
+import { parseOsuBeatmap } from '../../engine/parser';
 import { BeatmapAnalysisResult } from '../../engine/types';
 import { db } from '../../db';
+
+export function getModFromSlot(modSlot?: string): OsuMod | null {
+  if (!modSlot) return null;
+  const upper = modSlot.toUpperCase().trim();
+  if (upper.startsWith('HD')) return 'hd';
+  if (upper.startsWith('HR')) return 'hr';
+  if (upper.startsWith('DT')) return 'dt';
+  if (upper.startsWith('EZ')) return 'ez';
+  return null;
+}
+
+const SEVERITY_BADGES: Record<
+  PatternSeverity,
+  { bg: string; text: string; border: string; label: string }
+> = {
+  extreme: {
+    bg: 'bg-red-500/20',
+    text: 'text-red-400 font-extrabold',
+    border: 'border-red-500/40',
+    label: 'Extrema',
+  },
+  high: {
+    bg: 'bg-orange-500/20',
+    text: 'text-orange-400 font-bold',
+    border: 'border-orange-500/40',
+    label: 'Alta',
+  },
+  medium: {
+    bg: 'bg-yellow-500/20',
+    text: 'text-yellow-400 font-medium',
+    border: 'border-yellow-500/30',
+    label: 'Média',
+  },
+  low: {
+    bg: 'bg-cyan-500/15',
+    text: 'text-cyan-300 font-normal',
+    border: 'border-cyan-500/30',
+    label: 'Baixa',
+  },
+};
+
+const PATTERN_ICONS: Record<PatternType, React.ReactNode> = {
+  deathstream: <Waves className="w-3.5 h-3.5 text-osu-pink" />,
+  stream: <Waves className="w-3.5 h-3.5 text-osu-cyan" />,
+  spaced_stream: <Waves className="w-3.5 h-3.5 text-red-400" />,
+  burst: <Activity className="w-3.5 h-3.5 text-osu-cyan" />,
+  snap_jumps: <Target className="w-3.5 h-3.5 text-yellow-400" />,
+  flow_aim: <Zap className="w-3.5 h-3.5 text-green-400" />,
+  sv_spike: <Activity className="w-3.5 h-3.5 text-purple-400" />,
+  rhythm_switch: <Filter className="w-3.5 h-3.5 text-blue-400" />,
+  choke_point: <Zap className="w-3.5 h-3.5 text-red-500" />,
+};
+
+type PatternCategory = 'TODOS' | 'STREAMS' | 'JUMPS' | 'BURSTS' | 'TECH';
 
 interface OsuPreviewPlayerProps {
   map: BeatmapAnalysisResult;
@@ -47,7 +112,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const sectionsListRef = useRef<HTMLDivElement | null>(null);
+  const patternsListRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<OsuPreviewController | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -59,67 +124,94 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [bgDim, setBgDim] = useState<number>(0.85);
   const [activeMods, setActiveMods] = useState<Set<OsuMod>>(new Set());
-  const [copied, setCopied] = useState<boolean>(false);
+  const [copiedTime, setCopiedTime] = useState<boolean>(false);
+  const [copiedPatternId, setCopiedPatternId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [selectedPatternId, setSelectedPatternId] = useState<string | undefined>(initialPatternId);
   const [isLoopEnabled, setIsLoopEnabled] = useState<boolean>(false);
   const [hasAudioTrack, setHasAudioTrack] = useState<boolean>(false);
+  const [patternCategory, setPatternCategory] = useState<PatternCategory>('TODOS');
   const [audioStatus, setAudioStatus] = useState<AudioResolveStatus>({
     state: 'idle',
     message: '',
   });
 
-  // Sorted patterns list for the YouTube-style chapters
-  const sortedPatterns = useMemo(() => {
-    if (patterns.length > 0) {
-      return [...patterns].sort((a, b) => a.startTimeMs - b.startTimeMs);
+  // 1. Derive mod from beatmap slot (HD, HR, DT, EZ, or none)
+  const slotMod = useMemo(() => getModFromSlot(map.modSlot), [map.modSlot]);
+
+  // When map changes, auto-select its corresponding mod immediately and clear all others
+  useEffect(() => {
+    const nextMods = new Set<OsuMod>();
+    if (slotMod) {
+      nextMods.add(slotMod);
     }
-    // Fallback: create sections based on duration if no discrete patterns were detected
-    const totalSec = Math.floor((map.stats.durationMs || 60000) / 1000);
-    const stepSec = Math.max(15, Math.floor(totalSec / 8));
-    const fallbackList: DetectedPattern[] = [];
-    for (let s = 0; s < totalSec; s += stepSec) {
-      const startMs = s * 1000;
-      const endMs = Math.min((s + stepSec) * 1000, map.stats.durationMs || 60000);
-      const min = Math.floor(s / 60);
-      const sec = s % 60;
-      const startStr = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-      fallbackList.push({
-        id: `section-${s}`,
-        type: 'flow_aim',
-        label: s === 0 ? 'Introdução do Mapa' : `Seção ${Math.floor(s / stepSec) + 1}`,
-        startTimeMs: startMs,
-        endTimeMs: endMs,
-        startTimestamp: startStr,
-        endTimestamp: startStr,
-        osuEditorTimestamp: `${startStr}:000`,
-        severity: 'medium',
-        noteCount: 16,
-        description: 'Trecho do mapa',
-        metrics: {},
+    setActiveMods(nextMods);
+    setPlaybackRate(slotMod === 'dt' ? 1.5 : 1.0);
+    if (controllerRef.current) {
+      (['ez', 'hr', 'dt', 'hd'] as OsuMod[]).forEach((m) => {
+        controllerRef.current?.setMod(m, nextMods.has(m));
       });
     }
-    return fallbackList;
-  }, [patterns, map.stats.durationMs]);
+  }, [map.id, map.modSlot, slotMod]);
+
+  // Authentic algorithm-detected patterns (Streams, Deathstreams, Bursts, Jumps, SV Spikes, etc.)
+  const detectedPatterns = useMemo<DetectedPattern[]>(() => {
+    if (patterns && patterns.length > 0) {
+      return [...patterns].sort((a, b) => a.startTimeMs - b.startTimeMs);
+    }
+    if (map.patterns && map.patterns.length > 0) {
+      return [...map.patterns].sort((a, b) => a.startTimeMs - b.startTimeMs);
+    }
+    // Compute on-the-fly via the authentic algorithm
+    try {
+      const rawText = getOrReconstructBeatmapText(map);
+      const parsed = parseOsuBeatmap(rawText);
+      const computed = detectBeatmapPatterns(parsed.hitObjects, parsed.timingPoints);
+      return computed.sort((a, b) => a.startTimeMs - b.startTimeMs);
+    } catch (err) {
+      console.warn('Failed to detect patterns on the fly:', err);
+      return [];
+    }
+  }, [patterns, map]);
+
+  // Filtered patterns by category
+  const filteredPatterns = useMemo(() => {
+    return detectedPatterns.filter((p) => {
+      if (patternCategory === 'TODOS') return true;
+      if (patternCategory === 'STREAMS') {
+        return p.type === 'stream' || p.type === 'deathstream' || p.type === 'spaced_stream';
+      }
+      if (patternCategory === 'JUMPS') {
+        return p.type === 'snap_jumps' || p.type === 'flow_aim';
+      }
+      if (patternCategory === 'BURSTS') {
+        return p.type === 'burst';
+      }
+      if (patternCategory === 'TECH') {
+        return p.type === 'sv_spike' || p.type === 'rhythm_switch' || p.type === 'choke_point';
+      }
+      return true;
+    });
+  }, [detectedPatterns, patternCategory]);
 
   // 1. Identify active pattern currently playing live
   const livePattern = useMemo(() => {
     return (
-      sortedPatterns.find(
+      detectedPatterns.find(
         (p) => currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs
       ) || null
     );
-  }, [sortedPatterns, currentTimeMs]);
+  }, [detectedPatterns, currentTimeMs]);
 
-  // 2. Identify currently playing OR most recently completed pattern waiting for the next one
+  // 2. Identify currently playing OR most recently completed pattern
   const currentOrRecentPattern = useMemo(() => {
     if (livePattern) return livePattern;
-    const pastPatterns = sortedPatterns.filter((p) => currentTimeMs >= p.startTimeMs);
+    const pastPatterns = detectedPatterns.filter((p) => currentTimeMs >= p.startTimeMs);
     if (pastPatterns.length > 0) {
       return pastPatterns[pastPatterns.length - 1];
     }
-    return sortedPatterns.find((p) => p.id === selectedPatternId) || null;
-  }, [sortedPatterns, currentTimeMs, livePattern, selectedPatternId]);
+    return detectedPatterns.find((p) => p.id === selectedPatternId) || null;
+  }, [detectedPatterns, currentTimeMs, livePattern, selectedPatternId]);
 
   // Initialize OsuPreviewController
   useEffect(() => {
@@ -128,11 +220,18 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     const controller = new OsuPreviewController(canvasRef.current);
     controllerRef.current = controller;
 
+    const initialMods = new Set<OsuMod>();
+    if (slotMod) {
+      initialMods.add(slotMod);
+    }
+
     const rawText = getOrReconstructBeatmapText(map);
-    controller.init(rawText, initialTimeMs, map.audioBlob || map.audioUrl).then(() => {
-      controller.setVolume(volume);
-      controller.setBackgroundDim(bgDim);
-    });
+    controller
+      .init(rawText, initialTimeMs, map.audioBlob || map.audioUrl, initialMods)
+      .then(() => {
+        controller.setVolume(volume);
+        controller.setBackgroundDim(bgDim);
+      });
 
     const unsubscribe = controller.subscribe((state) => {
       setCurrentTimeMs(state.currentTimeMs);
@@ -165,17 +264,16 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     };
   }, [map]);
 
-  // Auto-scroll list to active chapter (like YouTube sections)
+  // Auto-scroll list to active pattern
   useEffect(() => {
     const targetToScroll = livePattern || currentOrRecentPattern;
-    if (targetToScroll && isPlaying && sectionsListRef.current) {
-      const container = sectionsListRef.current;
-      const activeEl = document.getElementById(`section-row-${targetToScroll.id}`);
+    if (targetToScroll && isPlaying && patternsListRef.current) {
+      const container = patternsListRef.current;
+      const activeEl = document.getElementById(`pattern-row-${targetToScroll.id}`);
       if (activeEl) {
         const containerRect = container.getBoundingClientRect();
         const elementRect = activeEl.getBoundingClientRect();
 
-        // Only scroll if outside visible area of the list container
         if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
           const offsetTop = activeEl.offsetTop - container.offsetTop;
           container.scrollTo({
@@ -187,7 +285,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     }
   }, [livePattern?.id, currentOrRecentPattern?.id, isPlaying]);
 
-  // Jump to pattern / section (Like clicking a YouTube chapter)
+  // Jump to pattern on click
   const jumpToPattern = useCallback(
     (p: DetectedPattern) => {
       setSelectedPatternId(p.id);
@@ -212,8 +310,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
         const target =
           livePattern ||
           currentOrRecentPattern ||
-          sortedPatterns.find((p) => p.id === selectedPatternId) ||
-          sortedPatterns[0];
+          detectedPatterns.find((p) => p.id === selectedPatternId) ||
+          detectedPatterns[0];
         if (target) {
           controllerRef.current.setLoopRange(target.startTimeMs, target.endTimeMs);
         }
@@ -255,9 +353,23 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     if (newMods.has(modName)) {
       newMods.delete(modName);
       controllerRef.current.setMod(modName, false);
+      if (modName === 'dt') {
+        setPlaybackRate(1.0);
+      }
     } else {
+      // HR and EZ are strictly mutually exclusive
+      if (modName === 'hr') {
+        newMods.delete('ez');
+        controllerRef.current.setMod('ez', false);
+      } else if (modName === 'ez') {
+        newMods.delete('hr');
+        controllerRef.current.setMod('hr', false);
+      }
       newMods.add(modName);
       controllerRef.current.setMod(modName, true);
+      if (modName === 'dt') {
+        setPlaybackRate(1.5);
+      }
     }
     setActiveMods(newMods);
   };
@@ -291,8 +403,15 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const copyEditorTimestamp = () => {
     const text = formatOsuEditorTimestamp(currentTimeMs);
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setCopiedTime(true);
+    setTimeout(() => setCopiedTime(false), 1500);
+  };
+
+  const handleCopyPatternTimestamp = async (p: DetectedPattern, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(p.osuEditorTimestamp);
+    setCopiedPatternId(p.id);
+    setTimeout(() => setCopiedPatternId(null), 1500);
   };
 
   // Keyboard shortcuts
@@ -332,7 +451,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     }
   };
 
-  // Manual audio file selection and drag-and-drop
+  // Manual audio file selection
   const handleAudioFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -455,7 +574,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
         </div>
       </div>
 
-      {/* Visor do Preview (Compacto, Snug Fit sem bordas pretas gigantes) */}
+      {/* Visor do Preview (Margens ampliadas internamente para evitar que hitobjects vazem da tela) */}
       <div
         className={`flex items-center justify-center bg-[#07090e] border-b border-white/5 ${
           isFullscreen ? 'flex-1 p-4' : 'py-2.5 px-3'
@@ -491,7 +610,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
         </div>
       </div>
 
-      {/* Compact Scrubber Timeline Bar */}
+      {/* Scrubber Timeline Bar */}
       <div className="px-3 py-2 bg-[#10141e] border-b border-white/10 flex flex-col gap-1.5 select-none">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono text-osu-cyan font-bold min-w-[50px]">
@@ -519,7 +638,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             title="Copiar Timestamp para o editor osu!"
             className="p-1 rounded bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all flex items-center gap-1 text-[10px]"
           >
-            {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+            {copiedTime ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
           </button>
         </div>
 
@@ -578,8 +697,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               onClick={handleToggleLoop}
               title={
                 isLoopEnabled
-                  ? 'Loop de Seção Ativado (clique para desativar)'
-                  : 'Ativar Loop da Seção'
+                  ? 'Repetição em Loop Ativada (Clique para desativar)'
+                  : 'Ativar Modo Loop para repetir o padrão selecionado'
               }
               className={`p-1.5 rounded transition-all flex items-center gap-1 ${
                 isLoopEnabled
@@ -652,186 +771,200 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
         </div>
       </div>
 
-      {/* Espaço Embaixo: Lista de Seções / Capítulos Estilo YouTube */}
+      {/* Espaço Ampliado: Padrões Competitivos Detectados pelo Algoritmo */}
       <div className="flex flex-col bg-[#0b0e14] p-3 flex-1 select-none">
-        {/* Header da Lista de Capítulos */}
-        <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-xs">
+        {/* Header do Reconhecimento de Padrões e Filtros */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-2 border-b border-white/10 text-xs">
           <div className="flex items-center gap-2 font-bold text-white/80 uppercase tracking-wider text-[11px]">
-            <Layers className="w-3.5 h-3.5 text-osu-pink" />
-            <span>Capítulos e Padrões ({sortedPatterns.length})</span>
+            <Zap className="w-3.5 h-3.5 text-osu-pink" />
+            <span>Padrões Detectados pelo Algoritmo ({detectedPatterns.length})</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleToggleLoop}
-              title={
-                isLoopEnabled
-                  ? 'Repetição em Loop Ativada (Clique para desativar e reproduzir continuamente)'
-                  : 'Ativar Modo Loop para repetir a seção selecionada'
-              }
-              className={`flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full border transition-all ${
-                isLoopEnabled
-                  ? 'bg-osu-pink/20 text-osu-pink border-osu-pink/50 font-bold shadow-sm'
-                  : 'bg-white/5 text-white/50 border-white/10 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Repeat className="w-3 h-3" />
-              <span>{isLoopEnabled ? 'Loop: Ativado' : 'Loop: Desativado'}</span>
-            </button>
-
-            {livePattern ? (
-              <div className="hidden sm:flex items-center gap-1.5 text-[10px] text-osu-pink font-semibold bg-osu-pink/10 px-2 py-0.5 rounded-full border border-osu-pink/20 animate-pulse">
-                <span className="w-1.5 h-1.5 rounded-full bg-osu-pink" />
-                <span className="truncate max-w-[120px]">Agora: {livePattern.label}</span>
-              </div>
-            ) : currentOrRecentPattern ? (
-              <div className="hidden sm:flex items-center gap-1.5 text-[10px] text-osu-pink/80 font-medium bg-osu-pink/5 px-2 py-0.5 rounded-full border border-osu-pink/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-osu-pink/60" />
-                <span className="truncate max-w-[120px]">Último: {currentOrRecentPattern.label}</span>
-              </div>
-            ) : null}
+          {/* Filtros de Categoria */}
+          <div className="flex items-center gap-1 text-[10px] font-bold uppercase flex-wrap">
+            {(['TODOS', 'STREAMS', 'JUMPS', 'BURSTS', 'TECH'] as PatternCategory[]).map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setPatternCategory(cat)}
+                className={`px-2 py-0.5 rounded transition-all ${
+                  patternCategory === cat
+                    ? 'bg-osu-pink text-white shadow-glowPink'
+                    : 'bg-white/5 hover:bg-white/10 text-white/50 hover:text-white'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Scrollable Chapters List (Com Auto-scroll e Iluminação em Tempo Real) */}
+        {/* Scrollable Patterns List (Tamanho aumentado substituindo o card de Pontos de Tensão) */}
         <div
-          ref={sectionsListRef}
-          className="flex flex-col gap-1.5 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar scroll-smooth"
+          ref={patternsListRef}
+          className="flex flex-col gap-1.5 h-[340px] max-h-[420px] min-h-[260px] overflow-y-auto pr-1 custom-scrollbar scroll-smooth"
         >
-          {sortedPatterns.map((p) => {
-            const isLive = currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs;
-            const isWaitingSelected =
-              (!livePattern && currentOrRecentPattern?.id === p.id) ||
-              selectedPatternId === p.id;
+          {filteredPatterns.length > 0 ? (
+            filteredPatterns.map((p) => {
+              const isLive = currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs;
+              const isWaitingSelected =
+                (!livePattern && currentOrRecentPattern?.id === p.id) ||
+                selectedPatternId === p.id;
 
-            // Section completion percentage
-            const sectionProgress = isLive
-              ? clamp(0, (currentTimeMs - p.startTimeMs) / Math.max(1, p.endTimeMs - p.startTimeMs), 1) * 100
-              : currentTimeMs > p.endTimeMs
-              ? 100
-              : 0;
+              // Pattern completion progress
+              const patternProgress = isLive
+                ? clamp(
+                    0,
+                    (currentTimeMs - p.startTimeMs) / Math.max(1, p.endTimeMs - p.startTimeMs),
+                    1
+                  ) * 100
+                : currentTimeMs > p.endTimeMs
+                ? 100
+                : 0;
 
-            const severityBadge =
-              p.severity === 'extreme'
-                ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                : p.severity === 'high'
-                ? 'bg-orange-500/20 text-orange-400 border-orange-500/30'
-                : p.severity === 'medium'
-                ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+              const sev = SEVERITY_BADGES[p.severity] || SEVERITY_BADGES.medium;
+              const isCopied = copiedPatternId === p.id;
 
-            return (
-              <div
-                key={p.id}
-                id={`section-row-${p.id}`}
-                onClick={() => jumpToPattern(p)}
-                className={`relative group shrink-0 min-h-[46px] rounded-lg p-2 transition-all duration-200 cursor-pointer overflow-hidden border ${
-                  isLive
-                    ? 'bg-gradient-to-r from-osu-pink/25 via-osu-pink/10 to-white/5 border-osu-pink shadow-glowPink ring-1 ring-osu-pink/40'
-                    : isWaitingSelected
-                    ? 'bg-osu-pink/[0.08] hover:bg-osu-pink/[0.12] border-osu-pink/40 ring-1 ring-osu-pink/20 shadow-sm'
-                    : 'bg-white/[0.02] hover:bg-white/[0.06] border-white/5 hover:border-white/15'
-                }`}
-              >
-                {/* Chapter Row Content */}
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  {/* Left: Index, Timestamp, and Label */}
-                  <div className="flex items-center gap-2.5 overflow-hidden">
-                    {/* Timestamp pill */}
-                    <span
-                      className={`font-mono text-[11px] px-1.5 py-0.5 rounded font-bold transition-colors ${
-                        isLive
-                          ? 'bg-osu-pink text-white shadow-sm'
-                          : isWaitingSelected
-                          ? 'bg-osu-pink/20 text-osu-pink border border-osu-pink/35'
-                          : 'bg-black/50 text-osu-cyan group-hover:text-white'
-                      }`}
-                    >
-                      {p.startTimestamp}
-                    </span>
+              return (
+                <div
+                  key={p.id}
+                  id={`pattern-row-${p.id}`}
+                  onClick={() => jumpToPattern(p)}
+                  className={`relative group shrink-0 min-h-[50px] rounded-lg p-2.5 transition-all duration-200 cursor-pointer overflow-hidden border ${
+                    isLive
+                      ? 'bg-gradient-to-r from-osu-pink/25 via-osu-pink/10 to-white/5 border-osu-pink shadow-glowPink ring-1 ring-osu-pink/40'
+                      : isWaitingSelected
+                      ? 'bg-osu-pink/[0.08] hover:bg-osu-pink/[0.12] border-osu-pink/40 ring-1 ring-osu-pink/20 shadow-sm'
+                      : 'bg-white/[0.02] hover:bg-white/[0.06] border-white/5 hover:border-white/15'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    {/* Left: Icon, Timestamp, and Pattern Title */}
+                    <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
+                      {/* Pattern Type Icon */}
+                      <div className="p-1 rounded bg-black/50 border border-white/10 shrink-0">
+                        {PATTERN_ICONS[p.type] || <Activity className="w-3.5 h-3.5 text-osu-pink" />}
+                      </div>
 
-                    {/* Chapter Title */}
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`font-semibold truncate transition-colors ${
-                            isLive
-                              ? 'text-white font-bold'
-                              : isWaitingSelected
-                              ? 'text-white/95 font-semibold'
-                              : 'text-white/80 group-hover:text-white'
-                          }`}
-                        >
-                          {p.label}
-                        </span>
+                      {/* Timestamp button */}
+                      <span
+                        className={`font-mono text-[11px] px-1.5 py-0.5 rounded font-bold transition-colors shrink-0 ${
+                          isLive
+                            ? 'bg-osu-pink text-white shadow-sm'
+                            : isWaitingSelected
+                            ? 'bg-osu-pink/20 text-osu-pink border border-osu-pink/35'
+                            : 'bg-black/50 text-osu-cyan group-hover:text-white'
+                        }`}
+                      >
+                        {p.startTimestamp}
+                      </span>
 
-                        {isLive && (
-                          <span className="flex items-center gap-1 text-[9px] font-black uppercase text-osu-pink bg-osu-pink/20 px-1 rounded tracking-wider">
-                            <Radio className="w-2.5 h-2.5 animate-pulse" />
-                            <span>AO VIVO</span>
+                      {/* Pattern Label & Live Indicator */}
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`font-semibold truncate transition-colors ${
+                              isLive
+                                ? 'text-white font-bold'
+                                : isWaitingSelected
+                                ? 'text-white/95 font-semibold'
+                                : 'text-white/80 group-hover:text-white'
+                            }`}
+                          >
+                            {p.label}
                           </span>
-                        )}
-                        {isWaitingSelected && !isLive && (
-                          <span className="flex items-center gap-1 text-[9px] font-bold text-osu-pink/80 bg-osu-pink/10 px-1 rounded border border-osu-pink/20">
-                            <span>SELECIONADO</span>
+
+                          {isLive && (
+                            <span className="flex items-center gap-1 text-[9px] font-black uppercase text-osu-pink bg-osu-pink/20 px-1 rounded tracking-wider shrink-0">
+                              <Radio className="w-2.5 h-2.5 animate-pulse" />
+                              <span>AO VIVO</span>
+                            </span>
+                          )}
+                          {isWaitingSelected && !isLive && (
+                            <span className="flex items-center gap-1 text-[9px] font-bold text-osu-pink/80 bg-osu-pink/10 px-1 rounded border border-osu-pink/20 shrink-0">
+                              <span>SELECIONADO</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {p.description && (
+                          <span className="text-[10px] text-white/50 truncate max-w-[280px]">
+                            {p.description}
                           </span>
                         )}
                       </div>
+                    </div>
 
-                      {p.description && (
-                        <span className="text-[10px] text-white/40 truncate max-w-[280px]">
-                          {p.description}
+                    {/* Right: Metrics, Severity Badge, and Copy Button */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {p.metrics.bpm && (
+                        <span className="text-[10px] font-mono text-white/40 hidden sm:inline">
+                          {p.metrics.bpm} BPM
                         </span>
                       )}
+
+                      {p.noteCount > 0 && (
+                        <span className="text-[10px] font-mono text-white/40 hidden sm:inline">
+                          {p.noteCount} notas
+                        </span>
+                      )}
+
+                      {p.metrics.svMultiplier && (
+                        <span className="text-[10px] font-mono text-purple-300/80 hidden sm:inline">
+                          {p.metrics.svMultiplier}x SV
+                        </span>
+                      )}
+
+                      <span
+                        className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border ${sev.bg} ${sev.text} ${sev.border}`}
+                      >
+                        {sev.label}
+                      </span>
+
+                      {/* Copy Timestamp Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopyPatternTimestamp(p, e)}
+                        title={`Copiar timestamp do editor osu! (${p.osuEditorTimestamp})`}
+                        className="p-1 rounded bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all ml-0.5"
+                      >
+                        {isCopied ? (
+                          <Check className="w-3 h-3 text-green-400" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
                     </div>
                   </div>
 
-                  {/* Right: Metrics & Severity Badge */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    {p.metrics.bpm && (
-                      <span className="text-[10px] font-mono text-white/40 hidden sm:inline">
-                        {p.metrics.bpm} BPM
-                      </span>
-                    )}
-
-                    {p.noteCount > 0 && (
-                      <span className="text-[10px] font-mono text-white/40 hidden sm:inline">
-                        {p.noteCount} notas
-                      </span>
-                    )}
-
-                    <span
-                      className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border ${severityBadge}`}
-                    >
-                      {p.severity === 'extreme'
-                        ? 'Extrema'
-                        : p.severity === 'high'
-                        ? 'Alta'
-                        : p.severity === 'medium'
-                        ? 'Média'
-                        : 'Baixa'}
-                    </span>
-                  </div>
+                  {/* Progress Bar at the bottom of active card */}
+                  {isLive && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/40 overflow-hidden">
+                      <div
+                        className="h-full bg-osu-pink shadow-glowPink transition-all duration-100"
+                        style={{ width: `${patternProgress}%` }}
+                      />
+                    </div>
+                  )}
+                  {isWaitingSelected && !isLive && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/40 overflow-hidden">
+                      <div className="h-full bg-osu-pink/35 w-full" />
+                    </div>
+                  )}
                 </div>
-
-                {/* Progress Bar at the bottom of active card */}
-                {isLive && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/40 overflow-hidden">
-                    <div
-                      className="h-full bg-osu-pink shadow-glowPink transition-all duration-100"
-                      style={{ width: `${sectionProgress}%` }}
-                    />
-                  </div>
-                )}
-                {isWaitingSelected && !isLive && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/40 overflow-hidden">
-                    <div className="h-full bg-osu-pink/35 w-full" />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center text-white/40 border border-dashed border-white/10 rounded-lg">
+              <Zap className="w-8 h-8 text-white/20 mb-2" />
+              <p className="text-xs font-semibold text-white/70">
+                Nenhum padrão detectado nesta categoria
+              </p>
+              <p className="text-[11px] text-white/40 mt-1 max-w-xs">
+                Selecione &ldquo;TODOS&rdquo; para visualizar todos os padrões mecânicos identificados pelo algoritmo.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

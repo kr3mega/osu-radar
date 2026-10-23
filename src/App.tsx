@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { usePoolStore, getFilteredAndSortedMaps, SortOption } from './store/usePoolStore';
 import { TrianglesBackground } from './components/common/TrianglesBackground';
 import { LazerToolbar } from './components/layout/LazerToolbar';
@@ -49,6 +49,23 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'select' | 'overview'>('select');
   const [isUploaderOpen, setIsUploaderOpen] = useState(false);
   const [isGlobalDragging, setIsGlobalDragging] = useState(false);
+
+  // Measure Left Wedge container height to sync the right beatmap carousel height exactly
+  const wedgeContainerRef = useRef<HTMLDivElement | null>(null);
+  const [wedgeHeight, setWedgeHeight] = useState<number>(0);
+
+  useEffect(() => {
+    if (!wedgeContainerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.height > 0) {
+          setWedgeHeight(Math.round(entry.contentRect.height));
+        }
+      }
+    });
+    observer.observe(wedgeContainerRef.current);
+    return () => observer.disconnect();
+  }, [selectedMapId, activeTab]);
 
   useEffect(() => {
     initFromDb();
@@ -192,7 +209,7 @@ export const App: React.FC = () => {
           /* Song Select Split View (Left: Info Wedge, Right: Carousel) */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
             {/* Left Column: The Beatmap Info Wedge */}
-            <div className="lg:col-span-5 xl:col-span-5 sticky top-16">
+            <div ref={wedgeContainerRef} className="lg:col-span-5 xl:col-span-5 sticky top-16">
               <LazerWedge
                 map={activeMap}
                 poolAverageSkills={maps.length > 1 ? avgSkills : undefined}
@@ -250,8 +267,14 @@ export const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* The Carousel List: Individual Beatmap Difficulty Cards (no parent card) */}
-              <div className="flex flex-col gap-2 max-h-[calc(100vh-170px)] overflow-y-auto overflow-x-hidden p-0.5 pr-1.5 w-full min-w-0 max-w-full">
+              {/* The Carousel List: Sized to match the Wedge container exactly */}
+              <div
+                style={{
+                  height: wedgeHeight > 0 ? `${Math.max(420, wedgeHeight - 56)}px` : undefined,
+                  maxHeight: wedgeHeight > 0 ? `${Math.max(420, wedgeHeight - 56)}px` : undefined,
+                }}
+                className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden p-0.5 pr-1.5 w-full min-w-0 max-w-full custom-scrollbar"
+              >
                 {filteredMaps.length > 0 ? (
                   filteredMaps.map((map) => (
                     <LazerCarouselItem

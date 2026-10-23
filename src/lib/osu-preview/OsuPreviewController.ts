@@ -25,6 +25,7 @@ export class OsuPreviewController {
   private currentTimeMs: number = 0;
   private isPlaying: boolean = false;
   private playbackRate: number = 1.0;
+  private basePlaybackRate: number = 1.0;
   private lastRafTime: number = 0;
   private rafId: number | null = null;
 
@@ -49,14 +50,27 @@ export class OsuPreviewController {
   public async init(
     rawBeatmapText: string,
     initialTimeMs: number = 0,
-    audioSource?: Blob | ArrayBuffer | string
+    audioSource?: Blob | ArrayBuffer | string,
+    initialMods?: Set<OsuMod>
   ): Promise<void> {
+    if (initialMods) {
+      this.activeMods = new Set(initialMods);
+      if (this.activeMods.has('dt')) {
+        this.playbackRate = 1.5;
+      } else if (this.activeMods.has('ht')) {
+        this.playbackRate = 0.75;
+      } else {
+        this.playbackRate = 1.0;
+      }
+    }
+
     // 1. Initialize Unified Audio Engine
     this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     this.masterGain = this.audioCtx.createGain();
     this.masterGain.connect(this.audioCtx.destination);
 
     this.musicPlayer.init(this.audioCtx, this.masterGain);
+    this.musicPlayer.setSpeed(this.playbackRate);
     this.hitsoundPlayer.init(this.audioCtx, this.masterGain);
 
     // 2. Load Beatmap & Skin
@@ -146,14 +160,45 @@ export class OsuPreviewController {
   }
 
   public setSpeed(rate: number): void {
-    this.playbackRate = clamp(0.25, rate, 3.0);
+    this.basePlaybackRate = clamp(0.25, rate, 3.0);
+    this.updateEffectiveSpeed();
+  }
+
+  private updateEffectiveSpeed(): void {
+    if (this.activeMods.has('dt')) {
+      this.playbackRate = clamp(0.25, this.basePlaybackRate * 1.5, 3.0);
+    } else if (this.activeMods.has('ht')) {
+      this.playbackRate = clamp(0.25, this.basePlaybackRate * 0.75, 3.0);
+    } else {
+      this.playbackRate = clamp(0.25, this.basePlaybackRate, 3.0);
+    }
     this.musicPlayer.setSpeed(this.playbackRate);
     this.notifyState();
   }
 
   public setMod(modName: OsuMod, enabled: boolean): void {
-    if (enabled) this.activeMods.add(modName);
-    else this.activeMods.delete(modName);
+    if (enabled) {
+      // 1. HR and EZ are strictly mutually exclusive
+      if (modName === 'hr') {
+        this.activeMods.delete('ez');
+      } else if (modName === 'ez') {
+        this.activeMods.delete('hr');
+      }
+
+      // 2. DT and HT are mutually exclusive
+      if (modName === 'dt') {
+        this.activeMods.delete('ht');
+      } else if (modName === 'ht') {
+        this.activeMods.delete('dt');
+      }
+
+      this.activeMods.add(modName);
+    } else {
+      this.activeMods.delete(modName);
+    }
+
+    // Apply accurate speed scaling for DT (1.5x) or HT (0.75x)
+    this.updateEffectiveSpeed();
 
     if (this.beatmap) {
       applyBeatmapCalculations(this.beatmap, this.activeMods);
