@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, FolderUp, FileText, AlertCircle, Loader2, Link2, Upload, Filter } from 'lucide-react';
 import { extractOsuFilesFromZip } from '../../utils/unzip';
 import { analyzeBeatmap } from '../../engine/analyzer';
 import { usePoolStore } from '../../store/usePoolStore';
@@ -60,7 +59,6 @@ export const PoolUploader: React.FC = () => {
         return;
       }
 
-      // Filter non-pool difficulties if active tournament filter is set
       let filesToAnalyze: Array<{
         fileName: string;
         text: string;
@@ -87,7 +85,6 @@ export const PoolUploader: React.FC = () => {
               modSlot: matched.slot,
             });
           }
-          // Non-matching difficulties are strictly ignored!
         }
 
         if (filesToAnalyze.length === 0) {
@@ -155,34 +152,43 @@ export const PoolUploader: React.FC = () => {
   };
 
   return (
-    <div className="w-full flex flex-col gap-4">
-      {/* Tab Switcher */}
-      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab('sheet')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all ${
-            activeTab === 'sheet'
-              ? 'bg-osu-pink text-white shadow-glowPink'
-              : 'bg-white/5 text-white/60 hover:text-white'
-          }`}
-        >
-          <Link2 className="w-4 h-4 text-osu-cyan" />
-          <span>Planilha de Torneio (Google Sheets)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('files')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all ${
-            activeTab === 'files'
-              ? 'bg-osu-pink text-white shadow-glowPink'
-              : 'bg-white/5 text-white/60 hover:text-white'
-          }`}
-        >
-          <Upload className="w-4 h-4 text-osu-pink" />
-          <span>Arquivos Manuais (.osz / .osu)</span>
-        </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+      {/* Official osu-web .page-mode Tab Switcher */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          paddingBottom: '10px',
+          borderBottom: '1px solid hsl(var(--hsl-b3))',
+        }}
+      >
+        <ul className="page-mode" style={{ justifyContent: 'flex-start' }}>
+          <li className="page-mode__item">
+            <button
+              type="button"
+              onClick={() => setActiveTab('sheet')}
+              className={`page-mode__link ${activeTab === 'sheet' ? 'page-mode__link--is-active' : ''}`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <i className="fas fa-table" style={{ marginRight: '6px' }} />
+              Planilha de Torneio (Google Sheets)
+              <span className="page-mode__underline" />
+            </button>
+          </li>
+          <li className="page-mode__item">
+            <button
+              type="button"
+              onClick={() => setActiveTab('files')}
+              className={`page-mode__link ${activeTab === 'files' ? 'page-mode__link--is-active' : ''}`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <i className="fas fa-file-upload" style={{ marginRight: '6px' }} />
+              Arquivos Manuais (.osz / .osu)
+              <span className="page-mode__underline" />
+            </button>
+          </li>
+        </ul>
       </div>
 
       {/* Tab 1: Google Sheets Sync & Folder Filter */}
@@ -190,10 +196,22 @@ export const PoolUploader: React.FC = () => {
 
       {/* Tab 2: Manual Drag & Drop */}
       {activeTab === 'files' && (
-        <div className="w-full flex flex-col gap-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
           {activeTournamentFilter && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-osu-cyan/10 border border-osu-cyan/30 text-xs text-osu-cyan">
-              <Filter className="w-4 h-4 shrink-0" />
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 14px',
+                borderRadius: '6px',
+                backgroundColor: 'hsl(var(--hsl-b5))',
+                borderLeft: '3px solid hsl(var(--hsl-blue-1))',
+                fontSize: '12px',
+                color: 'hsl(var(--hsl-l1))',
+              }}
+            >
+              <i className="fas fa-filter" style={{ color: 'hsl(var(--hsl-blue-1))' }} />
               <span>
                 <strong>Filtro de Torneio Ativo:</strong> {activeTournamentFilter.stageName} ({activeTournamentFilter.entries.length} mapas). Dificuldades fora da pool serão ignoradas automaticamente durante a importação.
               </span>
@@ -204,11 +222,19 @@ export const PoolUploader: React.FC = () => {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`relative border-2 border-dashed rounded-card p-6 flex flex-col items-center justify-center text-center transition-all duration-200 ${
-              isDragging
-                ? 'border-osu-pink bg-osu-pink/10 shadow-glowPink scale-[1.01]'
-                : 'border-white/10 hover:border-osu-pink/40 bg-osu-panel/80'
-            }`}
+            style={{
+              position: 'relative',
+              border: isDragging ? '2px dashed hsl(var(--hsl-h1))' : '2px dashed hsl(var(--hsl-b2))',
+              borderRadius: '10px',
+              padding: '28px 20px',
+              backgroundColor: isDragging ? 'hsla(var(--hsl-h1), 0.1)' : 'hsl(var(--hsl-b5))',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              transition: 'all 150ms ease',
+            }}
           >
             <input
               ref={fileInputRef}
@@ -216,7 +242,7 @@ export const PoolUploader: React.FC = () => {
               multiple
               accept=".osu,.osz,.zip"
               onChange={(e) => e.target.files && processFiles(e.target.files)}
-              className="hidden"
+              style={{ display: 'none' }}
             />
             <input
               ref={folderInputRef}
@@ -226,64 +252,85 @@ export const PoolUploader: React.FC = () => {
               directory=""
               multiple
               onChange={(e) => e.target.files && processFiles(e.target.files)}
-              className="hidden"
+              style={{ display: 'none' }}
             />
 
             {isAnalyzing ? (
-              <div className="flex flex-col items-center gap-3 py-4">
-                <Loader2 className="w-8 h-8 text-osu-pink animate-spin" />
-                <div className="flex flex-col items-center">
-                  <span className="text-sm font-bold text-white">
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '16px 0' }}>
+                <i className="fas fa-circle-notch fa-spin" style={{ fontSize: '28px', color: 'hsl(var(--hsl-h1))' }} />
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>
                     Escaneando física dos mapas...
-                  </span>
+                  </div>
                   {progress && (
-                    <span className="text-xs text-osu-cyan mt-1 font-mono">
+                    <div style={{ fontSize: '12px', color: 'hsl(var(--hsl-c1))', marginTop: '4px', fontFamily: 'AzeretMono, monospace' }}>
                       {progress.current} de {progress.total} — {progress.fileName}
-                    </span>
+                    </div>
                   )}
                 </div>
                 {progress && (
-                  <div className="w-64 bg-osu-base h-2 rounded-full overflow-hidden mt-1 border border-osu-border">
+                  <div className="bar bar--beatmap-stats" style={{ width: '260px', height: '6px' }}>
                     <div
-                      className="bg-gradient-to-r from-osu-pink to-osu-cyan h-full transition-all duration-150"
-                      style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                      className="bar__fill"
+                      style={{
+                        width: `${(progress.current / progress.total) * 100}%`,
+                        backgroundColor: 'hsl(var(--hsl-h1))',
+                      }}
                     />
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-3">
-                <div className="p-3 bg-osu-surface rounded-full text-osu-pink border border-osu-border">
-                  <UploadCloud className="w-6 h-6" />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    backgroundColor: 'hsl(var(--hsl-b4))',
+                    color: 'hsl(var(--hsl-h1))',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '20px',
+                  }}
+                >
+                  <i className="fas fa-cloud-upload-alt" />
                 </div>
 
                 <div>
-                  <p className="text-sm font-bold text-white">
-                    Arraste pacotes <span className="text-osu-pink">.osz</span>, arquivos{' '}
-                    <span className="text-osu-cyan">.osu</span> ou pastas de beatmaps aqui
+                  <p style={{ fontSize: '14px', fontWeight: 700, color: '#fff', margin: 0 }}>
+                    Arraste pacotes <span style={{ color: 'hsl(var(--hsl-h1))' }}>.osz</span>, arquivos{' '}
+                    <span style={{ color: 'hsl(var(--hsl-blue-1))' }}>.osu</span> ou pastas de beatmaps aqui
                   </p>
-                  <p className="text-xs text-osu-text-muted mt-1">
-                    Processamento 100% no seu navegador em microssegundos (áudios e vídeos são descartados na memória)
+                  <p style={{ fontSize: '12px', color: 'hsl(var(--hsl-l2))', margin: '4px 0 0' }}>
+                    Processamento 100% no seu navegador (áudios e mapas lidos diretamente na memória)
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 mt-1">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1.5 rounded-card bg-osu-surface hover:bg-osu-hover text-xs font-semibold text-osu-text-primary border border-osu-border flex items-center gap-1.5 transition-colors"
+                    className="btn-osu-big btn-osu-big--beatmapset-header-square"
+                    style={{ padding: '8px 16px', width: 'auto' }}
                   >
-                    <FileText className="w-3.5 h-3.5 text-osu-pink" />
-                    Selecionar Arquivos
+                    <span className="btn-osu-big__content" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <i className="fas fa-file-alt" />
+                      <span>Selecionar Arquivos</span>
+                    </span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => folderInputRef.current?.click()}
-                    className="px-3 py-1.5 rounded-card bg-osu-surface hover:bg-osu-hover text-xs font-semibold text-osu-text-primary border border-osu-border flex items-center gap-1.5 transition-colors"
+                    className="btn-osu-big btn-osu-big--beatmapset-header-square"
+                    style={{ padding: '8px 16px', width: 'auto' }}
                   >
-                    <FolderUp className="w-3.5 h-3.5 text-osu-cyan" />
-                    Selecionar Pasta de Mapas
+                    <span className="btn-osu-big__content" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <i className="fas fa-folder-open" />
+                      <span>Selecionar Pasta de Mapas</span>
+                    </span>
                   </button>
                 </div>
               </div>
@@ -291,8 +338,20 @@ export const PoolUploader: React.FC = () => {
           </div>
 
           {errorMessage && (
-            <div className="p-3 rounded-card bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 text-xs text-red-200">
-              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: '6px',
+                backgroundColor: 'hsl(var(--hsl-b5))',
+                borderLeft: '3px solid hsl(var(--hsl-red-1))',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                fontSize: '12px',
+                color: 'hsl(var(--hsl-red-1))',
+              }}
+            >
+              <i className="fas fa-exclamation-circle" />
               <span>{errorMessage}</span>
             </div>
           )}

@@ -1,47 +1,43 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePoolStore } from '../../store/usePoolStore';
-import {
-  Search,
-  RotateCcw,
-  Volume2,
-  AlertTriangle,
-  X,
-  Music,
-  Loader2,
-  CloudDownload,
-  Trash2,
-  HardDrive,
-} from 'lucide-react';
+import { formatTimestamp } from '../../engine/strains';
 
 interface LazerToolbarProps {
   activeTab: 'select' | 'overview';
   onTabChange: (tab: 'select' | 'overview') => void;
+  onOpenUpload?: () => void;
 }
 
-export const LazerToolbar: React.FC<LazerToolbarProps> = ({ activeTab, onTabChange }) => {
+export const LazerToolbar: React.FC<LazerToolbarProps> = ({
+  activeTab,
+  onTabChange,
+  onOpenUpload,
+}) => {
   const {
-    searchQuery,
-    setSearchQuery,
     resetAllData,
     currentPool,
     audioSyncStatus,
     startAudioSync,
     clearAudioCache,
+    exportPoolJson,
+    importPoolJson,
   } = usePoolStore();
-  const [pulse, setPulse] = useState(false);
+
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [showAudioMenu, setShowAudioMenu] = useState(false);
   const [isClearingAudio, setIsClearingAudio] = useState(false);
   const audioMenuRef = useRef<HTMLDivElement>(null);
+  const jsonInputRef = useRef<HTMLInputElement>(null);
 
   const maps = currentPool.maps;
   const cachedAudioCount = maps.filter((m) => m.audioBlob).length;
   const totalMaps = maps.length;
   const cachedBytes = maps.reduce((acc, m) => acc + (m.audioBlob?.size || 0), 0);
   const cachedMb = (cachedBytes / (1024 * 1024)).toFixed(1);
+  const avgSr = totalMaps > 0 ? maps.reduce((acc, m) => acc + m.stats.starRating, 0) / totalMaps : 0;
+  const totalDuration = maps.reduce((acc, m) => acc + m.stats.drainTimeMs, 0);
 
-  // Close audio menu on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (audioMenuRef.current && !audioMenuRef.current.contains(e.target as Node)) {
@@ -53,11 +49,6 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({ activeTab, onTabChan
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAudioMenu]);
-
-  const handleCookieClick = () => {
-    setPulse(true);
-    setTimeout(() => setPulse(false), 300);
-  };
 
   const handleConfirmReset = async () => {
     setIsResetting(true);
@@ -78,243 +69,495 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({ activeTab, onTabChan
     }
   };
 
+  const handleExportJson = () => {
+    const jsonStr = exportPoolJson();
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeName = (currentPool.name || 'osu-pool').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+    a.download = `${safeName}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportJsonFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const ok = await importPoolJson(text);
+    if (!ok) {
+      alert('Arquivo JSON inválido para osu!radar.');
+    }
+    if (jsonInputRef.current) jsonInputRef.current.value = '';
+  };
+
   return (
     <>
-      <nav className="relative z-40 bg-[#120819] border-b border-white/10 h-12 flex items-center justify-between px-3 sm:px-6 select-none shadow-md">
-        {/* Left: osu! cookie logo & Navigation Tabs */}
-        <div className="flex items-center gap-3 sm:gap-6 h-full">
-          {/* The Iconic osu! Pink Cookie Button */}
-          <button
-            type="button"
-            onClick={handleCookieClick}
-            className={`relative group w-9 h-9 rounded-full bg-gradient-to-br from-[#ff66aa] to-[#d6337a] flex items-center justify-center shadow-lg transition-transform duration-150 active:scale-90 ${
-              pulse ? 'scale-110 shadow-glowPink ring-2 ring-white' : 'hover:scale-105'
-            }`}
-            title="osu! — Clique para pulsar"
-          >
-            {/* Concentric white rings */}
-            <span className="absolute inset-1 rounded-full border border-white/40 pointer-events-none" />
-            <span className="font-extrabold text-white text-xs tracking-tighter drop-shadow-sm font-torus">
-              osu!
-            </span>
-          </button>
+      <input
+        ref={jsonInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleImportJsonFile}
+        style={{ display: 'none' }}
+      />
 
-          {/* Slanted Navigation Tabs (osu!lazer style) */}
-          <div className="flex items-center h-full">
-            <button
-              type="button"
-              onClick={() => onTabChange('select')}
-              className={`relative px-4 h-full flex items-center font-bold text-xs uppercase tracking-wider transition-colors ${
-                activeTab === 'select'
-                  ? 'text-white'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              <span>Song Select</span>
-              {activeTab === 'select' && (
-                <span className="absolute bottom-0 left-0 right-0 h-1 bg-osu-pink shadow-glowPink rounded-t" />
-              )}
-            </button>
+      {/* Official ppy/osu-web Pinned Top Navbar (layout/header.blade.php + _nav2.blade.php) */}
+      <div className="js-pinned-header no-print nav2-header">
+        <div className="nav2-header__body">
+          <div className="nav2-header__menu-bg" data-visibility="hidden" />
+          <div className="nav2-header__triangles" />
+          <div className="nav2-header__transition-overlay" />
 
-            <button
-              type="button"
-              onClick={() => onTabChange('overview')}
-              className={`relative px-4 h-full flex items-center font-bold text-xs uppercase tracking-wider transition-colors ${
-                activeTab === 'overview'
-                  ? 'text-white'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              <span>Pool Radar</span>
-              {activeTab === 'overview' && (
-                <span className="absolute bottom-0 left-0 right-0 h-1 bg-osu-pink shadow-glowPink rounded-t" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Right: Reset Button, Search, Audio visualizer, and Profile Badge */}
-        <div className="flex items-center gap-2 sm:gap-4">
-          {/* 1-Click Reset Button */}
-          <button
-            type="button"
-            onClick={() => setShowResetConfirm(true)}
-            className="px-2.5 py-1 rounded bg-[#2e1220] hover:bg-[#43172c] border border-red-500/40 hover:border-red-500 text-red-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-            title="Limpar todos os dados e apagar o banco IndexedDB"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-red-400" />
-            <span className="hidden sm:inline">Resetar Tudo</span>
-          </button>
-
-          {/* Search input (lazer pill style) */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-white/40 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Procurar beatmaps..."
-              className="pl-8 pr-3 py-1 text-xs rounded-full bg-[#1e0e29] border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-osu-pink w-32 sm:w-48 transition-all"
-            />
-          </div>
-
-          {/* Audio Cache Manager Button & Popover */}
-          {totalMaps > 0 && (
-            <div className="relative" ref={audioMenuRef}>
-              <button
-                type="button"
-                onClick={() => setShowAudioMenu(!showAudioMenu)}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-bold transition-all border shadow-sm ${
-                  audioSyncStatus?.isSyncing
-                    ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-300 animate-pulse'
-                    : cachedAudioCount === totalMaps
-                    ? 'bg-green-500/15 border-green-500/30 text-green-300 hover:bg-green-500/20'
-                    : 'bg-osu-pink/15 border-osu-pink/30 text-osu-pink hover:bg-osu-pink/25'
-                }`}
-                title="Status do Cache de Áudio Offline (IndexedDB)"
-              >
-                {audioSyncStatus?.isSyncing ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-yellow-400" />
-                ) : (
-                  <Music className="w-3.5 h-3.5" />
-                )}
-                <span className="hidden sm:inline font-mono text-[11px]">
-                  {audioSyncStatus?.isSyncing
-                    ? `${audioSyncStatus.current}/${audioSyncStatus.total}`
-                    : `${cachedAudioCount}/${totalMaps} áudios`}
-                </span>
-              </button>
-
-              {/* Popover Dropdown */}
-              {showAudioMenu && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-[#120819] border border-white/15 rounded-xl shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95">
-                  <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-                      <HardDrive className="w-3.5 h-3.5 text-osu-cyan" />
-                      <span>Cache de Áudio (IndexedDB)</span>
-                    </div>
-                    <span className="text-[10px] text-white/50 font-mono">
-                      {cachedMb} MB
-                    </span>
-                  </div>
-
-                  <p className="text-[11px] text-white/60 leading-relaxed mb-3">
-                    Os áudios são baixados e descompactados automaticamente via mirrors online e salvos permanentemente no seu IndexedDB local.
-                  </p>
-
-                  <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-white/5 mb-3 border border-white/5">
-                    <span className="text-white/70">Músicas em cache:</span>
-                    <span className="font-bold text-white font-mono">
-                      {cachedAudioCount} / {totalMaps}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    {cachedAudioCount < totalMaps && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          startAudioSync();
-                          setShowAudioMenu(false);
-                        }}
-                        disabled={audioSyncStatus?.isSyncing}
-                        className="w-full py-1.5 px-2.5 rounded-lg bg-osu-pink hover:bg-osu-pink/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md disabled:opacity-50"
-                      >
-                        <CloudDownload className="w-3.5 h-3.5" />
-                        <span>Baixar Áudios Restantes</span>
-                      </button>
-                    )}
-
-                    {cachedAudioCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleClearAudio}
-                        disabled={isClearingAudio}
-                        className="w-full py-1.5 px-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                        <span>{isClearingAudio ? 'Limpando...' : 'Liberar Espaço (Limpar Cache)'}</span>
-                      </button>
-                    )}
-                  </div>
+          <div className="osu-page">
+            <div className="nav2">
+              <div className="nav2__colgroup nav2__colgroup--menu">
+                {/* Official osu!lazer Logo */}
+                <div className="nav2__col nav2__col--logo">
+                  <a
+                    href="#select"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onTabChange('select');
+                    }}
+                    className="nav2__logo-link"
+                    title="osu!radar"
+                  >
+                    <div className="nav2__logo nav2__logo--bg" />
+                    <div className="nav2__logo" />
+                  </a>
                 </div>
-              )}
-            </div>
-          )}
 
-          {/* Music visualizer bars */}
-          <div className="hidden lg:flex items-center gap-1 px-2 text-osu-cyan">
-            <Volume2 className="w-4 h-4 text-white/50" />
-            <div className="flex items-end gap-0.5 h-3">
-              <span className="w-0.5 bg-osu-cyan h-2 animate-pulse" />
-              <span className="w-0.5 bg-osu-pink h-3 animate-pulse" style={{ animationDelay: '150ms' }} />
-              <span className="w-0.5 bg-osu-cyan h-1.5 animate-pulse" style={{ animationDelay: '300ms' }} />
-              <span className="w-0.5 bg-white h-2.5 animate-pulse" style={{ animationDelay: '450ms' }} />
-            </div>
-          </div>
+                {/* Menu Item 1: Beatmaps / Mappool */}
+                <div className="nav2__col nav2__col--menu">
+                  <a
+                    href="#select"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onTabChange('select');
+                    }}
+                    className={`nav2__menu-link-main ${activeTab === 'select' ? 'js-menu--active' : ''}`}
+                  >
+                    <span className="u-relative">
+                      beatmaps
+                      {activeTab === 'select' && (
+                        <span className="nav2__menu-link-bar u-section--bg-normal" />
+                      )}
+                    </span>
+                  </a>
+                </div>
 
-          {/* Profile Card (osu!lazer style) */}
-          <div className="flex items-center gap-2 pl-2 border-l border-white/10">
-            <div className="w-7 h-7 rounded-full bg-osu-surface border border-osu-pink flex items-center justify-center font-bold text-[10px] text-white overflow-hidden shadow-sm">
-              🇧🇷
-            </div>
-            <div className="hidden md:flex flex-col text-left">
-              <span className="text-[11px] font-bold text-white leading-none">Capitão</span>
-              <span className="text-[9px] font-mono text-osu-cyan leading-tight mt-0.5">#1 • 6WC</span>
+                {/* Menu Item 2: Rankings / Radar da Pool */}
+                <div className="nav2__col nav2__col--menu">
+                  <a
+                    href="#overview"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onTabChange('overview');
+                    }}
+                    className={`nav2__menu-link-main ${activeTab === 'overview' ? 'js-menu--active' : ''}`}
+                  >
+                    <span className="u-relative">
+                      radar da pool
+                      {activeTab === 'overview' && (
+                        <span className="nav2__menu-link-bar u-section--bg-normal" />
+                      )}
+                    </span>
+                  </a>
+                </div>
+
+                {/* Menu Item 3: Importar / Google Sheets */}
+                {onOpenUpload && (
+                  <div className="nav2__col nav2__col--menu">
+                    <a
+                      href="#import"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        onOpenUpload();
+                      }}
+                      className="nav2__menu-link-main"
+                    >
+                      <span className="u-relative">importar / planilha</span>
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Icons & User Avatar */}
+              <div className="nav2__colgroup nav2__colgroup--icons">
+                {onOpenUpload && (
+                  <div className="nav2__col">
+                    <button
+                      type="button"
+                      onClick={onOpenUpload}
+                      className="nav-button"
+                      title="Importar Beatmaps (.osz / .osu) ou Sincronizar Planilha Google Sheets"
+                    >
+                      <span className="fas fa-cloud-upload-alt" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="nav2__col">
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    disabled={totalMaps === 0}
+                    className="nav-button"
+                    title="Exportar telemetria da pool (.JSON)"
+                  >
+                    <span className="fas fa-download" />
+                  </button>
+                </div>
+
+                <div className="nav2__col">
+                  <button
+                    type="button"
+                    onClick={() => jsonInputRef.current?.click()}
+                    className="nav-button"
+                    title="Carregar arquivo .JSON da pool"
+                  >
+                    <span className="fas fa-folder-open" />
+                  </button>
+                </div>
+
+                {/* Audio Cache Status Pill (osu-web notification container style) */}
+                {totalMaps > 0 && (
+                  <div className="nav2__col nav2__col--notifications" ref={audioMenuRef} style={{ position: 'relative' }}>
+                    <div className="nav2__notification-container">
+                      <button
+                        type="button"
+                        onClick={() => setShowAudioMenu(!showAudioMenu)}
+                        className="nav-button nav-button--notifications"
+                        title="Gerenciador de Áudios em Cache (IndexedDB)"
+                      >
+                        <span className="notification-icon">
+                          <i
+                            className={
+                              audioSyncStatus?.isSyncing
+                                ? 'fas fa-circle-notch fa-spin'
+                                : 'fas fa-music'
+                            }
+                          />
+                          <span className="notification-icon__count">
+                            {audioSyncStatus?.isSyncing
+                              ? `${audioSyncStatus.current}/${audioSyncStatus.total}`
+                              : `${cachedAudioCount}/${totalMaps}`}
+                          </span>
+                        </span>
+                      </button>
+                    </div>
+
+                    {showAudioMenu && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          right: 0,
+                          top: '100%',
+                          marginTop: '8px',
+                          width: '280px',
+                          backgroundColor: 'hsl(var(--hsl-b4))',
+                          borderRadius: '10px',
+                          padding: '14px',
+                          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                          zIndex: 1000,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            paddingBottom: '8px',
+                            marginBottom: '8px',
+                            borderBottom: '1px solid hsl(var(--hsl-b2))',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          <span>
+                            <i className="fas fa-hdd" style={{ marginRight: '6px', color: 'hsl(var(--hsl-h1))' }} />
+                            Cache de Áudio (IndexedDB)
+                          </span>
+                          <span style={{ color: 'hsl(var(--hsl-l2))' }}>{cachedMb} MB</span>
+                        </div>
+
+                        <p style={{ fontSize: '11px', color: 'hsl(var(--hsl-l2))', margin: '0 0 10px' }}>
+                          Os áudios são baixados automaticamente via mirrors e armazenados no seu navegador.
+                        </p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {cachedAudioCount < totalMaps && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                startAudioSync();
+                                setShowAudioMenu(false);
+                              }}
+                              disabled={audioSyncStatus?.isSyncing}
+                              className="btn-osu-big btn-osu-big--full btn-osu-big--rounded-thin"
+                            >
+                              <div className="btn-osu-big__content btn-osu-big__content--center">
+                                <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
+                                  <i className="fas fa-cloud-download-alt" />
+                                </span>
+                                <span>Baixar Áudios Restantes</span>
+                              </div>
+                            </button>
+                          )}
+
+                          {cachedAudioCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleClearAudio}
+                              disabled={isClearingAudio}
+                              className="btn-osu-big btn-osu-big--danger btn-osu-big--full btn-osu-big--rounded-thin"
+                            >
+                              <div className="btn-osu-big__content btn-osu-big__content--center">
+                                <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
+                                  <i className="fas fa-trash" />
+                                </span>
+                                <span>{isClearingAudio ? 'Limpando...' : 'Limpar Cache de Áudio'}</span>
+                              </div>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Reset All Button */}
+                <div className="nav2__col">
+                  <button
+                    type="button"
+                    onClick={() => setShowResetConfirm(true)}
+                    className="nav-button"
+                    title="Resetar todos os mapas e limpar banco IndexedDB"
+                  >
+                    <span className="fas fa-redo-alt" />
+                  </button>
+                </div>
+
+                {/* Official osu-web User Avatar */}
+                <div className="nav2__col nav2__col--avatar">
+                  <span
+                    className="avatar avatar--nav2"
+                    style={{
+                      backgroundImage: 'url(/images/layout/avatar-guest@2x.png)',
+                    }}
+                    title="Capitão • 6WC"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </nav>
+      </div>
 
-      {/* Confirmation Modal for Resetting */}
+      {/* Official ppy/osu-web Page Header v4 (layout/_page_header_v4.blade.php) */}
+      <div className={`header-v4 ${activeTab === 'select' ? 'header-v4--beatmapsets' : 'header-v4--rankings'}`}>
+        <div
+          className="header-v4__container header-v4__container--main"
+          style={{ paddingTop: '50px', minHeight: '105px' }}
+        >
+          <div className="header-v4__bg-container">
+            <div className="header-v4__bg" />
+          </div>
+
+          <div className="header-v4__content">
+            <div
+              className="header-v4__row header-v4__row--title"
+              style={{ justifyContent: 'space-between', gap: '12px' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                <div className="header-v4__icon" />
+                <div className="header-v4__title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span>
+                    {activeTab === 'select' ? 'listagem de beatmaps' : 'radar & inteligência da pool'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons in Header Title Row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {onOpenUpload && (
+                  <button
+                    type="button"
+                    onClick={onOpenUpload}
+                    className="btn-osu-big btn-osu-big--rounded-small"
+                  >
+                    <div className="btn-osu-big__content">
+                      <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
+                        <i className="fas fa-plus-circle" />
+                      </span>
+                      <span>importar beatmaps / planilha</span>
+                    </div>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirm(true)}
+                  className="btn-osu-big btn-osu-big--danger btn-osu-big--rounded-small"
+                >
+                  <div className="btn-osu-big__content">
+                    <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
+                      <i className="fas fa-trash-alt" />
+                    </span>
+                    <span>resetar tudo</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sub-navigation bar (header-v4__row--bar + header-nav-v4) */}
+        <div className="header-v4__container">
+          <div className="header-v4__content">
+            <div
+              className="header-v4__row header-v4__row--bar"
+              style={{ justifyContent: 'space-between', gap: '15px' }}
+            >
+              <ul className="header-nav-v4 header-nav-v4--list" style={{ display: 'flex' }}>
+                <li className="header-nav-v4__item">
+                  <a
+                    href="#select"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onTabChange('select');
+                    }}
+                    className={`header-nav-v4__link ${
+                      activeTab === 'select' ? 'header-nav-v4__link--active' : ''
+                    }`}
+                  >
+                    <span className="fake-bold" data-content="listagem e visualizador">
+                      listagem e visualizador
+                    </span>
+                    <span className="header-nav-item-count">{totalMaps}</span>
+                  </a>
+                </li>
+
+                <li className="header-nav-v4__item">
+                  <a
+                    href="#overview"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onTabChange('overview');
+                    }}
+                    className={`header-nav-v4__link ${
+                      activeTab === 'overview' ? 'header-nav-v4__link--active' : ''
+                    }`}
+                  >
+                    <span className="fake-bold" data-content="radar de skills & anomalias">
+                      radar de skills & anomalias
+                    </span>
+                  </a>
+                </li>
+
+                {onOpenUpload && (
+                  <li className="header-nav-v4__item">
+                    <a
+                      href="#upload"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        onOpenUpload();
+                      }}
+                      className="header-nav-v4__link"
+                    >
+                      <span className="fake-bold" data-content="sincronizar google sheets">
+                        sincronizar google sheets
+                      </span>
+                    </a>
+                  </li>
+                )}
+              </ul>
+
+              {/* Pool Summary Telemetry */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '14px',
+                  fontSize: '12px',
+                  color: 'hsl(var(--hsl-l1))',
+                  padding: '6px 0',
+                }}
+              >
+                <span>
+                  <strong style={{ color: '#fff' }}>{currentPool.name}</strong>
+                  {currentPool.stage ? ` · ${currentPool.stage}` : ''}
+                </span>
+                <span>
+                  média: <strong style={{ color: '#ffcc22' }}>★ {avgSr.toFixed(2).replace('.', ',')}</strong>
+                </span>
+                <span>
+                  duração: <strong style={{ color: '#fff' }}>{formatTimestamp(totalDuration)}</strong>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Reset Confirmation Modal */}
       {showResetConfirm && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in"
+          className="osu-radar-modal-backdrop"
           onClick={() => setShowResetConfirm(false)}
         >
           <div
-            className="relative w-full max-w-md bg-[#1d0e26] border border-red-500/50 rounded-xl p-5 shadow-2xl"
+            className="osu-radar-modal"
+            style={{ maxWidth: '460px' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
-              <div className="flex items-center gap-2 text-red-400 font-black uppercase text-sm tracking-wider">
-                <AlertTriangle className="w-5 h-5 text-red-400" />
-                <span>Resetar Mappool & Limpar Banco</span>
-              </div>
+            <div className="osu-radar-modal__header">
+              <span style={{ fontWeight: 700, fontSize: '15px', color: '#fff' }}>
+                <i className="fas fa-exclamation-triangle" style={{ color: '#ed1221', marginRight: '8px' }} />
+                Resetar Mappool & Limpar Banco
+              </span>
               <button
                 type="button"
                 onClick={() => setShowResetConfirm(false)}
-                className="text-white/50 hover:text-white p-1"
+                className="btn-osu-big btn-osu-big--rounded-small"
               >
-                <X className="w-4 h-4" />
+                <i className="fas fa-times" />
               </button>
             </div>
 
-            <p className="text-xs text-white/80 leading-relaxed mb-4">
-              Você tem certeza de que deseja apagar todos os beatmaps carregados e limpar o banco de dados IndexedDB?
-              <br />
-              <span className="text-red-400 font-bold block mt-2">
-                Esta ação é irreversível e excluirá todos os mapas em cache local.
-              </span>
-            </p>
+            <div className="osu-radar-modal__body">
+              <p style={{ fontSize: '13px', color: 'hsl(var(--hsl-l1))', marginBottom: '12px' }}>
+                Você tem certeza de que deseja apagar todos os beatmaps carregados e limpar o banco de dados IndexedDB?
+              </p>
+              <div className="warning-box" style={{ marginBottom: '16px' }}>
+                Esta ação é irreversível e excluirá todos os mapas e áudios em cache local.
+              </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => setShowResetConfirm(false)}
-                className="px-3 py-1.5 rounded text-xs font-bold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={isResetting}
-                onClick={handleConfirmReset}
-                className="px-4 py-1.5 rounded text-xs font-bold bg-red-600 hover:bg-red-500 text-white flex items-center gap-1.5 transition-all shadow-md disabled:opacity-50"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>{isResetting ? 'Limpando...' : 'Confirmar e Resetar Tudo'}</span>
-              </button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirm(false)}
+                  className="btn-osu-big btn-osu-big--rounded-thin"
+                >
+                  <span>Cancelar</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={isResetting}
+                  onClick={handleConfirmReset}
+                  className="btn-osu-big btn-osu-big--danger btn-osu-big--rounded-thin"
+                >
+                  <div className="btn-osu-big__content">
+                    <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
+                      <i className="fas fa-redo-alt" />
+                    </span>
+                    <span>{isResetting ? 'Limpando...' : 'Confirmar e Resetar Tudo'}</span>
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
         </div>

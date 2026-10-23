@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { BeatmapAnalysisResult, SkillAttributes } from '../../engine/types';
-import { getStarRatingColor, getStarRatingTextColor } from '../../utils/osuColors';
+import { getStarRatingColor, getStarRatingTextColor, TOURNAMENT_MOD_COLORS } from '../../utils/osuColors';
 import { ModSlotBadge } from './ModSlotBadge';
 import { StatHexagon } from '../charts/StatHexagon';
 import { OsuPreviewPlayer } from '../visualizer/OsuPreviewPlayer';
 import { formatTimestamp } from '../../engine/strains';
-import { ExternalLink, Radio, Hexagon, Play } from 'lucide-react';
 
 interface LazerWedgeProps {
   map: BeatmapAnalysisResult | null;
@@ -22,13 +21,22 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
 
   if (!map) {
     return (
-      <div className="h-full bg-[#180e22]/90 border border-white/10 rounded-xl p-8 flex flex-col items-center justify-center text-center backdrop-blur-md">
-        <Radio className="w-12 h-12 text-osu-pink/40 animate-pulse mb-3" />
-        <h3 className="text-base font-bold text-white uppercase tracking-wider">
-          Nenhum mapa selecionado
+      <div
+        style={{
+          padding: '40px 20px',
+          textAlign: 'center',
+          backgroundColor: 'hsl(var(--hsl-b4))',
+          color: 'hsl(var(--hsl-l1))',
+        }}
+      >
+        <div style={{ fontSize: '32px', color: 'hsl(var(--hsl-h1))', marginBottom: '10px' }}>
+          <i className="fas fa-compact-disc fa-spin" />
+        </div>
+        <h3 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: 700, color: '#fff' }}>
+          Nenhum beatmap selecionado
         </h3>
-        <p className="text-xs text-white/50 max-w-xs mt-1">
-          Selecione um beatmap no carrossel à direita para carregar a telemetria física e a teia de atributos.
+        <p style={{ margin: 0, fontSize: '12px', color: 'hsl(var(--hsl-l2))' }}>
+          Selecione um beatmap na listagem à direita para carregar as estatísticas oficiais e o visualizador ao vivo.
         </p>
       </div>
     );
@@ -41,6 +49,8 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
 
   const starColor = getStarRatingColor(stats.starRating);
   const starTextColor = getStarRatingTextColor(stats.starRating);
+  const modPrefix = (modSlot || 'NM').slice(0, 2).toUpperCase();
+  const modColorConfig = TOURNAMENT_MOD_COLORS[modPrefix] || TOURNAMENT_MOD_COLORS.NM;
 
   const modSlotOptions = [
     'NM', 'NM1', 'NM2', 'NM3', 'NM4', 'NM5', 'NM6',
@@ -51,152 +61,302 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
     'TB',
   ];
 
-  return (
-    <div className="flex flex-col gap-3.5 bg-[#180e22]/95 border border-white/10 rounded-xl overflow-hidden shadow-2xl backdrop-blur-md">
-      {/* Top Banner (Wedge Style with Cover Art) */}
-      <div className="relative h-40 overflow-hidden bg-[#100717]">
-        {coverUrl ? (
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-40 transition-transform duration-500 hover:scale-105"
-            style={{ backgroundImage: `url(${coverUrl})` }}
-          />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-r from-osu-surface to-osu-panel opacity-50" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#180e22] via-[#180e22]/80 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#180e22] via-transparent to-transparent" />
+  const statRows = [
+    { key: 'cs', label: 'Tam. Círculo (CS)', val: difficulty.cs, max: 10, isStar: false },
+    { key: 'hp', label: 'Drenagem HP (HP)', val: difficulty.hp, max: 10, isStar: false },
+    { key: 'od', label: 'Precisão (OD)', val: difficulty.od, max: 10, isStar: false },
+    { key: 'ar', label: 'Aproximação (AR)', val: difficulty.ar, max: 10, isStar: false },
+    { key: 'sr', label: 'Dificuldade (★)', val: stats.starRating, max: 10, isStar: true },
+  ];
 
-        {/* Content over Cover */}
-        <div className="absolute bottom-2.5 left-4 right-4 z-10 flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <ModSlotBadge slot={modSlot} size="sm" />
-              <span className="text-xs font-bold uppercase tracking-wider text-osu-pink truncate">
-                {metadata.artist}
-              </span>
-              {metadata.beatmapId && (
-                <a
-                  href={`https://osu.ppy.sh/b/${metadata.beatmapId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] text-osu-cyan hover:underline flex items-center gap-0.5"
-                  title="Abrir no site oficial do osu!"
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Official ppy/osu-web .beatmapset-header (resources/js/beatmapsets-show/header.tsx) */}
+      <div className="beatmapset-header">
+        <div className="beatmapset-header__cover">
+          <div
+            className="beatmapset-cover beatmapset-cover--full"
+            style={
+              coverUrl
+                ? ({
+                    '--bg': `url("${coverUrl}")`,
+                    '--bg-2x': `url("${coverUrl}")`,
+                  } as React.CSSProperties)
+                : undefined
+            }
+          />
+        </div>
+
+        {/* Left Box: Picker, Version, Title, Artist, Mapper, Actions */}
+        <div className="beatmapset-header__box beatmapset-header__box--main">
+          <div className="beatmapset-header__beatmap-picker-box">
+            <div className="beatmapset-beatmap-picker">
+              <span
+                className="beatmapset-beatmap-picker__beatmap beatmapset-beatmap-picker__beatmap--active"
+                title={`${metadata.version} (★ ${stats.starRating.toFixed(2).replace('.', ',')})`}
+              >
+                <div
+                  className="beatmap-icon beatmap-icon--beatmapset"
+                  style={{ '--diff': starColor } as React.CSSProperties}
                 >
-                  <span>#{metadata.beatmapId}</span>
-                  <ExternalLink className="w-2.5 h-2.5" />
-                </a>
-              )}
+                  <i className="fal fa-extra-mode-osu" />
+                </div>
+              </span>
             </div>
 
-            <h2 className="text-xl sm:text-2xl font-black text-white leading-tight truncate drop-shadow-md">
-              {metadata.title}
-            </h2>
-            <p className="text-xs text-white/70 mt-0.5 truncate">
-              <span className="text-osu-cyan font-bold">[{metadata.version}]</span> • Mapeado por{' '}
-              <span className="text-white font-medium">{metadata.creator}</span>
-            </p>
-          </div>
-
-          {/* Canonical Star Rating Pill (Official ppy/osu spectrum) */}
-          <div
-            className="flex-shrink-0 px-3 py-1 rounded-pill font-extrabold text-sm flex items-center gap-1.5 shadow-lg border border-black/30"
-            style={{ backgroundColor: starColor, color: starTextColor }}
-          >
-            <span>★</span>
-            <span className="font-mono">{stats.starRating.toFixed(2).replace('.', ',')}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Middle Controls & Metrics Bar */}
-      <div className="px-4 flex flex-col gap-3">
-        {/* Mod Slot Selector + Meters */}
-        <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-[#22132d] border border-white/5 text-xs">
-          {/* Mod Slot Picker */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase text-white/50">Slot do Torneio:</span>
-            {onSlotChange ? (
-              <select
-                value={modSlot || 'NM1'}
-                onChange={(e) => onSlotChange(map.id, e.target.value)}
-                className="px-2 py-0.5 rounded bg-[#160a1e] border border-osu-pink/40 text-white font-bold text-xs focus:outline-none focus:border-osu-pink"
+            <span className="beatmapset-header__diff-name">
+              <div
+                className="difficulty-badge difficulty-badge--beatmapset"
+                style={
+                  {
+                    '--bg': starColor,
+                    color: starTextColor,
+                  } as React.CSSProperties
+                }
               >
-                {modSlotOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <ModSlotBadge slot={modSlot} size="sm" />
+                <span className="difficulty-badge__icon">
+                  <span className="fas fa-star" />
+                </span>
+                <span className="difficulty-badge__rating">
+                  {stats.starRating.toFixed(2).replace('.', ',')}
+                </span>
+              </div>{' '}
+              {metadata.version}
+            </span>
+          </div>
+
+          <span className="beatmapset-header__details-text beatmapset-header__details-text--title">
+            <span className="beatmapset-header__details-text-link">{metadata.title}</span>
+          </span>
+
+          <span className="beatmapset-header__details-text beatmapset-header__details-text--artist">
+            <span className="beatmapset-header__details-text-link">{metadata.artist}</span>
+          </span>
+
+          <div className="beatmapset-mapping">
+            <div className="beatmapset-mapping__user">
+              <span
+                className="avatar avatar--beatmapset"
+                style={{
+                  backgroundImage: 'url(/images/layout/avatar-guest@2x.png)',
+                }}
+              />
+            </div>
+            <div className="beatmapset-mapping__content">
+              <div>
+                mapeado por <strong style={{ color: '#fff' }}>{metadata.creator}</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                <span>slot do torneio:</span>
+                {onSlotChange ? (
+                  <select
+                    value={modSlot || 'NM1'}
+                    onChange={(e) => onSlotChange(map.id, e.target.value)}
+                    style={{
+                      backgroundColor: 'hsl(var(--hsl-b5))',
+                      color: '#fff',
+                      border: '1px solid hsl(var(--hsl-b2))',
+                      borderRadius: '4px',
+                      padding: '1px 6px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {modSlotOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <ModSlotBadge slot={modSlot} size="sm" />
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="beatmapset-header__buttons">
+            {metadata.beatmapId && (
+              <a
+                href={`https://osu.ppy.sh/b/${metadata.beatmapId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-osu-big btn-osu-big--beatmapset-header"
+              >
+                <div className="btn-osu-big__content">
+                  <div className="btn-osu-big__left">
+                    <span className="btn-osu-big__text-top">Página Oficial</span>
+                    <span className="btn-osu-big__text-bottom">osu.ppy.sh #{metadata.beatmapId}</span>
+                  </div>
+                  <div className="btn-osu-big__icon">
+                    <span className="fas fa-external-link-alt" />
+                  </div>
+                </div>
+              </a>
             )}
           </div>
+        </div>
 
-          {/* Difficulty Meters */}
-          <div className="flex items-center gap-2.5 font-mono text-[11px] text-white/80">
-            <span>CS <strong className="text-white">{difficulty.cs.toFixed(1).replace('.', ',')}</strong></span>
-            <span>AR <strong className="text-white">{difficulty.ar.toFixed(1).replace('.', ',')}</strong></span>
-            <span>OD <strong className="text-white">{difficulty.od.toFixed(1).replace('.', ',')}</strong></span>
-            <span>HP <strong className="text-white">{difficulty.hp.toFixed(1).replace('.', ',')}</strong></span>
-            <span>BPM <strong className="text-white">{stats.bpmMode}</strong></span>
-            <span>⏱ <strong className="text-white">{formatTimestamp(stats.drainTimeMs)}</strong></span>
+        {/* Right Box: Status Pill & Official .beatmapset-stats Table (resources/js/beatmapsets-show/stats.tsx) */}
+        <div className="beatmapset-header__box beatmapset-header__box--stats">
+          <div className="beatmapset-header__status">
+            <span
+              className="beatmapset-status beatmapset-status--show"
+              style={{
+                backgroundColor: modColorConfig.bg,
+                color: modColorConfig.text,
+                fontWeight: 800,
+              }}
+            >
+              {modSlot || 'NM1'}
+            </span>
           </div>
-        </div>
 
-        {/* Sub-tab Navigation (Radar vs Patterns vs Playfield Visualizer) */}
-        <div className="flex items-center gap-2 border-b border-white/10 pb-2">
-          <button
-            type="button"
-            onClick={() => setActiveWedgeTab('radar')}
-            className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
-              activeWedgeTab === 'radar'
-                ? 'bg-osu-pink text-white shadow-glowPink'
-                : 'bg-white/5 text-white/60 hover:text-white'
-            }`}
-          >
-            <Hexagon className="w-3.5 h-3.5" />
-            <span>Radar de Skills</span>
-          </button>
+          <div className="beatmapset-stats">
+            <div className="beatmapset-stats__row beatmapset-stats__row--basic">
+              <div className="beatmap-basic-stats">
+                <div className="beatmap-basic-stats__entry" title="Duração Total (Drain Time)">
+                  <div
+                    className="beatmap-basic-stats__entry-icon"
+                    style={{
+                      backgroundImage: 'url(/images/layout/beatmapset-page/total_length.svg)',
+                    }}
+                  />
+                  <span>{formatTimestamp(stats.drainTimeMs)}</span>
+                </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveWedgeTab('visualizer')}
-            className={`px-3 py-1 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
-              activeWedgeTab === 'visualizer'
-                ? 'bg-osu-pink text-white shadow-glowPink ring-1 ring-osu-pink'
-                : 'bg-white/5 text-white/60 hover:text-white'
-            }`}
-          >
-            <Play className="w-3.5 h-3.5 fill-current text-osu-cyan" />
-            <span>Visualizador ao Vivo</span>
-          </button>
-        </div>
+                <div className="beatmap-basic-stats__entry" title="BPM">
+                  <div
+                    className="beatmap-basic-stats__entry-icon"
+                    style={{
+                      backgroundImage: 'url(/images/layout/beatmapset-page/bpm.svg)',
+                    }}
+                  />
+                  <span>{stats.bpmMode}</span>
+                </div>
 
-        {/* View 1: Stat Hexagon (Radar) with Pool Comparison */}
-        {activeWedgeTab === 'radar' && (
-          <div className="flex flex-col items-center bg-[#13081a]/80 p-3 rounded-xl border border-white/5">
-            <div className="w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider text-white/70 mb-1">
-              <span>Hexágono de Atributos</span>
-              <span className="text-[10px] text-osu-pink font-mono">Top: {map.topSkills.join(' + ')}</span>
+                <div className="beatmap-basic-stats__entry" title="Contagem de Círculos">
+                  <div
+                    className="beatmap-basic-stats__entry-icon"
+                    style={{
+                      backgroundImage: 'url(/images/layout/beatmapset-page/count_circles.svg)',
+                    }}
+                  />
+                  <span>{stats.circleCount}</span>
+                </div>
+
+                <div className="beatmap-basic-stats__entry" title="Contagem de Sliders">
+                  <div
+                    className="beatmap-basic-stats__entry-icon"
+                    style={{
+                      backgroundImage: 'url(/images/layout/beatmapset-page/count_sliders.svg)',
+                    }}
+                  />
+                  <span>{stats.sliderCount}</span>
+                </div>
+              </div>
             </div>
-            <StatHexagon
-              skills={skills}
-              comparisonSkills={poolAverageSkills}
-              comparisonLabel="Média da Pool"
-              size={260}
-              showLegend={true}
-            />
-          </div>
-        )}
 
-        {/* View 2: Authentic osu! Preview Player with Pattern Recognition */}
-        {activeWedgeTab === 'visualizer' && (
-          <OsuPreviewPlayer
-            map={map}
-            patterns={patterns}
-          />
-        )}
+            <div className="beatmapset-stats__row beatmapset-stats__row--advanced">
+              <table className="beatmap-stats-table">
+                <tbody>
+                  {statRows.map((row) => {
+                    const pct = Math.min(100, Math.max(0, (row.val / row.max) * 100));
+                    return (
+                      <tr key={row.key}>
+                        <th className="beatmap-stats-table__label">{row.label}</th>
+                        <td className="beatmap-stats-table__bar">
+                          <div
+                            className={`bar bar--beatmap-stats ${
+                              row.isStar ? 'bar--beatmap-stats-stars' : ''
+                            }`}
+                            style={{ '--fill': `${pct}%` } as React.CSSProperties}
+                          >
+                            <div className="bar__fill" />
+                          </div>
+                        </td>
+                        <td className="beatmap-stats-table__value">
+                          {row.isStar
+                            ? row.val.toFixed(2).replace('.', ',')
+                            : row.val.toFixed(1).replace('.', ',')}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Official ppy/osu-web .page-mode Sub-Navigation Bar */}
+      <ul
+        className="page-mode page-mode--sticky-toolbar"
+        style={{
+          padding: '8px 15px 0',
+          backgroundColor: 'hsl(var(--hsl-b4))',
+          textAlign: 'left',
+        }}
+      >
+        <li className="page-mode__item">
+          <a
+            href="#visualizer"
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveWedgeTab('visualizer');
+            }}
+            className={`page-mode-link ${
+              activeWedgeTab === 'visualizer' ? 'page-mode-link--is-active' : ''
+            }`}
+          >
+            <i className="fas fa-play-circle" style={{ marginRight: '6px', alignSelf: 'center' }} />
+            <span>visualizador ao vivo</span>
+            <span className="page-mode-link__stripe" />
+          </a>
+        </li>
+
+        <li className="page-mode__item">
+          <a
+            href="#radar"
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveWedgeTab('radar');
+            }}
+            className={`page-mode-link ${
+              activeWedgeTab === 'radar' ? 'page-mode-link--is-active' : ''
+            }`}
+          >
+            <i className="fas fa-chart-pie" style={{ marginRight: '6px', alignSelf: 'center' }} />
+            <span>radar de skills</span>
+            <span className="page-mode-link__badge">{map.topSkills.slice(0, 2).join(' + ')}</span>
+            <span className="page-mode-link__stripe" />
+          </a>
+        </li>
+      </ul>
+
+      {/* Tab Content */}
+      {activeWedgeTab === 'radar' ? (
+        <div
+          style={{
+            padding: '20px',
+            backgroundColor: 'hsl(var(--hsl-b5))',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          <StatHexagon
+            skills={skills}
+            comparisonSkills={poolAverageSkills}
+            comparisonLabel="Média da Pool"
+            size={280}
+            showLegend={true}
+          />
+        </div>
+      ) : (
+        <OsuPreviewPlayer map={map} patterns={patterns} />
+      )}
     </div>
   );
 };

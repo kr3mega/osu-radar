@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { usePoolStore, getFilteredAndSortedMaps, SortOption } from './store/usePoolStore';
-import { TrianglesBackground } from './components/common/TrianglesBackground';
 import { LazerToolbar } from './components/layout/LazerToolbar';
 import { LazerBottomBar } from './components/layout/LazerBottomBar';
 import { LazerWedge } from './components/beatmap/LazerWedge';
@@ -8,16 +7,23 @@ import { LazerCarouselItem } from './components/beatmap/LazerCarouselItem';
 import { PoolOverview } from './components/pool/PoolOverview';
 import { PoolUploader } from './components/pool/PoolUploader';
 import { SkillAttributes } from './engine/types';
-import { SlidersHorizontal, UploadCloud, X } from 'lucide-react';
 import { extractOsuFilesFromZip } from './utils/unzip';
 import { analyzeBeatmap } from './engine/analyzer';
 import { extractQuickOsuMeta, matchOsuFileToTournamentEntry } from './utils/sheetParser';
 
-const MOD_FILTERS = ['ALL', 'NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
+const MOD_FILTERS: Array<{ id: string; label: string }> = [
+  { id: 'ALL', label: 'Qualquer' },
+  { id: 'NM', label: 'NoMod (NM)' },
+  { id: 'HD', label: 'Hidden (HD)' },
+  { id: 'HR', label: 'HardRock (HR)' },
+  { id: 'DT', label: 'DoubleTime (DT)' },
+  { id: 'FM', label: 'FreeMod (FM)' },
+  { id: 'TB', label: 'Tiebreaker (TB)' },
+];
 
 const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
-  { value: 'slot', label: 'Slot do Mod (NM1 → TB)' },
-  { value: 'sr', label: 'Star Rating (★ Decrescente)' },
+  { value: 'slot', label: 'Slot' },
+  { value: 'sr', label: 'Dificuldade (★)' },
   { value: 'bpm', label: 'BPM' },
   { value: 'snapAim', label: 'Snap Aim' },
   { value: 'flowAim', label: 'Flow Aim' },
@@ -38,6 +44,7 @@ export const App: React.FC = () => {
     removeBeatmap,
     updateModSlot,
     setFilterMod,
+    setSearchQuery,
     setSortBy,
     initFromDb,
     addBeatmaps,
@@ -50,7 +57,7 @@ export const App: React.FC = () => {
   const [isUploaderOpen, setIsUploaderOpen] = useState(false);
   const [isGlobalDragging, setIsGlobalDragging] = useState(false);
 
-  // Measure Left Wedge container height to sync the right beatmap carousel height exactly
+  // Measure Left Wedge container height to sync the right beatmapset-panel list height
   const wedgeContainerRef = useRef<HTMLDivElement | null>(null);
   const [wedgeHeight, setWedgeHeight] = useState<number>(0);
 
@@ -73,9 +80,11 @@ export const App: React.FC = () => {
 
   const maps = currentPool.maps;
   const filteredMaps = getFilteredAndSortedMaps(maps, filterMod, searchQuery, sortBy);
-
-  // Selected map
   const activeMap = maps.find((m) => m.id === selectedMapId) || maps[0] || null;
+
+  const activeCoverUrl = activeMap?.metadata.beatmapSetId
+    ? `https://assets.ppy.sh/beatmaps/${activeMap.metadata.beatmapSetId}/covers/cover.jpg`
+    : null;
 
   // Calculate pool average skills for comparison in the Wedge
   const avgSkills: SkillAttributes = {
@@ -137,7 +146,6 @@ export const App: React.FC = () => {
         }
       }
 
-      // Filter non-pool difficulties if active tournament filter is set
       let filesToAnalyze: Array<{
         fileName: string;
         text: string;
@@ -192,160 +200,261 @@ export const App: React.FC = () => {
       onDragOver={handleWindowDragOver}
       onDragLeave={handleWindowDragLeave}
       onDrop={handleWindowDrop}
-      className="min-h-screen bg-[#140a1b] text-white flex flex-col font-torus select-none relative overflow-x-hidden"
+      className="osu-radar-app"
     >
-      {/* 1. Animated Floating Triangles Background (Official ppy/osu Triangles.cs) */}
-      <TrianglesBackground />
-
-      {/* 2. Top Toolbar (osu.Game/Overlays/Toolbar) */}
+      {/* 1. Official ppy/osu-web Pinned Navbar + Header v4 */}
       <LazerToolbar
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
+        onOpenUpload={() => setIsUploaderOpen(true)}
       />
 
-      {/* 3. Main View Area (Song Select / Overview) */}
-      <main className="relative z-10 flex-1 px-3 sm:px-6 pt-4 pb-16 max-w-[1700px] w-full mx-auto">
+      {/* 2. Main osu-web Page Content */}
+      <div className="osu-layout__section osu-layout__section--full">
         {activeTab === 'select' ? (
-          /* Song Select Split View (Left: Info Wedge, Right: Carousel) */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-            {/* Left Column: The Beatmap Info Wedge */}
-            <div ref={wedgeContainerRef} className="lg:col-span-5 xl:col-span-5 sticky top-16">
-              <LazerWedge
-                map={activeMap}
-                poolAverageSkills={maps.length > 1 ? avgSkills : undefined}
-                onSlotChange={(id, newSlot) => updateModSlot(id, newSlot)}
-              />
-            </div>
-
-            {/* Right Column: Beatmap Carousel & Mod Filters */}
-            <div className="lg:col-span-7 xl:col-span-7 flex flex-col gap-3 min-w-0 max-w-full overflow-hidden">
-              {/* Filter and Sort Toolbar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-[#1b0f24]/90 border border-white/10 rounded-lg backdrop-blur-md shadow-md min-w-0 max-w-full">
-                {/* Mod Category Tabs */}
-                <div className="flex items-center gap-1 flex-wrap">
-                  {MOD_FILTERS.map((mod) => {
-                    const cnt =
-                      mod === 'ALL'
-                        ? maps.length
-                        : maps.filter((m) => m.modSlot?.startsWith(mod)).length;
-                    const isSelected = filterMod === mod;
-
-                    return (
-                      <button
-                        key={mod}
-                        type="button"
-                        onClick={() => setFilterMod(mod)}
-                        className={`px-3 py-1 rounded text-xs font-black uppercase transition-all flex items-center gap-1.5 ${
-                          isSelected
-                            ? 'bg-osu-pink text-white shadow-glowPink'
-                            : 'bg-[#150a1d] hover:bg-[#22102e] text-white/70 border border-white/5'
-                        }`}
-                      >
-                        <span>{mod}</span>
-                        <span className={`text-[10px] ${isSelected ? 'text-white/80' : 'text-white/40'}`}>
-                          {cnt}
-                        </span>
-                      </button>
-                    );
-                  })}
+          <>
+            {/* Official ppy/osu-web .beatmapsets-search Header (resources/js/beatmaps/search-panel.tsx) */}
+            <div className="osu-page osu-page--beatmapsets-search-header">
+              <div className="beatmapsets-search" style={{ paddingTop: '14px', paddingBottom: '14px' }}>
+                <div className="beatmapsets-search__cover">
+                  <div
+                    className="beatmapset-cover beatmapset-cover--full"
+                    style={
+                      activeCoverUrl
+                        ? ({
+                            '--bg': `url("${activeCoverUrl}")`,
+                            '--bg-2x': `url("${activeCoverUrl}")`,
+                          } as React.CSSProperties)
+                        : undefined
+                    }
+                  />
                 </div>
 
-                {/* Sort Option Dropdown */}
-                <div className="flex items-center gap-1.5 bg-[#150a1d] border border-white/10 rounded px-2.5 py-1 shrink-0">
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-osu-cyan" />
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as SortOption)}
-                    className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
-                  >
-                    {SORT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="bg-[#1c0f26] text-white">
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* The Carousel List: Sized to match the Wedge container exactly */}
-              <div
-                style={{
-                  height: wedgeHeight > 0 ? `${Math.max(420, wedgeHeight - 56)}px` : undefined,
-                  maxHeight: wedgeHeight > 0 ? `${Math.max(420, wedgeHeight - 56)}px` : undefined,
-                }}
-                className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden p-0.5 pr-1.5 w-full min-w-0 max-w-full custom-scrollbar"
-              >
-                {filteredMaps.length > 0 ? (
-                  filteredMaps.map((map) => (
-                    <LazerCarouselItem
-                      key={map.id}
-                      map={map}
-                      isSelected={map.id === selectedMapId}
-                      onSelect={() => selectMap(map.id)}
-                      onRemove={() => removeBeatmap(map.id)}
+                {/* Official osu-web Search Box */}
+                <div className="beatmapsets-search__input-container" style={{ margin: '8px 0 12px' }}>
+                  <label className="beatmapsets-search__input-container-label">
+                    <span className="beatmapsets-search__icon">
+                      <i className="fas fa-search" />
+                    </span>
+                    <input
+                      className="beatmapsets-search__input"
+                      type="search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="procurar beatmap por título, artista, mapper, diff ou slot..."
                     />
-                  ))
-                ) : (
-                  <div className="p-12 bg-[#1b0f24]/80 border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center text-center gap-3 text-white/50 backdrop-blur-md">
-                    <p className="text-sm font-bold text-white">Nenhum beatmap importado ainda</p>
-                    <p className="text-xs max-w-sm">
-                      Arraste qualquer pacote <span className="text-osu-pink">.osz</span> ou arquivo <span className="text-osu-cyan">.osu</span> para a tela, ou clique em &ldquo;Importar .osz / .osu&rdquo; na barra inferior.
-                    </p>
+                  </label>
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="beatmapsets-search__icon beatmapsets-search__icon--button"
+                      title="Limpar busca"
+                    >
+                      <i className="fas fa-times" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Official osu-web Filter Grid (.beatmapsets-search__filter-grid) */}
+                <div className="beatmapsets-search__filter-grid">
+                  <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
+                    <span className="beatmapsets-search-filter__header">Slot / Mod</span>
+                    <div className="beatmapsets-search-filter__items">
+                      {MOD_FILTERS.map((mod) => {
+                        const cnt =
+                          mod.id === 'ALL'
+                            ? maps.length
+                            : maps.filter((m) => m.modSlot?.startsWith(mod.id)).length;
+                        const isSelected = filterMod === mod.id;
+
+                        return (
+                          <a
+                            key={mod.id}
+                            href={`#mod-${mod.id}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setFilterMod(mod.id);
+                            }}
+                            className={`beatmapsets-search-filter__item ${
+                              isSelected ? 'beatmapsets-search-filter__item--active' : ''
+                            }`}
+                          >
+                            {mod.label} ({cnt})
+                          </a>
+                        );
+                      })}
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             </div>
-          </div>
+
+            {/* Main Split Workspace inside .osu-page */}
+            <div className="osu-page">
+              <div className="osu-radar-workspace">
+                {/* Left Column: Selected Beatmapset Header + Live Visualizer / Radar */}
+                <div ref={wedgeContainerRef} className="osu-radar-left-col">
+                  <LazerWedge
+                    map={activeMap}
+                    poolAverageSkills={maps.length > 1 ? avgSkills : undefined}
+                    onSlotChange={(id, newSlot) => updateModSlot(id, newSlot)}
+                  />
+                </div>
+
+                {/* Right Column: Official .beatmapsets Toolbar + .beatmapset-panel List */}
+                <div className="osu-radar-right-col">
+                  {/* Official ppy/osu-web .beatmapsets__toolbar & .sort (resources/js/beatmaps/search-sort.tsx) */}
+                  <div className="beatmapsets__toolbar">
+                    <div className="beatmapsets__toolbar-item">
+                      <div className="sort sort--beatmapsets">
+                        <div className="sort__items">
+                          <span className="sort__item sort__item--title">ordenar por</span>
+                          {SORT_OPTIONS.map((opt) => {
+                            const active = sortBy === opt.value;
+                            return (
+                              <a
+                                key={opt.value}
+                                href={`#sort-${opt.value}`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setSortBy(opt.value);
+                                }}
+                                className={`sort__item sort__item--button ${
+                                  active ? 'sort__item--active' : ''
+                                }`}
+                              >
+                                {opt.label}
+                                <span className="sort__item-arrow">
+                                  <i className="fas fa-caret-down" />
+                                </span>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Beatmapset Panels List (sized to match Left Column) */}
+                  <div
+                    style={{
+                      height: wedgeHeight > 0 ? `${Math.max(460, wedgeHeight - 48)}px` : undefined,
+                      maxHeight: wedgeHeight > 0 ? `${Math.max(460, wedgeHeight - 48)}px` : undefined,
+                    }}
+                    className="osu-radar-beatmapsets-list"
+                  >
+                    {filteredMaps.length > 0 ? (
+                      filteredMaps.map((map) => (
+                        <LazerCarouselItem
+                          key={map.id}
+                          map={map}
+                          isSelected={map.id === selectedMapId}
+                          onSelect={() => selectMap(map.id)}
+                          onRemove={() => removeBeatmap(map.id)}
+                        />
+                      ))
+                    ) : (
+                      <div
+                        className="beatmapsets__empty"
+                        style={{
+                          flexDirection: 'column',
+                          gap: '12px',
+                          padding: '40px 20px',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <img
+                          src="/images/layout/beatmaps/not-found.png"
+                          alt="Nenhum beatmap encontrado"
+                          style={{ maxWidth: '180px', opacity: 0.85 }}
+                        />
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff' }}>
+                          Nenhum beatmap encontrado nesta visualização
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'hsl(var(--hsl-l2))', maxWidth: '380px' }}>
+                          Arraste pacotes <strong>.osz</strong> ou arquivos <strong>.osu</strong> para a janela, ou clique abaixo para importar uma mappool / planilha do Google Sheets.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsUploaderOpen(true)}
+                          className="btn-osu-big btn-osu-big--rounded"
+                        >
+                          <div className="btn-osu-big__content">
+                            <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
+                              <i className="fas fa-cloud-upload-alt" />
+                            </span>
+                            <span>Importar Beatmaps / Google Sheets</span>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
         ) : (
           /* Overview & Full Pool Intelligence View */
-          <div className="flex flex-col gap-6">
+          <div className="osu-page osu-page--generic">
             <PoolOverview />
           </div>
         )}
-      </main>
+      </div>
 
-      {/* 4. Bottom Control Bar (ppy/osu style) */}
+      {/* 3. Official ppy/osu-web Footer */}
       <LazerBottomBar
         onBackClick={() => setActiveTab('select')}
         onOpenUpload={() => setIsUploaderOpen(true)}
       />
 
-      {/* 5. Uploader Modal Drawer */}
+      {/* 4. Uploader Modal */}
       {isUploaderOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in"
+          className="osu-radar-modal-backdrop"
           onClick={() => setIsUploaderOpen(false)}
         >
           <div
-            className="relative w-full max-w-3xl bg-[#1b0f24] border border-osu-pink/40 rounded-xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+            className="osu-radar-modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
-              <h3 className="text-base font-extrabold text-white uppercase tracking-wider">
-                Importador de Mappool
-              </h3>
+            <div className="osu-radar-modal__header">
+              <span style={{ fontWeight: 700, fontSize: '16px', color: 'hsl(var(--hsl-c1))' }}>
+                <i className="fas fa-cloud-upload-alt" style={{ marginRight: '8px', color: 'hsl(var(--hsl-h1))' }} />
+                Importador de Mappool & Sincronizador Google Sheets
+              </span>
               <button
                 type="button"
                 onClick={() => setIsUploaderOpen(false)}
-                className="p-1 text-white/50 hover:text-white"
+                className="btn-osu-big btn-osu-big--rounded-small"
               >
-                <X className="w-5 h-5" />
+                <i className="fas fa-times" />
               </button>
             </div>
-            <PoolUploader />
+            <div className="osu-radar-modal__body">
+              <PoolUploader />
+            </div>
           </div>
         </div>
       )}
 
-      {/* 6. Fullscreen Drag Overlay (When dragging files from OS over browser window) */}
+      {/* 5. Fullscreen Drag Overlay */}
       {isGlobalDragging && (
-        <div className="fixed inset-0 z-50 bg-[#1a0c24]/90 backdrop-blur-md border-4 border-dashed border-osu-pink flex flex-col items-center justify-center pointer-events-none shadow-glowPink">
-          <UploadCloud className="w-16 h-16 text-osu-pink animate-bounce mb-4" />
-          <h2 className="text-2xl font-black text-white uppercase tracking-wider">
-            Solte seus beatmaps aqui
+        <div
+          className="osu-radar-modal-backdrop"
+          style={{
+            border: '4px dashed hsl(var(--hsl-h1))',
+            flexDirection: 'column',
+            gap: '12px',
+            pointerEvents: 'none',
+          }}
+        >
+          <i className="fas fa-cloud-upload-alt" style={{ fontSize: '54px', color: 'hsl(var(--hsl-h1))' }} />
+          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: '#fff' }}>
+            Solte seus beatmaps (.osz / .osu) aqui
           </h2>
-          <p className="text-sm text-osu-cyan mt-1 font-semibold">
-            O osu!Radar extrairá e analisará a física dos arquivos .osu instantaneamente
+          <p style={{ margin: 0, fontSize: '14px', color: 'hsl(var(--hsl-c1))' }}>
+            O osu!radar extrairá e analisará a física dos arquivos instantaneamente
           </p>
         </div>
       )}

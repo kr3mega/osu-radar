@@ -13,16 +13,6 @@ import { extractOsuFilesFromZip } from '../../utils/unzip';
 import { analyzeBeatmap } from '../../engine/analyzer';
 import { usePoolStore } from '../../store/usePoolStore';
 import { BeatmapAnalysisResult } from '../../engine/types';
-import {
-  Link2,
-  FolderSearch,
-  CloudDownload,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Layers,
-  Sparkles,
-} from 'lucide-react';
 import { TOURNAMENT_MOD_COLORS } from '../../utils/osuColors';
 
 const DEFAULT_SHEET_URL =
@@ -43,7 +33,6 @@ export const PoolSheetSync: React.FC = () => {
 
   const selectedStage = stages.find((s) => s.stageName === selectedStageName) || stages[0];
 
-  // Keep active tournament filter in store synced whenever stage changes
   React.useEffect(() => {
     if (selectedStage && selectedStage.entries.length > 0) {
       setActiveTournamentFilter({
@@ -85,7 +74,6 @@ export const PoolSheetSync: React.FC = () => {
     }
   };
 
-  // 1. Process files from selected local osu!/Songs folder
   const handleLocalFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !selectedStage) return;
 
@@ -118,7 +106,6 @@ export const PoolSheetSync: React.FC = () => {
       }> = [];
       const foundIds = new Set<number>();
 
-      // Scan .osu files
       for (let i = 0; i < osuFiles.length; i++) {
         const file = osuFiles[i];
         if (i % 25 === 0) {
@@ -137,7 +124,6 @@ export const PoolSheetSync: React.FC = () => {
         if (matched && !foundIds.has(matched.beatmapId)) {
           foundIds.add(matched.beatmapId);
 
-          // Attempt to find companion audio file in same folder
           const dirPath = (file as any).webkitRelativePath
             ? (file as any).webkitRelativePath.split('/').slice(0, -1).join('/')
             : '';
@@ -155,11 +141,9 @@ export const PoolSheetSync: React.FC = () => {
           matchedOsuItems.push({ text, fileName: file.name, entry: matched, audioBlob });
         }
 
-        // If we found all maps in the stage, stop early!
         if (matchedOsuItems.length === requiredEntries.length) break;
       }
 
-      // If still missing maps, inspect .osz files
       if (matchedOsuItems.length < requiredEntries.length && oszFiles.length > 0) {
         setProcessProgress({
           current: 0,
@@ -193,7 +177,6 @@ export const PoolSheetSync: React.FC = () => {
         );
       }
 
-      // Analyze matched beatmaps and assign their sheet slots and official metadata
       const results: BeatmapAnalysisResult[] = [];
       for (let i = 0; i < matchedOsuItems.length; i++) {
         const item = matchedOsuItems[i];
@@ -226,7 +209,6 @@ export const PoolSheetSync: React.FC = () => {
     }
   };
 
-  // 2. Download directly from mirrors
   const handleDownloadFromWeb = async () => {
     if (!selectedStage) return;
     setErrorMessage(null);
@@ -280,7 +262,7 @@ export const PoolSheetSync: React.FC = () => {
   };
 
   return (
-    <div className="w-full flex flex-col gap-4 text-white">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
       {/* Hidden Folder Input */}
       <input
         ref={folderInputRef}
@@ -290,60 +272,111 @@ export const PoolSheetSync: React.FC = () => {
         directory=""
         multiple
         onChange={handleLocalFolderSelect}
-        className="hidden"
+        style={{ display: 'none' }}
       />
 
       {/* URL Input Bar */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-bold uppercase tracking-wider text-white/70 flex items-center justify-between">
-          <span className="flex items-center gap-1.5">
-            <Link2 className="w-3.5 h-3.5 text-osu-cyan" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '12px',
+            fontWeight: 700,
+            color: 'hsl(var(--hsl-l1))',
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <i className="fas fa-link" style={{ color: 'hsl(var(--hsl-h1))' }} />
             Link da Planilha de Torneio (Google Sheets)
           </span>
           <button
             type="button"
             onClick={() => setSheetUrl(DEFAULT_SHEET_URL)}
-            className="text-[11px] text-osu-pink hover:underline flex items-center gap-1 font-semibold"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'hsl(var(--hsl-h1))',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
           >
-            <Sparkles className="w-3 h-3" />
+            <i className="fas fa-magic" />
             Preencher 6WC 2026
           </button>
-        </label>
+        </div>
 
-        <div className="flex items-center gap-2">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <input
             type="text"
             value={sheetUrl}
             onChange={(e) => setSheetUrl(e.target.value)}
             placeholder="Cole o link da planilha do Google Sheets aqui..."
-            className="flex-1 px-3 py-2 rounded-lg bg-[#140a1d] border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-osu-pink transition-colors font-mono"
+            style={{
+              flex: 1,
+              minWidth: '240px',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              backgroundColor: 'hsl(var(--hsl-b5))',
+              border: '1px solid hsl(var(--hsl-b2))',
+              color: '#fff',
+              fontSize: '12px',
+              fontFamily: 'AzeretMono, monospace',
+              outline: 'none',
+            }}
           />
 
           <button
             type="button"
             onClick={handleFetchSheet}
             disabled={isLoadingSheet || !sheetUrl.trim()}
-            className="px-4 py-2 rounded-lg bg-osu-pink hover:bg-osu-pink/80 disabled:opacity-50 text-white font-extrabold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-glowPink transition-all"
+            className="btn-osu-big btn-osu-big--beatmapset-header"
+            style={{ padding: '8px 18px', width: 'auto' }}
           >
-            {isLoadingSheet ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Carregando...</span>
-              </>
-            ) : (
-              <span>Carregar Planilha</span>
-            )}
+            <span className="btn-osu-big__content">
+              <span className="btn-osu-big__left">
+                <span className="btn-osu-big__text-top">
+                  {isLoadingSheet ? 'Carregando...' : 'Carregar Planilha'}
+                </span>
+              </span>
+              <span className="btn-osu-big__icon">
+                <i className={`fas ${isLoadingSheet ? 'fa-circle-notch fa-spin' : 'fa-sync-alt'}`} />
+              </span>
+            </span>
           </button>
         </div>
       </div>
 
       {/* Stage Selector and Beatmap Checklist */}
       {stages.length > 0 && selectedStage && (
-        <div className="flex flex-col gap-3 bg-[#13071b]/90 border border-white/10 rounded-xl p-3.5 animate-in fade-in">
-          {/* Stage Tabs */}
-          <div className="flex items-center gap-1.5 flex-wrap border-b border-white/10 pb-2.5">
-            <span className="text-[11px] font-bold uppercase text-white/50 mr-1 flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5 text-osu-cyan" />
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            backgroundColor: 'hsl(var(--hsl-b5))',
+            borderRadius: '8px',
+            padding: '15px',
+          }}
+        >
+          {/* Stage Tabs using osu-web .sort */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              flexWrap: 'wrap',
+              paddingBottom: '10px',
+              borderBottom: '1px solid hsl(var(--hsl-b3))',
+            }}
+          >
+            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'hsl(var(--hsl-l2))' }}>
+              <i className="fas fa-layer-group" style={{ marginRight: '5px', color: 'hsl(var(--hsl-h1))' }} />
               Etapas:
             </span>
             {stages.map((stage) => {
@@ -353,70 +386,88 @@ export const PoolSheetSync: React.FC = () => {
                   key={stage.stageName}
                   type="button"
                   onClick={() => setSelectedStageName(stage.stageName)}
-                  className={`px-2.5 py-1 rounded text-xs font-black uppercase transition-all flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-osu-pink text-white shadow-glowPink'
-                      : 'bg-white/5 hover:bg-white/10 text-white/70'
-                  }`}
+                  className={`osu-radar-player__mod-btn ${isSelected ? 'osu-radar-player__mod-btn--active' : ''}`}
+                  style={{ padding: '4px 10px', fontSize: '11px' }}
                 >
-                  <span>{stage.stageName}</span>
-                  <span className={`text-[10px] ${isSelected ? 'text-white/80' : 'text-white/40'}`}>
-                    {stage.entries.length}
-                  </span>
+                  {stage.stageName} ({stage.entries.length})
                 </button>
               );
             })}
           </div>
 
           {/* Action Buttons to Source the Beatmaps */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-            {/* Action A: Filter from Local Folder (User Request) */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '10px',
+            }}
+          >
             <button
               type="button"
               disabled={isProcessing}
               onClick={() => folderInputRef.current?.click()}
-              className="p-3 rounded-lg bg-[#241334] hover:bg-[#321948] border border-osu-pink/40 hover:border-osu-pink text-white flex items-center gap-3 transition-all text-left shadow-sm disabled:opacity-50 group"
+              className="btn-osu-big btn-osu-big--beatmapset-header"
+              style={{ padding: '10px 16px' }}
             >
-              <div className="p-2.5 rounded-lg bg-osu-pink/20 text-osu-pink group-hover:scale-105 transition-transform">
-                <FolderSearch className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-xs font-black uppercase tracking-wider text-white block">
-                  Filtrar da Pasta do osu! (Songs)
+              <span className="btn-osu-big__content">
+                <span className="btn-osu-big__left">
+                  <span className="btn-osu-big__text-top">Filtrar da Pasta do osu! (Songs)</span>
+                  <span className="btn-osu-big__text-bottom">
+                    Importa somente os {selectedStage.entries.length} mapas desta etapa
+                  </span>
                 </span>
-                <span className="text-[10px] text-white/60 block mt-0.5 truncate">
-                  Detecta e importa somente os {selectedStage.entries.length} mapas desta etapa
+                <span className="btn-osu-big__icon">
+                  <i className="fas fa-folder-open" />
                 </span>
-              </div>
+              </span>
             </button>
 
-            {/* Action B: Download from Web Mirrors */}
             <button
               type="button"
               disabled={isProcessing}
               onClick={handleDownloadFromWeb}
-              className="p-3 rounded-lg bg-[#152336] hover:bg-[#1d324e] border border-osu-cyan/40 hover:border-osu-cyan text-white flex items-center gap-3 transition-all text-left shadow-sm disabled:opacity-50 group"
+              className="btn-osu-big btn-osu-big--beatmapset-header"
+              style={{ padding: '10px 16px' }}
             >
-              <div className="p-2.5 rounded-lg bg-osu-cyan/20 text-osu-cyan group-hover:scale-105 transition-transform">
-                <CloudDownload className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-xs font-black uppercase tracking-wider text-white block">
-                  Baixar da Web via Mirrors
+              <span className="btn-osu-big__content">
+                <span className="btn-osu-big__left">
+                  <span className="btn-osu-big__text-top">Baixar da Web via Mirrors</span>
+                  <span className="btn-osu-big__text-bottom">
+                    Download direto dos {selectedStage.entries.length} arquivos .osu por ID
+                  </span>
                 </span>
-                <span className="text-[10px] text-white/60 block mt-0.5 truncate">
-                  Download direto dos {selectedStage.entries.length} arquivos .osu por ID
+                <span className="btn-osu-big__icon">
+                  <i className="fas fa-cloud-download-alt" />
                 </span>
-              </div>
+              </span>
             </button>
           </div>
 
           {/* Required Beatmaps Preview Grid */}
-          <div className="mt-2">
-            <span className="text-[11px] font-bold uppercase text-white/60 block mb-1.5">
+          <div>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                color: 'hsl(var(--hsl-l2))',
+                display: 'block',
+                marginBottom: '8px',
+              }}
+            >
               Mapas definidos para {selectedStage.stageName} ({selectedStage.entries.length} mapas):
             </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto pr-1">
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
+                gap: '6px',
+                maxHeight: '190px',
+                overflowY: 'auto',
+                paddingRight: '4px',
+              }}
+            >
               {selectedStage.entries.map((entry) => {
                 const modPrefix = entry.slot.slice(0, 2).toUpperCase();
                 const modColor = TOURNAMENT_MOD_COLORS[modPrefix] || TOURNAMENT_MOD_COLORS.NM;
@@ -424,20 +475,38 @@ export const PoolSheetSync: React.FC = () => {
                 return (
                   <div
                     key={`${entry.slot}-${entry.beatmapId}`}
-                    className="p-1.5 rounded bg-[#180b23] border border-white/5 flex items-center justify-between gap-2"
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: 'hsl(var(--hsl-b4))',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                    }}
                   >
-                    <div className="flex items-center gap-1.5 min-w-0">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                       <span
-                        className="px-1.5 py-0.2 rounded text-[10px] font-black uppercase shrink-0"
+                        className="osu-radar-mod-pill"
                         style={{ backgroundColor: modColor.bg, color: modColor.text }}
                       >
                         {entry.slot}
                       </span>
-                      <span className="text-xs text-white/90 truncate font-medium">
+                      <span
+                        className="u-ellipsis-overflow"
+                        style={{ fontSize: '12px', color: '#fff', fontWeight: 600 }}
+                      >
                         {entry.songInfo}
                       </span>
                     </div>
-                    <span className="text-[10px] font-mono text-osu-cyan/80 shrink-0">
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontFamily: 'AzeretMono, monospace',
+                        color: 'hsl(var(--hsl-l2))',
+                        flexShrink: 0,
+                      }}
+                    >
                       #{entry.beatmapId}
                     </span>
                   </div>
@@ -450,21 +519,32 @@ export const PoolSheetSync: React.FC = () => {
 
       {/* Processing Loader */}
       {isProcessing && processProgress && (
-        <div className="p-3.5 rounded-xl bg-[#190d23] border border-osu-pink/40 flex flex-col gap-2 shadow-lg animate-in fade-in">
-          <div className="flex items-center justify-between text-xs font-bold">
-            <span className="text-white flex items-center gap-2">
-              <Loader2 className="w-4 h-4 text-osu-pink animate-spin" />
+        <div
+          style={{
+            padding: '12px 15px',
+            borderRadius: '8px',
+            backgroundColor: 'hsl(var(--hsl-b5))',
+            borderLeft: '3px solid hsl(var(--hsl-h1))',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700 }}>
+            <span style={{ color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <i className="fas fa-circle-notch fa-spin" style={{ color: 'hsl(var(--hsl-h1))' }} />
               {processProgress.label}
             </span>
-            <span className="text-osu-cyan font-mono">
+            <span style={{ color: 'hsl(var(--hsl-c1))', fontFamily: 'AzeretMono, monospace' }}>
               {processProgress.current} / {processProgress.total}
             </span>
           </div>
-          <div className="w-full bg-[#120619] h-2 rounded-full overflow-hidden border border-white/10">
+          <div className="bar bar--beatmap-stats" style={{ width: '100%', height: '6px' }}>
             <div
-              className="bg-gradient-to-r from-osu-pink to-osu-cyan h-full transition-all duration-150"
+              className="bar__fill"
               style={{
                 width: `${Math.min(100, (processProgress.current / Math.max(1, processProgress.total)) * 100)}%`,
+                backgroundColor: 'hsl(var(--hsl-h1))',
               }}
             />
           </div>
@@ -473,16 +553,40 @@ export const PoolSheetSync: React.FC = () => {
 
       {/* Success Notification */}
       {statusMessage && (
-        <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-2.5 text-xs text-emerald-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+        <div
+          style={{
+            padding: '12px 14px',
+            borderRadius: '6px',
+            backgroundColor: 'hsl(var(--hsl-b5))',
+            borderLeft: '3px solid hsl(var(--hsl-lime-1))',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '12px',
+            color: 'hsl(var(--hsl-lime-1))',
+          }}
+        >
+          <i className="fas fa-check-circle" />
           <span>{statusMessage}</span>
         </div>
       )}
 
       {/* Error Alert */}
       {errorMessage && (
-        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 text-xs text-red-200">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+        <div
+          style={{
+            padding: '12px 14px',
+            borderRadius: '6px',
+            backgroundColor: 'hsl(var(--hsl-b5))',
+            borderLeft: '3px solid hsl(var(--hsl-red-1))',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '12px',
+            color: 'hsl(var(--hsl-red-1))',
+          }}
+        >
+          <i className="fas fa-exclamation-circle" />
           <span>{errorMessage}</span>
         </div>
       )}

@@ -1,0 +1,441 @@
+// Custom osu!radar layout & visualizer styles built on top of ppy/osu-web's LESS design system
+@import "./osu-web/css/colors";
+@import "./osu-web/css/variables";
+@import "./osu-web/css/functions";
+
+@font-face {
+  font-family: "AzeretMono";
+  src: url("/fonts/AzeretMono.ttf") format("truetype");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+// Keep navbar pinned and compact like osu-web inner pages
+.osu-radar-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: @osu-colour-b6;
+  color: #fff;
+
+  // Wider desktop container for side-by-side Beatmapset Show + Beatmap Listing
+  .osu-page {
+    max-width: 1480px;
+    width: calc(100% - 20px);
+
+    @media @desktop {
+      width: calc(100% - 60px);
+      max-width: 1480px;
+    }
+  }
+
+  .header-v4__content {
+    max-width: 1480px;
+    width: calc(100% - 20px);
+
+    @media @desktop {
+      width: calc(100% - 60px);
+      max-width: 1480px;
+    }
+  }
+}
+
+// Split workspace inside osu-page--generic-compact
+.osu-radar-workspace {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  padding: 20px;
+  background-color: @osu-colour-b5;
+  .default-box-shadow();
+
+  @media (min-width: 1100px) {
+    grid-template-columns: 580px 1fr;
+    align-items: start;
+  }
+
+  @media (min-width: 1360px) {
+    grid-template-columns: 620px 1fr;
+  }
+}
+
+.osu-radar-left-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: @osu-colour-b4;
+  border-radius: @border-radius--large;
+  overflow: hidden;
+  .default-box-shadow();
+}
+
+.osu-radar-right-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: @osu-colour-b5;
+  border-radius: @border-radius--large;
+  overflow: hidden;
+}
+
+// Override beatmapset-header inside the left column so it fits cleanly
+.osu-radar-left-col {
+  .beatmapset-header {
+    min-height: 220px;
+    padding: 16px 20px;
+    grid-template-columns: 1fr;
+    gap: 15px;
+
+    @media (min-width: 640px) {
+      grid-template-columns: 1fr 245px;
+    }
+  }
+
+  .beatmapset-header__box--main {
+    padding-bottom: 5px;
+    min-width: 0;
+  }
+
+  .beatmapset-header__details-text--title {
+    font-size: 22px;
+    line-height: 1.15;
+    margin-top: 6px;
+  }
+
+  .beatmapset-header__details-text--artist {
+    font-size: 15px;
+    padding-bottom: 10px;
+  }
+}
+
+// Beatmapset Panel list in the right column (1 column stack of official osu-web panels)
+.osu-radar-beatmapsets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 15px;
+  background-color: @osu-colour-b5;
+  overflow-y: auto;
+  overflow-x: hidden;
+  .fancy-scrollbar();
+
+  .beatmapset-panel {
+    width: 100%;
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+
+    &--selected {
+      box-shadow: 0 0 0 2px @osu-colour-h1, 0 4px 14px rgba(0, 0, 0, 0.45);
+      --info-bg: linear-gradient(
+        0.25turn,
+        hsl(var(--hsl-b3)),
+        hsla(var(--hsl-b3), 0.88)
+      );
+      --play-bg: hsla(var(--hsl-b6), 0.75);
+      --play-icon-opacity: 1;
+      --menu-opacity: 1;
+      --menu-container-width: 30px;
+    }
+  }
+}
+
+// Official osu-web style Mod Badges & Pills
+.osu-radar-mod-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 7px;
+  border-radius: 10000px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 16px;
+  flex-shrink: 0;
+}
+
+// Visualizer & Pattern Recognition Panel (styled with osu-web b2..b6 surfaces)
+.osu-radar-player {
+  display: flex;
+  flex-direction: column;
+  background-color: @osu-colour-b5;
+  border-top: 1px solid @osu-colour-b3;
+
+  &--fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: @z-index--overlay;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 15px;
+    background-color: @osu-colour-b4;
+    border-bottom: 1px solid @osu-colour-b3;
+    font-size: @font-size--normal;
+  }
+
+  &__toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  &__toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  &__mods-group {
+    display: inline-flex;
+    align-items: center;
+    background-color: @osu-colour-b6;
+    border-radius: 10000px;
+    padding: 2px;
+    gap: 2px;
+  }
+
+  &__mod-btn {
+    .reset-input();
+    padding: 2px 8px;
+    border-radius: 10000px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: @osu-colour-l2;
+    cursor: pointer;
+    transition: all 120ms ease;
+
+    &:hover {
+      color: #fff;
+      background-color: @osu-colour-b3;
+    }
+
+    &--active {
+      background-color: @osu-colour-h1;
+      color: @osu-colour-b6;
+
+      &:hover {
+        background-color: @osu-colour-h1;
+        color: @osu-colour-b6;
+      }
+    }
+  }
+
+  &__stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #0e0b0d;
+    padding: 10px 15px;
+    border-bottom: 1px solid @osu-colour-b4;
+
+    .osu-radar-player--fullscreen & {
+      flex: 1;
+      padding: 20px;
+    }
+  }
+
+  &__canvas-box {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    aspect-ratio: 512 / 384;
+    background-color: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    .default-box-shadow();
+
+    .osu-radar-player--fullscreen & {
+      max-width: 860px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  }
+
+  &__play-overlay {
+    .full-size();
+    background-color: rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color 150ms ease;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  &__play-circle {
+    .circle(50px);
+    .center-content();
+    background-color: @osu-colour-h1;
+    color: @osu-colour-b6;
+    font-size: 18px;
+    .thick-box-shadow();
+    transition: transform 150ms ease;
+
+    .osu-radar-player__canvas-box:hover & {
+      transform: scale(1.08);
+    }
+  }
+
+  &__controls {
+    padding: 10px 15px;
+    background-color: @osu-colour-b4;
+    border-bottom: 1px solid @osu-colour-b3;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__scrubber-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  &__time {
+    font-family: "AzeretMono", monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: @osu-colour-c1;
+    min-width: 55px;
+
+    &--muted {
+      color: @osu-colour-f1;
+      text-align: right;
+    }
+  }
+
+  &__range {
+    flex: 1;
+    height: 5px;
+    appearance: none;
+    background-color: @osu-colour-b6;
+    border-radius: 10000px;
+    cursor: pointer;
+    accent-color: @osu-colour-h1;
+  }
+
+  &__buttons-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  &__patterns {
+    padding: 12px 15px;
+    background-color: @osu-colour-b5;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__patterns-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid @osu-colour-b3;
+  }
+
+  &__patterns-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: 340px;
+    max-height: 420px;
+    min-height: 260px;
+    overflow-y: auto;
+    padding-right: 4px;
+    .fancy-scrollbar();
+  }
+
+  &__pattern-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    min-height: 48px;
+    border-radius: 6px;
+    background-color: @osu-colour-b4;
+    border-left: 3px solid @osu-colour-b2;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+
+    &:hover {
+      background-color: @osu-colour-b3;
+    }
+
+    &--active {
+      background-color: @osu-colour-b3;
+      border-left-color: @osu-colour-h1;
+      box-shadow: 0 0 0 1px @osu-colour-h1;
+    }
+
+    &--selected {
+      background-color: @osu-colour-b3;
+      border-left-color: @osu-colour-c2;
+    }
+  }
+}
+
+// Modal backdrop using osu-web blackout + dialog style
+.osu-radar-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: @z-index--overlay;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.osu-radar-modal {
+  width: 100%;
+  max-width: 780px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background-color: @osu-colour-b4;
+  border-radius: @border-radius--large;
+  .thick-box-shadow();
+  .fancy-scrollbar();
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 20px;
+    background-color: @osu-colour-b5;
+    border-bottom: 1px solid @osu-colour-b3;
+  }
+
+  &__body {
+    padding: 20px;
+  }
+}

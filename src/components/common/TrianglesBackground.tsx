@@ -10,15 +10,14 @@ interface Triangle {
 }
 
 const TRIANGLE_COLORS = [
-  'rgba(255, 102, 170, ',  // osu-pink
-  'rgba(0, 216, 255, ',    // osu-cyan
-  'rgba(155, 89, 182, ',   // osu-purple
-  'rgba(255, 255, 255, ',  // white
+  'rgba(255, 102, 171, ',  // osu-web primary pink (--hsl-p)
+  'rgba(90, 70, 80, ',     // osu-web warm surface (--hsl-b1)
+  'rgba(136, 102, 238, ',  // osu-web purple
+  'rgba(255, 255, 255, ',  // subtle highlight
 ];
 
 /**
- * Faithful port of osu.Game.Graphics.Backgrounds.Triangles from ppy/osu.
- * Renders the iconic upward-drifting pastel triangles on a deep violet background.
+ * Faithful port of osu! / osu-web background triangles on --hsl-b6 (#1c1719).
  */
 export const TrianglesBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -43,26 +42,26 @@ export const TrianglesBackground: React.FC = () => {
     window.addEventListener('resize', handleResize);
 
     // Initialize triangles
-    const count = Math.floor((width * height) / 22000);
+    const count = Math.floor((width * height) / 26000);
     const triangles: Triangle[] = [];
 
     for (let i = 0; i < count; i++) {
       triangles.push({
         x: Math.random() * width,
         y: Math.random() * height,
-        size: 30 + Math.random() * 80,
-        speed: 0.3 + Math.random() * 0.8,
-        alpha: 0.03 + Math.random() * 0.08,
+        size: 35 + Math.random() * 75,
+        speed: 0.2 + Math.random() * 0.55,
+        alpha: 0.02 + Math.random() * 0.045,
         color: TRIANGLE_COLORS[Math.floor(Math.random() * TRIANGLE_COLORS.length)],
       });
     }
 
     const draw = () => {
-      // Deep purple/violet background gradient
+      // Authentic osu-web --hsl-b6 charcoal-magenta background
       const grad = ctx.createLinearGradient(0, 0, 0, height);
-      grad.addColorStop(0, '#1c1024');
-      grad.addColorStop(0.5, '#160b1e');
-      grad.addColorStop(1, '#0e0714');
+      grad.addColorStop(0, '#20191d');
+      grad.addColorStop(0.4, '#1c1719');
+      grad.addColorStop(1, '#161214');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 

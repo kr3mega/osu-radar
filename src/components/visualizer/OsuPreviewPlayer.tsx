@@ -1,27 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
-  Play,
-  Pause,
-  RotateCcw,
-  SkipBack,
-  SkipForward,
-  Repeat,
-  Volume2,
-  VolumeX,
-  Maximize2,
-  Minimize2,
-  Copy,
-  Check,
-  Radio,
-  Music,
-  Loader2,
-  Zap,
-  Waves,
-  Target,
-  Activity,
-  Filter,
-} from 'lucide-react';
-import {
   OsuPreviewController,
   getOrReconstructBeatmapText,
   OsuMod,
@@ -43,44 +21,40 @@ import { db } from '../../db';
 
 const SEVERITY_BADGES: Record<
   PatternSeverity,
-  { bg: string; text: string; border: string; label: string }
+  { bg: string; color: string; label: string }
 > = {
   extreme: {
-    bg: 'bg-red-500/20',
-    text: 'text-red-400 font-extrabold',
-    border: 'border-red-500/40',
+    bg: 'hsl(var(--hsl-red-3))',
+    color: '#ffffff',
     label: 'Extrema',
   },
   high: {
-    bg: 'bg-orange-500/20',
-    text: 'text-orange-400 font-bold',
-    border: 'border-orange-500/40',
+    bg: 'hsl(var(--hsl-orange-3))',
+    color: '#ffffff',
     label: 'Alta',
   },
   medium: {
-    bg: 'bg-yellow-500/20',
-    text: 'text-yellow-400 font-medium',
-    border: 'border-yellow-500/30',
+    bg: 'hsl(var(--hsl-blue-3))',
+    color: '#ffffff',
     label: 'Média',
   },
   low: {
-    bg: 'bg-cyan-500/15',
-    text: 'text-cyan-300 font-normal',
-    border: 'border-cyan-500/30',
+    bg: 'hsl(var(--hsl-b2))',
+    color: 'hsl(var(--hsl-l1))',
     label: 'Baixa',
   },
 };
 
-const PATTERN_ICONS: Record<PatternType, React.ReactNode> = {
-  deathstream: <Waves className="w-3.5 h-3.5 text-osu-pink" />,
-  stream: <Waves className="w-3.5 h-3.5 text-osu-cyan" />,
-  spaced_stream: <Waves className="w-3.5 h-3.5 text-red-400" />,
-  burst: <Activity className="w-3.5 h-3.5 text-osu-cyan" />,
-  snap_jumps: <Target className="w-3.5 h-3.5 text-yellow-400" />,
-  flow_aim: <Zap className="w-3.5 h-3.5 text-green-400" />,
-  sv_spike: <Activity className="w-3.5 h-3.5 text-purple-400" />,
-  rhythm_switch: <Filter className="w-3.5 h-3.5 text-blue-400" />,
-  choke_point: <Zap className="w-3.5 h-3.5 text-red-500" />,
+const PATTERN_ICON_CLASS: Record<PatternType, string> = {
+  deathstream: 'fas fa-water',
+  stream: 'fas fa-stream',
+  spaced_stream: 'fas fa-wave-square',
+  burst: 'fas fa-bolt',
+  snap_jumps: 'fas fa-crosshairs',
+  flow_aim: 'fas fa-bezier-curve',
+  sv_spike: 'fas fa-tachometer-alt',
+  rhythm_switch: 'fas fa-random',
+  choke_point: 'fas fa-exclamation-circle',
 };
 
 type PatternCategory = 'TODOS' | 'STREAMS' | 'JUMPS' | 'BURSTS' | 'TECH';
@@ -146,7 +120,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     }
   }, [map.id, map.modSlot, slotMod]);
 
-  // Authentic algorithm-detected patterns (Streams, Deathstreams, Bursts, Jumps, SV Spikes, etc.)
+  // Authentic algorithm-detected patterns
   const detectedPatterns = useMemo<DetectedPattern[]>(() => {
     if (patterns && patterns.length > 0) {
       return [...patterns].sort((a, b) => a.startTimeMs - b.startTimeMs);
@@ -154,7 +128,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     if (map.patterns && map.patterns.length > 0) {
       return [...map.patterns].sort((a, b) => a.startTimeMs - b.startTimeMs);
     }
-    // Compute on-the-fly via the authentic algorithm
     try {
       const rawText = getOrReconstructBeatmapText(map);
       const parsed = parseOsuBeatmap(rawText);
@@ -166,7 +139,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     }
   }, [patterns, map]);
 
-  // Filtered patterns by category
   const filteredPatterns = useMemo(() => {
     return detectedPatterns.filter((p) => {
       if (patternCategory === 'TODOS') return true;
@@ -186,7 +158,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     });
   }, [detectedPatterns, patternCategory]);
 
-  // 1. Identify active pattern currently playing live
   const livePattern = useMemo(() => {
     return (
       detectedPatterns.find(
@@ -195,7 +166,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     );
   }, [detectedPatterns, currentTimeMs]);
 
-  // 2. Identify currently playing OR most recently completed pattern
   const currentOrRecentPattern = useMemo(() => {
     if (livePattern) return livePattern;
     const pastPatterns = detectedPatterns.filter((p) => currentTimeMs >= p.startTimeMs);
@@ -233,7 +203,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       setHasAudioTrack(state.hasAudioTrack);
     });
 
-    // Auto-resolve or download full audio track if missing
     let isCancelled = false;
     resolveBeatmapAudio(map, (status) => {
       if (!isCancelled) setAudioStatus(status);
@@ -277,7 +246,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     }
   }, [livePattern?.id, currentOrRecentPattern?.id, isPlaying]);
 
-  // Jump to pattern on click
   const jumpToPattern = useCallback(
     (p: DetectedPattern) => {
       setSelectedPatternId(p.id);
@@ -313,7 +281,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     }
   };
 
-  // Playback controls
   const handleTogglePlay = useCallback(() => {
     if (controllerRef.current) {
       controllerRef.current.togglePlay();
@@ -380,7 +347,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     setTimeout(() => setCopiedPatternId(null), 1500);
   };
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
@@ -401,7 +367,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleTogglePlay, currentTimeMs]);
 
-  // Fullscreen / Cinema mode
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
     if (!isFullscreen) {
@@ -417,7 +382,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     }
   };
 
-  // Manual audio file selection
   const handleAudioFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -456,45 +420,54 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       ref={containerRef}
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleAudioDrop}
-      className={`flex flex-col bg-[#0b0e14] border border-white/10 rounded-xl overflow-hidden shadow-2xl transition-all ${
-        isFullscreen ? 'fixed inset-0 z-50 rounded-none w-screen h-screen' : 'w-full'
-      }`}
+      className={`osu-radar-player ${isFullscreen ? 'osu-radar-player--fullscreen' : ''}`}
     >
-      {/* Top Compact Header Bar */}
-      <div className="flex items-center justify-between px-3 py-2 bg-[#121620] border-b border-white/10 text-xs select-none">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <span className="font-bold text-white truncate max-w-[180px] sm:max-w-xs">
+      {/* Top Toolbar */}
+      <div className="osu-radar-player__toolbar">
+        <div className="osu-radar-player__toolbar-left">
+          <strong className="u-ellipsis-overflow" style={{ color: '#fff', maxWidth: '220px' }}>
             {map.metadata.title}
-          </span>
-          <span className="text-white/40 hidden sm:inline text-[11px]">
+          </strong>
+          <span style={{ color: 'hsl(var(--hsl-l2))', fontSize: '11px' }}>
             [{map.metadata.version}]
           </span>
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-osu-pink/20 text-osu-pink border border-osu-pink/30 uppercase tracking-wider">
+          <span
+            className="osu-radar-mod-pill"
+            style={{
+              backgroundColor: 'hsl(var(--hsl-h2))',
+              color: '#fff',
+              fontSize: '10px',
+            }}
+          >
             {map.modSlot || 'NM'}
           </span>
+
           {hasAudioTrack ? (
             <span
-              title="Música do beatmap ativa e sincronizada no ritmo via AudioContext"
-              className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-500/15 text-green-400 border border-green-500/30 shadow-sm"
+              className="osu-radar-mod-pill"
+              style={{
+                backgroundColor: 'hsl(var(--hsl-lime-3))',
+                color: '#fff',
+                fontSize: '9px',
+                gap: '4px',
+              }}
+              title="Música do beatmap sincronizada via AudioContext"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              <Music className="w-2.5 h-2.5" />
-              <span>MÚSICA ATIVA</span>
+              <i className="fas fa-music" />
+              <span>ÁUDIO ATIVO</span>
             </span>
           ) : audioStatus.state === 'loading' ? (
             <span
-              title={audioStatus.message}
-              className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-bold bg-yellow-500/15 text-yellow-300 border border-yellow-500/30 animate-pulse shadow-sm"
+              className="osu-radar-mod-pill"
+              style={{
+                backgroundColor: 'hsl(var(--hsl-orange-3))',
+                color: '#fff',
+                fontSize: '9px',
+                gap: '4px',
+              }}
             >
-              <Loader2 className="w-2.5 h-2.5 animate-spin text-yellow-400" />
-              <span>{audioStatus.message || 'Baixando música...'}</span>
-            </span>
-          ) : audioStatus.state === 'error' ? (
-            <span
-              title={audioStatus.message}
-              className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/15 text-red-400 border border-red-500/30"
-            >
-              <span>{audioStatus.message || 'Música offline'}</span>
+              <i className="fas fa-circle-notch fa-spin" />
+              <span>{audioStatus.message || 'Baixando áudio...'}</span>
             </span>
           ) : null}
 
@@ -502,14 +475,14 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             ref={audioInputRef}
             type="file"
             accept="audio/mp3,audio/ogg,audio/wav,audio/*"
-            className="hidden"
+            style={{ display: 'none' }}
             onChange={handleAudioFileSelect}
           />
         </div>
 
-        {/* Mod Buttons & Fullscreen */}
-        <div className="flex items-center gap-1.5">
-          <div className="flex items-center bg-black/50 rounded-md p-0.5 border border-white/10">
+        <div className="osu-radar-player__toolbar-right">
+          {/* Mod Buttons (EZ, HR, DT, HD) */}
+          <div className="osu-radar-player__mods-group">
             {(['ez', 'hr', 'dt', 'hd'] as OsuMod[]).map((modKey) => {
               const active = activeMods.has(modKey);
               return (
@@ -517,10 +490,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                   key={modKey}
                   type="button"
                   onClick={() => handleToggleMod(modKey)}
-                  className={`px-1.5 py-0.5 text-[9px] font-black uppercase rounded transition-all ${
-                    active
-                      ? 'bg-osu-cyan text-black font-extrabold shadow-sm'
-                      : 'text-white/40 hover:text-white'
+                  className={`osu-radar-player__mod-btn ${
+                    active ? 'osu-radar-player__mod-btn--active' : ''
                   }`}
                 >
                   {modKey}
@@ -533,160 +504,158 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             type="button"
             onClick={toggleFullscreen}
             title={isFullscreen ? 'Sair do Modo Cinema' : 'Modo Cinema'}
-            className="p-1 rounded-md bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all ml-1"
+            className="btn-osu-big btn-osu-big--rounded-small"
           >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            <i className={`fas fa-${isFullscreen ? 'compress' : 'expand'}`} />
           </button>
         </div>
       </div>
 
-      {/* Visor do Preview (Margens ampliadas internamente para evitar que hitobjects vazem da tela) */}
-      <div
-        className={`flex items-center justify-center bg-[#07090e] border-b border-white/5 ${
-          isFullscreen ? 'flex-1 p-4' : 'py-2.5 px-3'
-        }`}
-      >
-        <div
-          className={`relative aspect-[512/384] bg-black rounded-lg overflow-hidden shadow-inner cursor-pointer group ${
-            isFullscreen ? 'w-full max-w-[800px]' : 'w-full max-w-[380px] sm:max-w-[420px]'
-          }`}
-          onClick={handleTogglePlay}
-        >
-          <canvas ref={canvasRef} className="w-full h-full block cursor-pointer" />
+      {/* Playfield Stage */}
+      <div className="osu-radar-player__stage">
+        <div className="osu-radar-player__canvas-box" onClick={handleTogglePlay}>
+          <canvas ref={canvasRef} />
 
-          {/* Center Play Splash */}
           {!isPlaying && (
-            <div className="absolute inset-0 bg-black/35 backdrop-blur-[1px] flex flex-col items-center justify-center gap-2 transition-all">
-              <div className="w-12 h-12 rounded-full bg-osu-pink/90 text-white flex items-center justify-center shadow-glowPink ring-2 ring-white/30 group-hover:scale-110 transition-transform">
-                <Play className="w-6 h-6 fill-current ml-0.5" />
+            <div className="osu-radar-player__play-overlay">
+              <div className="osu-radar-player__play-circle">
+                <i className="fas fa-play" style={{ marginLeft: '2px' }} />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-white/80 bg-black/60 px-2 py-0.5 rounded-full border border-white/10">
+              <span
+                className="osu-radar-mod-pill"
+                style={{
+                  backgroundColor: 'rgba(0,0,0,0.75)',
+                  color: '#fff',
+                  padding: '3px 10px',
+                }}
+              >
                 Clique para Jogar
               </span>
             </div>
           )}
 
-          {/* Mini active pattern floating pill inside visor */}
           {livePattern && (
-            <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-md border border-white/15 text-[10px] font-bold text-white flex items-center gap-1.5 shadow-md">
-              <span className="w-1.5 h-1.5 rounded-full bg-osu-pink animate-ping" />
-              <span className="truncate max-w-[140px]">{livePattern.label}</span>
+            <div
+              style={{
+                position: 'absolute',
+                top: '8px',
+                left: '8px',
+                backgroundColor: 'rgba(0,0,0,0.75)',
+                padding: '3px 8px',
+                borderRadius: '1000px',
+                fontSize: '10px',
+                fontWeight: 700,
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <i className="fas fa-circle" style={{ color: 'hsl(var(--hsl-h1))', fontSize: '7px' }} />
+              <span>{livePattern.label}</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Scrubber Timeline Bar */}
-      <div className="px-3 py-2 bg-[#10141e] border-b border-white/10 flex flex-col gap-1.5 select-none">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-osu-cyan font-bold min-w-[50px]">
+      {/* Scrubber & Playback Controls */}
+      <div className="osu-radar-player__controls">
+        <div className="osu-radar-player__scrubber-row">
+          <span className="osu-radar-player__time">
             {formatOsuEditorTimestamp(currentTimeMs)}
           </span>
 
-          <div className="relative flex-1 flex items-center">
-            <input
-              type="range"
-              min={0}
-              max={Math.max(1, durationMs)}
-              value={currentTimeMs}
-              onChange={(e) => handleSeek(parseFloat(e.target.value))}
-              className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-osu-pink hover:bg-white/20 transition-all"
-            />
-          </div>
+          <input
+            type="range"
+            min={0}
+            max={Math.max(1, durationMs)}
+            value={currentTimeMs}
+            onChange={(e) => handleSeek(parseFloat(e.target.value))}
+            className="osu-radar-player__range"
+          />
 
-          <span className="text-[10px] font-mono text-white/40 min-w-[50px] text-right">
+          <span className="osu-radar-player__time osu-radar-player__time--muted">
             {formatOsuEditorTimestamp(durationMs)}
           </span>
 
           <button
             type="button"
             onClick={copyEditorTimestamp}
-            title="Copiar Timestamp para o editor osu!"
-            className="p-1 rounded bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all flex items-center gap-1 text-[10px]"
+            title="Copiar Timestamp para o editor do osu!"
+            className="btn-osu-big btn-osu-big--rounded-small"
           >
-            {copiedTime ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+            <i className={`fas fa-${copiedTime ? 'check' : 'copy'}`} />
           </button>
         </div>
 
-        {/* Buttons Row */}
-        <div className="flex items-center justify-between gap-1 pt-0.5 text-xs">
-          {/* Controls */}
-          <div className="flex items-center gap-1">
+        <div className="osu-radar-player__buttons-row">
+          {/* Transport Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               type="button"
               onClick={() => handleSeek(0)}
               title="Reiniciar"
-              className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white/60 hover:text-white"
+              className="btn-osu-big btn-osu-big--rounded-small"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <i className="fas fa-undo" />
             </button>
 
             <button
               type="button"
               onClick={() => handleStep(-1000)}
               title="-1s"
-              className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white/60 hover:text-white"
+              className="btn-osu-big btn-osu-big--rounded-small"
             >
-              <SkipBack className="w-3.5 h-3.5" />
+              <i className="fas fa-step-backward" />
             </button>
 
             <button
               type="button"
               onClick={handleTogglePlay}
-              className="px-3 py-1 rounded-lg bg-osu-pink hover:bg-pink-600 text-white font-bold flex items-center gap-1.5 shadow-sm transition-all"
+              className="btn-osu-big btn-osu-big--pink btn-osu-big--rounded-small"
             >
-              {isPlaying ? (
-                <>
-                  <Pause className="w-3.5 h-3.5 fill-current" />
-                  <span className="text-[10px] uppercase">Pausar</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span className="text-[10px] uppercase">Jogar</span>
-                </>
-              )}
+              <div className="btn-osu-big__content">
+                <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
+                  <i className={`fas fa-${isPlaying ? 'pause' : 'play'}`} />
+                </span>
+                <span>{isPlaying ? 'pausar' : 'jogar'}</span>
+              </div>
             </button>
 
             <button
               type="button"
               onClick={() => handleStep(1000)}
               title="+1s"
-              className="p-1.5 rounded bg-white/5 hover:bg-white/10 text-white/60 hover:text-white"
+              className="btn-osu-big btn-osu-big--rounded-small"
             >
-              <SkipForward className="w-3.5 h-3.5" />
+              <i className="fas fa-step-forward" />
             </button>
 
-            {/* Loop Toggle Button */}
             <button
               type="button"
               onClick={handleToggleLoop}
               title={
                 isLoopEnabled
-                  ? 'Repetição em Loop Ativada (Clique para desativar)'
-                  : 'Ativar Modo Loop para repetir o padrão selecionado'
+                  ? 'Loop de Padrão Ativo (Clique para desativar)'
+                  : 'Repetir padrão selecionado em Loop'
               }
-              className={`p-1.5 rounded transition-all flex items-center gap-1 ${
-                isLoopEnabled
-                  ? 'bg-osu-pink/20 text-osu-pink border border-osu-pink/40 shadow-sm'
-                  : 'bg-white/5 hover:bg-white/10 text-white/50 hover:text-white'
+              className={`btn-osu-big btn-osu-big--rounded-small ${
+                isLoopEnabled ? 'btn-osu-big--pink' : ''
               }`}
             >
-              <Repeat className={`w-3.5 h-3.5 ${isLoopEnabled ? 'stroke-[2.5]' : ''}`} />
+              <i className="fas fa-sync-alt" />
             </button>
           </div>
 
-          {/* Speed */}
-          <div className="flex items-center gap-0.5 bg-black/40 p-0.5 rounded-lg border border-white/10">
+          {/* Speed Selector */}
+          <div className="osu-radar-player__mods-group">
             {[0.5, 0.75, 1.0, 1.5].map((speed) => (
               <button
                 key={speed}
                 type="button"
                 onClick={() => handleSpeedChange(speed)}
-                className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all ${
-                  playbackRate === speed
-                    ? 'bg-osu-pink text-white'
-                    : 'text-white/40 hover:text-white'
+                className={`osu-radar-player__mod-btn ${
+                  playbackRate === speed ? 'osu-radar-player__mod-btn--active' : ''
                 }`}
               >
                 {speed}x
@@ -694,19 +663,15 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             ))}
           </div>
 
-          {/* Volume */}
-          <div className="flex items-center gap-1.5">
+          {/* Volume Control */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               type="button"
               onClick={handleToggleMute}
-              className="text-white/50 hover:text-white transition-colors"
+              className="btn-osu-big btn-osu-big--rounded-small"
               title={isMuted ? 'Desmutar áudio' : 'Mutar áudio'}
             >
-              {isMuted || volume === 0 ? (
-                <VolumeX className="w-3.5 h-3.5 text-red-400" />
-              ) : (
-                <Volume2 className="w-3.5 h-3.5" />
-              )}
+              <i className={`fas fa-volume-${isMuted || volume === 0 ? 'mute' : 'up'}`} />
             </button>
             <input
               type="range"
@@ -715,46 +680,47 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               step={0.05}
               value={isMuted ? 0 : volume}
               onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-              className="w-16 sm:w-20 h-1 bg-white/10 rounded appearance-none cursor-pointer accent-osu-cyan"
+              className="osu-radar-player__range"
+              style={{ width: '75px' }}
               title="Volume"
             />
           </div>
         </div>
       </div>
 
-      {/* Espaço Ampliado: Padrões Competitivos Detectados pelo Algoritmo */}
-      <div className="flex flex-col bg-[#0b0e14] p-3 flex-1 select-none">
-        {/* Header do Reconhecimento de Padrões e Filtros */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-2 border-b border-white/10 text-xs">
-          <div className="flex items-center gap-2 font-bold text-white/80 uppercase tracking-wider text-[11px]">
-            <Zap className="w-3.5 h-3.5 text-osu-pink" />
-            <span>Padrões Detectados pelo Algoritmo ({detectedPatterns.length})</span>
+      {/* Algorithm-Detected Patterns Section */}
+      <div className="osu-radar-player__patterns">
+        <div className="osu-radar-player__patterns-header">
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'hsl(var(--hsl-c1))' }}>
+            <i className="fas fa-bolt" style={{ color: 'hsl(var(--hsl-h1))', marginRight: '6px' }} />
+            <span>padrões detectados pelo algoritmo ({detectedPatterns.length})</span>
           </div>
 
-          {/* Filtros de Categoria */}
-          <div className="flex items-center gap-1 text-[10px] font-bold uppercase flex-wrap">
-            {(['TODOS', 'STREAMS', 'JUMPS', 'BURSTS', 'TECH'] as PatternCategory[]).map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setPatternCategory(cat)}
-                className={`px-2 py-0.5 rounded transition-all ${
-                  patternCategory === cat
-                    ? 'bg-osu-pink text-white shadow-glowPink'
-                    : 'bg-white/5 hover:bg-white/10 text-white/50 hover:text-white'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+          {/* Category Filter using osu-web .sort */}
+          <div className="sort">
+            <div className="sort__items">
+              {(['TODOS', 'STREAMS', 'JUMPS', 'BURSTS', 'TECH'] as PatternCategory[]).map((cat) => (
+                <a
+                  key={cat}
+                  href={`#cat-${cat}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPatternCategory(cat);
+                  }}
+                  className={`sort__item sort__item--button ${
+                    patternCategory === cat ? 'sort__item--active' : ''
+                  }`}
+                  style={{ padding: '2px 8px', fontSize: '11px' }}
+                >
+                  {cat.toLowerCase()}
+                </a>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Scrollable Patterns List (Tamanho aumentado substituindo o card de Pontos de Tensão) */}
-        <div
-          ref={patternsListRef}
-          className="flex flex-col gap-1.5 h-[340px] max-h-[420px] min-h-[260px] overflow-y-auto pr-1 custom-scrollbar scroll-smooth"
-        >
+        {/* Scrollable Patterns List */}
+        <div ref={patternsListRef} className="osu-radar-player__patterns-list">
           {filteredPatterns.length > 0 ? (
             filteredPatterns.map((p) => {
               const isLive = currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs;
@@ -762,7 +728,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                 (!livePattern && currentOrRecentPattern?.id === p.id) ||
                 selectedPatternId === p.id;
 
-              // Pattern completion progress
               const patternProgress = isLive
                 ? clamp(
                     0,
@@ -775,145 +740,148 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
 
               const sev = SEVERITY_BADGES[p.severity] || SEVERITY_BADGES.medium;
               const isCopied = copiedPatternId === p.id;
+              const iconClass = PATTERN_ICON_CLASS[p.type] || 'fas fa-bolt';
 
               return (
                 <div
                   key={p.id}
                   id={`pattern-row-${p.id}`}
                   onClick={() => jumpToPattern(p)}
-                  className={`relative group shrink-0 min-h-[50px] rounded-lg p-2.5 transition-all duration-200 cursor-pointer overflow-hidden border ${
+                  className={`osu-radar-player__pattern-item ${
                     isLive
-                      ? 'bg-gradient-to-r from-osu-pink/25 via-osu-pink/10 to-white/5 border-osu-pink shadow-glowPink ring-1 ring-osu-pink/40'
+                      ? 'osu-radar-player__pattern-item--active'
                       : isWaitingSelected
-                      ? 'bg-osu-pink/[0.08] hover:bg-osu-pink/[0.12] border-osu-pink/40 ring-1 ring-osu-pink/20 shadow-sm'
-                      : 'bg-white/[0.02] hover:bg-white/[0.06] border-white/5 hover:border-white/15'
+                      ? 'osu-radar-player__pattern-item--selected'
+                      : ''
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-3 text-xs">
-                    {/* Left: Icon, Timestamp, and Pattern Title */}
-                    <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
-                      {/* Pattern Type Icon */}
-                      <div className="p-1 rounded bg-black/50 border border-white/10 shrink-0">
-                        {PATTERN_ICONS[p.type] || <Activity className="w-3.5 h-3.5 text-osu-pink" />}
-                      </div>
+                  {/* Left: Icon + Official osu-web Timestamp + Label */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <span
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '4px',
+                        backgroundColor: 'hsl(var(--hsl-b6))',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'hsl(var(--hsl-h1))',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <i className={iconClass} />
+                    </span>
 
-                      {/* Timestamp button */}
-                      <span
-                        className={`font-mono text-[11px] px-1.5 py-0.5 rounded font-bold transition-colors shrink-0 ${
-                          isLive
-                            ? 'bg-osu-pink text-white shadow-sm'
-                            : isWaitingSelected
-                            ? 'bg-osu-pink/20 text-osu-pink border border-osu-pink/35'
-                            : 'bg-black/50 text-osu-cyan group-hover:text-white'
-                        }`}
-                      >
-                        {p.startTimestamp}
-                      </span>
+                    <span className="beatmap-discussion-timestamp">
+                      {p.startTimestamp}
+                    </span>
 
-                      {/* Pattern Label & Live Indicator */}
-                      <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-1.5">
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <strong
+                          className="u-ellipsis-overflow"
+                          style={{ fontSize: '12px', color: '#fff' }}
+                        >
+                          {p.label}
+                        </strong>
+                        {isLive && (
                           <span
-                            className={`font-semibold truncate transition-colors ${
-                              isLive
-                                ? 'text-white font-bold'
-                                : isWaitingSelected
-                                ? 'text-white/95 font-semibold'
-                                : 'text-white/80 group-hover:text-white'
-                            }`}
+                            className="osu-radar-mod-pill"
+                            style={{
+                              backgroundColor: 'hsl(var(--hsl-h1))',
+                              color: 'hsl(var(--hsl-b6))',
+                              fontSize: '9px',
+                            }}
                           >
-                            {p.label}
-                          </span>
-
-                          {isLive && (
-                            <span className="flex items-center gap-1 text-[9px] font-black uppercase text-osu-pink bg-osu-pink/20 px-1 rounded tracking-wider shrink-0">
-                              <Radio className="w-2.5 h-2.5 animate-pulse" />
-                              <span>AO VIVO</span>
-                            </span>
-                          )}
-                          {isWaitingSelected && !isLive && (
-                            <span className="flex items-center gap-1 text-[9px] font-bold text-osu-pink/80 bg-osu-pink/10 px-1 rounded border border-osu-pink/20 shrink-0">
-                              <span>SELECIONADO</span>
-                            </span>
-                          )}
-                        </div>
-
-                        {p.description && (
-                          <span className="text-[10px] text-white/50 truncate max-w-[280px]">
-                            {p.description}
+                            AO VIVO
                           </span>
                         )}
                       </div>
-                    </div>
-
-                    {/* Right: Metrics, Severity Badge, and Copy Button */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      {p.metrics.bpm && (
-                        <span className="text-[10px] font-mono text-white/40 hidden sm:inline">
-                          {p.metrics.bpm} BPM
+                      {p.description && (
+                        <span
+                          className="u-ellipsis-overflow"
+                          style={{ fontSize: '11px', color: 'hsl(var(--hsl-l2))' }}
+                        >
+                          {p.description}
                         </span>
                       )}
-
-                      {p.noteCount > 0 && (
-                        <span className="text-[10px] font-mono text-white/40 hidden sm:inline">
-                          {p.noteCount} notas
-                        </span>
-                      )}
-
-                      {p.metrics.svMultiplier && (
-                        <span className="text-[10px] font-mono text-purple-300/80 hidden sm:inline">
-                          {p.metrics.svMultiplier}x SV
-                        </span>
-                      )}
-
-                      <span
-                        className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border ${sev.bg} ${sev.text} ${sev.border}`}
-                      >
-                        {sev.label}
-                      </span>
-
-                      {/* Copy Timestamp Button */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleCopyPatternTimestamp(p, e)}
-                        title={`Copiar timestamp do editor osu! (${p.osuEditorTimestamp})`}
-                        className="p-1 rounded bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all ml-0.5"
-                      >
-                        {isCopied ? (
-                          <Check className="w-3 h-3 text-green-400" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </button>
                     </div>
                   </div>
 
-                  {/* Progress Bar at the bottom of active card */}
+                  {/* Right: Metrics + Severity Pill + Copy Button */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    {p.metrics.bpm && (
+                      <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-l2))' }}>
+                        {p.metrics.bpm} BPM
+                      </span>
+                    )}
+
+                    {p.noteCount > 0 && (
+                      <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-l2))' }}>
+                        {p.noteCount} notas
+                      </span>
+                    )}
+
+                    <span
+                      className="osu-radar-mod-pill"
+                      style={{
+                        backgroundColor: sev.bg,
+                        color: sev.color,
+                        fontSize: '9px',
+                      }}
+                    >
+                      {sev.label}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyPatternTimestamp(p, e)}
+                      title={`Copiar timestamp do editor osu! (${p.osuEditorTimestamp})`}
+                      className="btn-osu-big btn-osu-big--rounded-small"
+                    >
+                      <i className={`fas fa-${isCopied ? 'check' : 'copy'}`} />
+                    </button>
+                  </div>
+
                   {isLive && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/40 overflow-hidden">
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: '2px',
+                      }}
+                    >
                       <div
-                        className="h-full bg-osu-pink shadow-glowPink transition-all duration-100"
-                        style={{ width: `${patternProgress}%` }}
-                      />
-                    </div>
-                  )}
-                  {isWaitingSelected && !isLive && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/40 overflow-hidden">
-                      <div className="h-full bg-osu-pink/35 w-full" />
+                        className="bar bar--user-profile"
+                        style={{ '--fill': `${patternProgress}%`, height: '2px' } as React.CSSProperties}
+                      >
+                        <div className="bar__fill" />
+                      </div>
                     </div>
                   )}
                 </div>
               );
             })
           ) : (
-            <div className="h-full flex flex-col items-center justify-center p-6 text-center text-white/40 border border-dashed border-white/10 rounded-lg">
-              <Zap className="w-8 h-8 text-white/20 mb-2" />
-              <p className="text-xs font-semibold text-white/70">
+            <div
+              style={{
+                padding: '30px',
+                textAlign: 'center',
+                color: 'hsl(var(--hsl-l2))',
+                backgroundColor: 'hsl(var(--hsl-b4))',
+                borderRadius: '8px',
+              }}
+            >
+              <i className="fas fa-bolt" style={{ fontSize: '24px', marginBottom: '8px' }} />
+              <div style={{ fontWeight: 700, color: '#fff' }}>
                 Nenhum padrão detectado nesta categoria
-              </p>
-              <p className="text-[11px] text-white/40 mt-1 max-w-xs">
-                Selecione &ldquo;TODOS&rdquo; para visualizar todos os padrões mecânicos identificados pelo algoritmo.
-              </p>
+              </div>
+              <div style={{ fontSize: '11px', marginTop: '4px' }}>
+                Selecione &ldquo;todos&rdquo; acima para visualizar todos os padrões identificados.
+              </div>
             </div>
           )}
         </div>
