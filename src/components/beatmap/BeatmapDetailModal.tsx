@@ -2,7 +2,6 @@ import React from 'react';
 import { usePoolStore } from '../../store/usePoolStore';
 import { ModSlotBadge } from './ModSlotBadge';
 import { StatHexagon } from '../charts/StatHexagon';
-import { StrainTimeline } from '../charts/StrainTimeline';
 import { formatTimestamp } from '../../engine/strains';
 import { X, ExternalLink, Activity } from 'lucide-react';
 import { SkillAttributes } from '../../engine/types';
@@ -42,7 +41,7 @@ export const BeatmapDetailModal: React.FC<BeatmapDetailModalProps> = ({ onClose 
     });
   }
 
-  const { metadata, stats, difficulty, skills, timeline, modSlot } = map;
+  const { metadata, stats, difficulty, skills, modSlot } = map;
   const coverUrl = metadata.beatmapSetId
     ? `https://assets.ppy.sh/beatmaps/${metadata.beatmapSetId}/covers/cover.jpg`
     : null;
@@ -218,14 +217,6 @@ export const BeatmapDetailModal: React.FC<BeatmapDetailModalProps> = ({ onClose 
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Strain Timeline Chart (Pontos de Tensão) */}
-          <div className="rounded-card overflow-hidden">
-            <StrainTimeline
-              timeline={timeline}
-              height={140}
-            />
           </div>
         </div>
       </div>

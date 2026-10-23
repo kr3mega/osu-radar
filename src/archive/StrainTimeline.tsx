@@ -1,7 +1,24 @@
-import React, { useState, useRef } from 'react';
-import { StrainPoint } from '../../engine/types';
+/**
+ * ARQUIVADO: Componente de Gráfico de "Pontos de Tensão" (StrainTimeline)
+ * 
+ * Histórico:
+ * Removido da interface ativa a pedido do usuário para despoluir o layout visual,
+ * substituído pela lista ampliada de reconhecimento de padrões mecânicos (streams, jumps, bursts).
+ * 
+ * Descrição:
+ * Renderiza um histograma bicromático (amarelo/laranja) da tensão contínua calculada
+ * ao longo da duração do beatmap, permitindo interatividade ao passar o mouse e clicar
+ * para sincronizar o reprodutor de vídeo/preview ao vivo em determinado segundo.
+ * 
+ * Como restaurar no futuro se necessário:
+ * 1. Importar: `import { StrainTimeline } from '../archive/StrainTimeline';`
+ * 2. Usar: `<StrainTimeline timeline={timeline} height={130} onSelectTimestamp={(timeMs) => ...} />`
+ */
 
-interface StrainTimelineProps {
+import React, { useState, useRef } from 'react';
+import { StrainPoint } from '../engine/types';
+
+export interface StrainTimelineProps {
   timeline: StrainPoint[];
   height?: number;
   onSelectTimestamp?: (timeMs: number) => void;
@@ -71,7 +88,7 @@ export const StrainTimeline: React.FC<StrainTimelineProps> = ({
         )}
       </div>
 
-      {/* 3. Bicolor Histogram Bar Chart (Orange = Fails, Yellow = Retries) */}
+      {/* Bicolor Histogram Bar Chart (Orange = Fails, Yellow = Retries) */}
       <div
         ref={containerRef}
         onMouseMove={handleMouseMove}
