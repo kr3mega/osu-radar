@@ -9,10 +9,10 @@ export interface ViewportTransform {
   bezierSegmentMaxLengthSqrd: number;
 }
 
-const bakedPaths: Map<PreviewHitObject, Array<[Array<[number, number]>, number[]]>> = new Map();
+let bakedPaths: WeakMap<PreviewHitObject, Array<[Array<[number, number]>, number[]]>> = new WeakMap();
 
 export function clearBakedSliderPaths(): void {
-  bakedPaths.clear();
+  bakedPaths = new WeakMap();
 }
 
 /**

@@ -103,7 +103,16 @@ export const usePoolStore = create<PoolState>((set, get) => ({
     // Auto-assign tournament slots if not set (NM1, NM2, ..., HD1, HR1, etc.)
     const updatedNewMaps = assignDefaultModSlots(get().currentPool.maps, newMaps);
 
-    const merged = [...get().currentPool.maps, ...updatedNewMaps];
+    // Cache full record (including audioBlob if provided locally) in IndexedDB first
+    try {
+      await cacheBeatmaps(updatedNewMaps);
+    } catch (e) {
+      console.warn('Could not cache to IndexedDB:', e);
+    }
+
+    // Keep in-memory Zustand store lightweight (audioBlob stays in IndexedDB and is read on-demand for the active map)
+    const lightweightNewMaps = updatedNewMaps.map(stripHeavyFieldsForMemory);
+    const merged = [...get().currentPool.maps, ...lightweightNewMaps];
 
     set((state) => ({
       currentPool: {
@@ -113,18 +122,6 @@ export const usePoolStore = create<PoolState>((set, get) => ({
       },
       selectedMapId: state.selectedMapId || (merged.length > 0 ? merged[0].id : null),
     }));
-
-    // Cache in IndexedDB
-    try {
-      await cacheBeatmaps(merged);
-    } catch (e) {
-      console.warn('Could not cache to IndexedDB:', e);
-    }
-
-    // Automatically download and cache audio for all maps in background
-    setTimeout(() => {
-      get().startAudioSync();
-    }, 150);
   },
 
   removeBeatmap: (id) => {
@@ -279,15 +276,7 @@ export const usePoolStore = create<PoolState>((set, get) => ({
               m.metadata?.creator !== 'Tester' &&
               m.metadata?.artist !== 'Antigravity'
           )
-          .map((m) => {
-            // Restore fresh object URL from cached audioBlob
-            if (m.audioBlob instanceof Blob && (!m.audioUrl || !m.audioUrl.startsWith('blob:'))) {
-              try {
-                m.audioUrl = URL.createObjectURL(m.audioBlob);
-              } catch {}
-            }
-            return m;
-          });
+          .map(stripHeavyFieldsForMemory);
 
         if (userMaps.length !== allCached.length) {
           const toDelete = allCached
@@ -308,17 +297,31 @@ export const usePoolStore = create<PoolState>((set, get) => ({
           },
           selectedMapId: userMaps.length > 0 ? userMaps[0].id : null,
         }));
-
-        // Kick off background audio sync for any missing maps
-        setTimeout(() => {
-          get().startAudioSync();
-        }, 300);
       }
     } catch (e) {
       console.warn('Failed to load from DB:', e);
     }
   },
 }));
+
+/**
+ * Strips heavy binary/object arrays from the in-memory Zustand store (keeping audioBlob safely
+ * in IndexedDB to be loaded on-demand only for the currently active beatmap).
+ */
+function stripHeavyFieldsForMemory(m: BeatmapAnalysisResult): BeatmapAnalysisResult {
+  if (m.audioUrl?.startsWith('blob:')) {
+    try {
+      URL.revokeObjectURL(m.audioUrl);
+    } catch {}
+  }
+  return {
+    ...m,
+    audioBlob: undefined,
+    audioUrl: m.audioUrl?.startsWith('blob:') ? undefined : m.audioUrl,
+    hitObjects: m.rawText ? undefined : m.hitObjects,
+    timeline: [],
+  };
+}
 
 /**
  * Sets default mod slot strictly to 'NM'.

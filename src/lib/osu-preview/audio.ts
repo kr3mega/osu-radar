@@ -1,5 +1,7 @@
 import { clamp } from './functions';
 
+const rawWavCache: Map<string, ArrayBuffer> = new Map();
+
 export class MusicPlayer {
   private ctx: AudioContext | null = null;
   private buffer: AudioBuffer | null = null;
@@ -29,6 +31,7 @@ export class MusicPlayer {
   ): Promise<boolean> {
     if (!this.ctx) return false;
     this.stopSource();
+    this.buffer = null;
     this._hasRealAudio = false;
 
     if (source) {
@@ -41,31 +44,31 @@ export class MusicPlayer {
         } else if (source instanceof Blob) {
           arrayBuf = await source.arrayBuffer();
         } else {
-          arrayBuf = source;
+          // Only copy if caller passed a shared ArrayBuffer directly
+          arrayBuf = source.slice(0);
         }
 
-        const copyBuf = arrayBuf.slice(0);
+        if (!this.ctx) return false;
         this.buffer = await new Promise<AudioBuffer>((resolve, reject) => {
-          this.ctx!.decodeAudioData(copyBuf, resolve, reject);
+          this.ctx!.decodeAudioData(arrayBuf, resolve, reject);
         });
         this._duration = this.buffer.duration;
         this._hasRealAudio = true;
         return true;
       } catch (err) {
-        console.warn('OsuPreview: Could not decode audio from source, using fallback buffer:', err);
+        console.warn('OsuPreview: Could not decode audio from source, using clock fallback:', err);
       }
     }
 
-    // Fallback: create silent audio buffer with fallback duration
-    const freq = 44100;
-    const duration = Math.max(1, fallbackDurationSec);
-    this.buffer = this.ctx.createBuffer(1, Math.floor(duration * freq), freq);
-    this._duration = duration;
+    // Zero-allocation fallback: do NOT allocate a multi-megabyte silent PCM AudioBuffer.
+    // OsuPreviewController uses its internal high-precision delta clock when hasRealAudio is false.
+    this.buffer = null;
+    this._duration = Math.max(1, fallbackDurationSec);
     return false;
   }
 
   public play(fromMs?: number): void {
-    if (!this.ctx || !this.buffer) return;
+    if (!this.ctx) return;
     if (this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
@@ -74,7 +77,11 @@ export class MusicPlayer {
       this.pauseTime = clamp(0, fromMs / 1000, this._duration);
     }
 
-    this.startSource(this.pauseTime);
+    if (this.buffer) {
+      this.startSource(this.pauseTime);
+    } else {
+      this.startTime = this.ctx.currentTime;
+    }
     this._isPlaying = true;
   }
 
@@ -88,7 +95,11 @@ export class MusicPlayer {
     const targetSec = clamp(0, timeMs / 1000, this._duration);
     this.pauseTime = targetSec;
     if (this._isPlaying) {
-      this.startSource(targetSec);
+      if (this.buffer) {
+        this.startSource(targetSec);
+      } else if (this.ctx) {
+        this.startTime = this.ctx.currentTime;
+      }
     }
   }
 
@@ -179,7 +190,14 @@ export class MusicPlayer {
 
   public destroy(): void {
     this.stopSource();
+    if (this.musicGain) {
+      try {
+        this.musicGain.disconnect();
+      } catch {}
+      this.musicGain = null;
+    }
     this.buffer = null;
+    this.ctx = null;
   }
 }
 
@@ -215,10 +233,16 @@ export class HitsoundPlayer {
 
     for (const name of sounds) {
       try {
-        const res = await fetch(`/skin/default/${name}.wav`);
-        if (res.ok) {
-          const arrayBuffer = await res.arrayBuffer();
-          const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+        let rawBuf = rawWavCache.get(name);
+        if (!rawBuf) {
+          const res = await fetch(`/skin/default/${name}.wav`);
+          if (res.ok) {
+            rawBuf = await res.arrayBuffer();
+            rawWavCache.set(name, rawBuf);
+          }
+        }
+        if (rawBuf && this.ctx) {
+          const audioBuffer = await this.ctx.decodeAudioData(rawBuf.slice(0));
           this.soundBuffers.set(name, audioBuffer);
         }
       } catch {
@@ -335,5 +359,17 @@ export class HitsoundPlayer {
 
     osc.start(now);
     osc.stop(now + 0.02);
+  }
+
+  public destroy(): void {
+    this.cancelScheduled();
+    this.soundBuffers.clear();
+    if (this.effectsGain) {
+      try {
+        this.effectsGain.disconnect();
+      } catch {}
+      this.effectsGain = null;
+    }
+    this.ctx = null;
   }
 }

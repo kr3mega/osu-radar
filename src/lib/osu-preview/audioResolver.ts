@@ -215,40 +215,30 @@ export async function resolveBeatmapAudio(
   map: BeatmapAnalysisResult,
   onStatusChange?: (status: AudioResolveStatus) => void
 ): Promise<Blob | undefined> {
-  // 1. Existing in-memory audioBlob
+  // 1. Existing in-memory audioBlob (if passed directly during local folder import)
   if (map.audioBlob && map.audioBlob instanceof Blob && map.audioBlob.size > 1000) {
-    if (!map.audioUrl) {
-      try {
-        map.audioUrl = URL.createObjectURL(map.audioBlob);
-      } catch {}
-    }
     onStatusChange?.({ state: 'ready', message: 'Música carregada do cache' });
     return map.audioBlob;
   }
 
-  // 2. Check IndexedDB persistent cache
+  // 2. Check IndexedDB persistent cache (on-demand read, without pinning all blobs in RAM)
   try {
     const cached = await db.beatmaps.get(map.id);
     if (cached?.audioBlob && cached.audioBlob instanceof Blob && cached.audioBlob.size > 1000) {
-      map.audioBlob = cached.audioBlob;
-      map.audioUrl = URL.createObjectURL(cached.audioBlob);
       onStatusChange?.({ state: 'ready', message: 'Música recuperada do cache local' });
       return cached.audioBlob;
     }
   } catch {}
 
-  // 3. Existing audio URL
+  // 3. Existing remote audio URL
   if (map.audioUrl && !map.audioUrl.startsWith('blob:')) {
     try {
       const res = await fetch(map.audioUrl);
       if (res.ok) {
         const blob = await res.blob();
-        map.audioBlob = blob;
-        map.audioUrl = URL.createObjectURL(blob);
         try {
           await db.beatmaps.update(map.id, {
             audioBlob: blob,
-            audioUrl: map.audioUrl,
           });
         } catch {}
         onStatusChange?.({ state: 'ready', message: 'Música pronta' });
@@ -277,14 +267,10 @@ export async function resolveBeatmapAudio(
   const audioBlob = await downloadBeatmapAudio(setId, targetAudio, onStatusChange);
 
   if (audioBlob) {
-    map.audioBlob = audioBlob;
-    map.audioUrl = URL.createObjectURL(audioBlob);
-
-    // Persist permanently into IndexedDB
+    // Persist permanently into IndexedDB without pinning all 20+ Blobs in JS RAM
     try {
       await db.beatmaps.update(map.id, {
         audioBlob,
-        audioUrl: map.audioUrl,
         metadata: map.metadata,
       });
     } catch (e) {

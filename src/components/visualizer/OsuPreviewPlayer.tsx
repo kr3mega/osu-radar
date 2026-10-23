@@ -219,12 +219,13 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     window.addEventListener('resize', handleResize);
 
     return () => {
+      isCancelled = true;
       unsubscribe();
       window.removeEventListener('resize', handleResize);
       controller.destroy();
       controllerRef.current = null;
     };
-  }, [map]);
+  }, [map.id]);
 
   // Auto-scroll list to active pattern
   useEffect(() => {

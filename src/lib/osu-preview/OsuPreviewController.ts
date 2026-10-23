@@ -450,14 +450,21 @@ export class OsuPreviewController {
       document.removeEventListener('visibilitychange', this.visibilityListener);
       this.visibilityListener = null;
     }
-    this.hitsoundPlayer.cancelScheduled();
+    this.hitsoundPlayer.destroy();
     this.musicPlayer.destroy();
+    if (this.masterGain) {
+      try {
+        this.masterGain.disconnect();
+      } catch {}
+      this.masterGain = null;
+    }
     if (this.audioCtx) {
       try {
         this.audioCtx.close();
       } catch {}
       this.audioCtx = null;
     }
+    this.beatmap = null;
     this.tickCallbacks.clear();
   }
 }
