@@ -78,4 +78,56 @@ HPDrainRate:6
     expect(meta.artist).toBe('Hana');
     expect(meta.version).toBe('The World Resonated');
   });
+
+  it('distinguishes GRAND FINALS, FINALS, SEMIFINALS, QUARTERFINALS without duplicating Finals 3 times', () => {
+    const fullTournamentCsv = `
+,,GRAND FINALS,,,,,,BO13,,,,,,
+,,NM1,Artist A - Song A [Diff],Custom,6.10,180,03:20,1200x,4,9.3,9,100001
+,,FINALS,,,,,,BO13,,,,,,
+,,NM1,Artist B - Song B [Diff],Custom,5.90,175,03:10,1100x,4,9.2,8.8,100002
+,,SEMIFINALS,,,,,,BO11,,,,,,
+,,NM1,Artist C - Song C [Diff],Custom,5.70,170,03:00,1000x,4,9.1,8.5,100003
+,,QUARTERFINALS,,,,,,BO11,,,,,,
+,,NM1,Artist D - Song D [Diff],Custom,5.50,165,02:50,900x,4,9.0,8.2,100004
+,,ROUND OF 16,,,,,,BO9,,,,,,
+,,NM1,Artist E - Song E [Diff],Custom,5.30,160,02:40,850x,4,8.8,8.0,100005
+,,GROUP STAGE,,,,,,BO9,,,,,,
+,,NM1,Artist F - Song F [Diff],Custom,5.10,155,02:30,800x,4,8.5,7.8,100006
+,,QUALIFIERS,,,,,,MAPPACK,,,,,,
+,,NM1,Artist G - Song G [Diff],Custom,4.90,150,02:20,750x,4,8.3,7.5,100007
+`;
+
+    const stages = parseMappoolCsv(fullTournamentCsv);
+    const stageNames = stages.map((s) => s.stageName);
+
+    expect(stageNames).toEqual([
+      'Grand Finals',
+      'Finals',
+      'Semifinals',
+      'Quarterfinals',
+      'Round Of 16',
+      'Group Stage',
+      'Qualifiers',
+    ]);
+
+    // Ensure "Finals" appears exactly once and all stage names are unique
+    const finalsCount = stageNames.filter((n) => n === 'Finals').length;
+    expect(finalsCount).toBe(1);
+    expect(new Set(stageNames).size).toBe(stageNames.length);
+  });
+
+  it('does not split or duplicate stages when song titles contain stage keywords or when headers repeat', () => {
+    const trickyCsv = `
+,,FINALS,,,,,,BO13,,,,,,
+,,NM1,Camellia - Final Boss [Grand Finals],Custom,6.20,200,04:00,1500x,4,9.5,9.0,200001
+,,NM2,Xi - Halcyon [Qualifiers Showcase],Custom,6.05,191,03:45,1400x,4,9.3,8.8,200002
+,,FINALS,,,,,,CONTINUED,,,,,,
+,,HD1,Mili - String Theocracy [Playoffs],Custom,5.85,140,03:10,1100x,4,9.2,8.5,200003
+`;
+
+    const stages = parseMappoolCsv(trickyCsv);
+    expect(stages.length).toBe(1);
+    expect(stages[0].stageName).toBe('Finals');
+    expect(stages[0].entries.length).toBe(3);
+  });
 });

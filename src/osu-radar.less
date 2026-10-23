@@ -124,6 +124,13 @@
     width: 100%;
     cursor: pointer;
     transition: transform 120ms ease, box-shadow 120ms ease;
+    --play-bg: hsla(var(--hsl-b6), 0.72);
+    --play-icon-opacity: 1;
+
+    &:hover {
+      --play-bg: hsla(var(--hsl-b6), 0.85);
+      --play-icon-opacity: 1;
+    }
 
     &--selected {
       box-shadow: 0 0 0 2px @osu-colour-h1, 0 4px 14px rgba(0, 0, 0, 0.45);
@@ -132,7 +139,7 @@
         hsl(var(--hsl-b3)),
         hsla(var(--hsl-b3), 0.88)
       );
-      --play-bg: hsla(var(--hsl-b6), 0.75);
+      --play-bg: hsla(var(--hsl-b6), 0.82);
       --play-icon-opacity: 1;
       --menu-opacity: 1;
       --menu-container-width: 30px;

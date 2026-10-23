@@ -151,27 +151,56 @@ export function parseCsvRows(csvText: string): string[][] {
 }
 
 /**
- * Known tournament stages pattern detector.
+ * Known tournament stages pattern detector, ordered from most specific to least specific
+ * with strict word boundaries so "SEMIFINALS" and "QUARTERFINALS" never collide with "FINALS".
  */
-const STAGE_PATTERNS = [
-  'GRAND FINALS',
-  'FINALS',
-  'SEMIFINALS',
-  'SEMI FINALS',
-  'QUARTERFINALS',
-  'QUARTER FINALS',
-  'ROUND OF 16',
-  'ROUND OF 32',
-  'GROUP STAGE',
-  'QUALIFIERS',
-  'SHOWCASE',
-  'PLAYOFFS',
+const STAGE_DEFINITIONS: Array<{ canonicalName: string; regex: RegExp }> = [
+  { canonicalName: 'Grand Finals', regex: /\bGRAND\s*[-_]?\s*FINALS?\b/i },
+  { canonicalName: 'Winners Finals', regex: /\bWINNERS?\s*[-_]?\s*FINALS?\b/i },
+  { canonicalName: 'Losers Finals', regex: /\bLOSERS?\s*[-_]?\s*FINALS?\b/i },
+  { canonicalName: 'Bracket Finals', regex: /\bBRACKET\s*[-_]?\s*FINALS?\b/i },
+  { canonicalName: 'Semifinals', regex: /\bSEMI\s*[-_]?\s*FINALS?\b/i },
+  { canonicalName: 'Quarterfinals', regex: /\bQUARTER\s*[-_]?\s*FINALS?\b/i },
+  { canonicalName: 'Finals', regex: /\bFINALS?\b/i },
+  { canonicalName: 'Round Of 64', regex: /\b(?:ROUND\s+OF\s+64|RO64)\b/i },
+  { canonicalName: 'Round Of 32', regex: /\b(?:ROUND\s+OF\s+32|RO32)\b/i },
+  { canonicalName: 'Round Of 16', regex: /\b(?:ROUND\s+OF\s+16|RO16)\b/i },
+  { canonicalName: 'Group Stage', regex: /\bGROUP\s*[-_]?\s*STAGE\b/i },
+  { canonicalName: 'Qualifiers', regex: /\bQUALIFIERS?\b/i },
+  { canonicalName: 'Showcase', regex: /\bSHOWCASE\b/i },
+  { canonicalName: 'Playoffs', regex: /\bPLAYOFFS?\b/i },
 ];
 
 /**
  * Checks if a string represents a valid tournament mod slot (NM1, HD2, HR1, DT3, FM1, TB, etc.)
  */
 const MOD_SLOT_REGEX = /^(NM|HD|HR|DT|FM|TB|EZ)\d*$/i;
+
+function upsertStageGroup(
+  stages: SheetStageGroup[],
+  stageName: string,
+  entries: SheetBeatmapEntry[]
+): void {
+  if (entries.length === 0) return;
+  const normalized = stageName.trim().toLowerCase();
+  const existing = stages.find((s) => s.stageName.trim().toLowerCase() === normalized);
+
+  if (existing) {
+    const existingKeys = new Set(existing.entries.map((e) => `${e.slot.toUpperCase()}_${e.beatmapId}`));
+    for (const entry of entries) {
+      const key = `${entry.slot.toUpperCase()}_${entry.beatmapId}`;
+      if (!existingKeys.has(key)) {
+        existingKeys.add(key);
+        existing.entries.push({ ...entry, stage: existing.stageName });
+      }
+    }
+  } else {
+    stages.push({
+      stageName,
+      entries: entries.map((e) => ({ ...e, stage: stageName })),
+    });
+  }
+}
 
 /**
  * Parses tournament sheet CSV into structured stages and beatmap entries.
@@ -186,31 +215,7 @@ export function parseMappoolCsv(csvText: string): SheetStageGroup[] {
   for (const row of rows) {
     if (row.length === 0) continue;
 
-    const rowText = row.join(' ').toUpperCase();
-
-    // 1. Detect Stage Section Header (e.g. "GRAND FINALS", "ROUND OF 16", "QUALIFIERS")
-    const matchedStage = STAGE_PATTERNS.find((pattern) => {
-      // Must not be a sub-reference cell or column header
-      return rowText.includes(pattern) && !rowText.includes('INDIVIDUAL STATS') && !rowText.includes('MULTIPLIER');
-    });
-
-    if (matchedStage) {
-      if (currentEntries.length > 0) {
-        stages.push({
-          stageName: currentStageName,
-          entries: [...currentEntries],
-        });
-        currentEntries = [];
-      }
-
-      // Title Case stage name
-      currentStageName = matchedStage
-        .toLowerCase()
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-      continue;
-    }
-
-    // 2. Detect Beatmap Row: Look for a cell that is a valid mod slot (NM1, HD1, TB, etc.)
+    // 1. First check if the row is a Beatmap Row (contains a valid mod slot like NM1, HD1, TB, etc.)
     let slotIndex = -1;
     let slotValue = '';
 
@@ -224,7 +229,6 @@ export function parseMappoolCsv(csvText: string): SheetStageGroup[] {
     }
 
     if (slotIndex !== -1 && slotValue) {
-      // Detect Beatmap ID, SR, BPM and attributes in the row
       let beatmapId = 0;
       let songInfo = '';
       let sr: number | undefined;
@@ -233,7 +237,6 @@ export function parseMappoolCsv(csvText: string): SheetStageGroup[] {
       let ar: number | undefined;
       let od: number | undefined;
 
-      // The song title is usually adjacent to the slot
       if (row[slotIndex + 1] && row[slotIndex + 1].length > 3) {
         songInfo = row[slotIndex + 1];
       }
@@ -242,7 +245,6 @@ export function parseMappoolCsv(csvText: string): SheetStageGroup[] {
         const cell = row[c].trim();
         if (!cell) continue;
 
-        // Check for Star Rating (e.g. "5.53★" or "5.53")
         if (cell.includes('★') || /^\d+[.,]\d{1,2}$/.test(cell)) {
           const num = parseFloat(cell.replace('★', '').replace(',', '.').trim());
           if (!isNaN(num) && num >= 1.0 && num <= 12.0 && !sr) {
@@ -251,7 +253,6 @@ export function parseMappoolCsv(csvText: string): SheetStageGroup[] {
           }
         }
 
-        // Check for Beatmap ID or link
         const linkMatch = cell.match(/(?:osu\.ppy\.sh\/(?:b|beatmaps)\/(\d+)|#osu\/(\d+))/);
         if (linkMatch) {
           beatmapId = parseInt(linkMatch[1] || linkMatch[2], 10);
@@ -261,7 +262,6 @@ export function parseMappoolCsv(csvText: string): SheetStageGroup[] {
           continue;
         }
 
-        // Check for BPM (e.g. 130, 220)
         if (/^\d{2,3}$/.test(cell)) {
           const num = parseInt(cell, 10);
           if (num >= 60 && num <= 420 && !bpm) {
@@ -283,16 +283,29 @@ export function parseMappoolCsv(csvText: string): SheetStageGroup[] {
           ar,
           od,
         });
+        continue;
+      }
+    }
+
+    // 2. Detect Stage Section Header (e.g. "GRAND FINALS", "SEMIFINALS", "QUARTERFINALS", "FINALS")
+    const rowText = row.join(' ');
+    const upperRowText = rowText.toUpperCase();
+    if (!upperRowText.includes('INDIVIDUAL STATS') && !upperRowText.includes('MULTIPLIER')) {
+      const matchedStage = STAGE_DEFINITIONS.find((def) => def.regex.test(rowText));
+      if (matchedStage) {
+        if (currentEntries.length > 0) {
+          upsertStageGroup(stages, currentStageName, currentEntries);
+          currentEntries = [];
+        }
+        currentStageName = matchedStage.canonicalName;
+        continue;
       }
     }
   }
 
   // Push final group
   if (currentEntries.length > 0) {
-    stages.push({
-      stageName: currentStageName,
-      entries: currentEntries,
-    });
+    upsertStageGroup(stages, currentStageName, currentEntries);
   }
 
   return stages;

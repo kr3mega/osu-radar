@@ -94,7 +94,7 @@ export class MusicPlayer {
 
   public setSpeed(rate: number): void {
     const curSec = this.currentTimeSec;
-    this._playbackRate = clamp(0.25, rate, 3.0);
+    this._playbackRate = clamp(0.25, rate, 4.0);
     if (this._isPlaying) {
       this.pauseTime = curSec;
       this.startTime = this.ctx?.currentTime || 0;
@@ -189,6 +189,7 @@ export class HitsoundPlayer {
   private effectsGain: GainNode | null = null;
   private volume: number = 0.8;
   private isMuted: boolean = false;
+  private scheduledNodes: Set<AudioScheduledSourceNode> = new Set();
 
   constructor() {}
 
@@ -238,7 +239,17 @@ export class HitsoundPlayer {
     this.setVolume(this.volume);
   }
 
-  public playHit(hitSounds: number = 0, sampleSet: number = 2): void {
+  public cancelScheduled(): void {
+    for (const node of this.scheduledNodes) {
+      try {
+        node.stop();
+        node.disconnect();
+      } catch {}
+    }
+    this.scheduledNodes.clear();
+  }
+
+  public playHit(hitSounds: number = 0, sampleSet: number = 2, delaySec: number = 0): void {
     if (!this.ctx || this.isMuted || this.volume <= 0) return;
     if (this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
@@ -253,13 +264,19 @@ export class HitsoundPlayer {
       buffer = this.soundBuffers.get(clapSound);
     }
 
+    const startTime = this.ctx.currentTime + Math.max(0, delaySec);
+
     if (buffer && this.effectsGain) {
       const src = this.ctx.createBufferSource();
       src.buffer = buffer;
       src.connect(this.effectsGain);
-      src.start();
+      if (delaySec > 0.01) {
+        this.scheduledNodes.add(src);
+        src.onended = () => this.scheduledNodes.delete(src);
+      }
+      src.start(startTime);
     } else {
-      this.synthesizeHitClick();
+      this.synthesizeHitClick(startTime, delaySec > 0.01);
     }
   }
 
@@ -276,24 +293,29 @@ export class HitsoundPlayer {
     }
   }
 
-  private synthesizeHitClick(): void {
+  private synthesizeHitClick(startTime?: number, trackScheduled: boolean = false): void {
     if (!this.ctx || !this.effectsGain) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    const now = this.ctx.currentTime;
+    const when = startTime ?? this.ctx.currentTime;
 
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(800, now);
-    osc.frequency.exponentialRampToValueAtTime(140, now + 0.04);
+    osc.frequency.setValueAtTime(800, when);
+    osc.frequency.exponentialRampToValueAtTime(140, when + 0.04);
 
-    gain.gain.setValueAtTime(0.3 * this.volume, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    gain.gain.setValueAtTime(0.3 * this.volume, when);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + 0.04);
 
     osc.connect(gain);
     gain.connect(this.effectsGain);
 
-    osc.start(now);
-    osc.stop(now + 0.045);
+    if (trackScheduled) {
+      this.scheduledNodes.add(osc);
+      osc.onended = () => this.scheduledNodes.delete(osc);
+    }
+
+    osc.start(when);
+    osc.stop(when + 0.045);
   }
 
   private synthesizeTick(): void {

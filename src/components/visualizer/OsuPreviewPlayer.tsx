@@ -7,6 +7,7 @@ import {
   resolveBeatmapAudio,
   AudioResolveStatus,
   getModFromSlot,
+  previewAudioManager,
 } from '../../lib/osu-preview';
 import {
   DetectedPattern,
@@ -116,7 +117,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       });
       setPlaybackRate(controllerRef.current.getPlaybackRate());
     } else {
-      setPlaybackRate(slotMod === 'dt' ? 1.5 : 1.0);
+      setPlaybackRate(1.0);
     }
   }, [map.id, map.modSlot, slotMod]);
 
@@ -248,6 +249,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
 
   const jumpToPattern = useCallback(
     (p: DetectedPattern) => {
+      previewAudioManager.stop();
       setSelectedPatternId(p.id);
       if (controllerRef.current) {
         controllerRef.current.seek(p.startTimeMs);
@@ -282,6 +284,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   };
 
   const handleTogglePlay = useCallback(() => {
+    previewAudioManager.stop();
     if (controllerRef.current) {
       controllerRef.current.togglePlay();
     }

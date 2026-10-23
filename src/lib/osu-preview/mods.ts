@@ -34,13 +34,50 @@ export function computeMapProperties(
 }
 
 /**
- * Derives the effective playback speed multiplier according to active mods.
+ * Computes the unified Hidden (HD) opacity for a hit object (circle, slider head,
+ * slider body, slider end circle, ticks, and reverse arrows) so every component of
+ * a slider fades in and disappears together with its head circle.
+ */
+export function getHiddenAlpha(time: number, objTime: number, preempt: number): number {
+  if (time > objTime) return 0;
+
+  const hiddenFadeInStart = objTime - preempt;
+  const hiddenFadeInEnd = objTime - preempt * 0.6;
+  const hiddenFadeOutStart = objTime - preempt * 0.6;
+  const hiddenFadeOutEnd = objTime - preempt * 0.3;
+
+  if (time < hiddenFadeOutStart) {
+    return clamp(
+      0,
+      1 - (hiddenFadeInEnd - time) / Math.max(1, hiddenFadeInEnd - hiddenFadeInStart),
+      1
+    );
+  }
+
+  return clamp(
+    0,
+    (hiddenFadeOutEnd - time) / Math.max(1, hiddenFadeOutEnd - hiddenFadeOutStart),
+    1
+  );
+}
+
+/**
+ * Derives the mod speed multiplier (backend layer) according to active mods.
  * DT = 1.5x, HT = 0.75x, otherwise 1.0x.
  */
 export function getPlaySpeed(activeMods: Set<OsuMod>): number {
   if (activeMods.has('dt')) return 1.5;
   if (activeMods.has('ht')) return 0.75;
   return 1.0;
+}
+
+/**
+ * Combines the user UI speed multiplier (e.g. 0.5x, 0.75x, 1.0x, 1.5x)
+ * with the backend mod speed multiplier (e.g. DT = 1.5x).
+ */
+export function getEffectivePlaybackRate(userSpeed: number, activeMods: Set<OsuMod>): number {
+  const modSpeed = getPlaySpeed(activeMods);
+  return clamp(0.25, userSpeed * modSpeed, 3.0);
 }
 
 /**

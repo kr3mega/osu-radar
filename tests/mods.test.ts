@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   computeMapProperties,
   getPlaySpeed,
+  getEffectivePlaybackRate,
+  getHiddenAlpha,
   toggleMod,
   setMod,
   getModFromSlot,
@@ -201,5 +203,45 @@ SliderTickRate: 1
     expect(getModFromSlot('FL1')).toBe('fl');
     expect(getModFromSlot('TB')).toBeNull();
     expect(getModFromSlot(undefined)).toBeNull();
+  });
+
+  it('applies DT as a second backend speed layer while keeping UI speed at 1x (allowing 1.5x on top of DT)', () => {
+    const dtMods = new Set<OsuMod>(['dt']);
+    const nmMods = new Set<OsuMod>();
+
+    // Default UI speed is 1.0x; with DT active in backend, effective speed is 1.5x
+    const defaultUiSpeed = 1.0;
+    expect(getEffectivePlaybackRate(defaultUiSpeed, nmMods)).toBe(1.0);
+    expect(getEffectivePlaybackRate(defaultUiSpeed, dtMods)).toBe(1.5);
+
+    // User can apply 1.5x in the UI on top of DT (1.5 * 1.5 = 2.25x effective backend speed)
+    expect(getEffectivePlaybackRate(1.5, dtMods)).toBeCloseTo(2.25, 2);
+
+    // User can apply 0.5x in the UI on top of DT (0.5 * 1.5 = 0.75x effective backend speed)
+    expect(getEffectivePlaybackRate(0.5, dtMods)).toBeCloseTo(0.75, 2);
+  });
+
+  it('computes unified Hidden (HD) alpha so slider body, end circle, and head circle disappear together before hit time', () => {
+    const objTime = 2000;
+    const preempt = 600; // fadeIn: [1400, 1640], fadeOut: [1640, 1820]
+
+    // Before preempt: completely invisible
+    expect(getHiddenAlpha(1300, objTime, preempt)).toBe(0);
+
+    // Halfway through fade-in (1520ms): alpha = 0.5
+    expect(getHiddenAlpha(1520, objTime, preempt)).toBeCloseTo(0.5, 2);
+
+    // Peak visibility at objTime - 0.6 * preempt (1640ms): alpha = 1.0
+    expect(getHiddenAlpha(1640, objTime, preempt)).toBeCloseTo(1.0, 2);
+
+    // Halfway through fade-out (1730ms): alpha = 0.5
+    expect(getHiddenAlpha(1730, objTime, preempt)).toBeCloseTo(0.5, 2);
+
+    // At objTime - 0.3 * preempt (1820ms): completely disappeared (alpha = 0)
+    expect(getHiddenAlpha(1820, objTime, preempt)).toBe(0);
+
+    // At hit time (2000ms) and during slider hold (2250ms): remains 0 (no delayed fadeout on slider body/end)
+    expect(getHiddenAlpha(2000, objTime, preempt)).toBe(0);
+    expect(getHiddenAlpha(2250, objTime, preempt)).toBe(0);
   });
 });

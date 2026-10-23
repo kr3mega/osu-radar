@@ -2,12 +2,12 @@ import { OsuPreviewRenderer, RenderOptions } from './render';
 import { parseBeatmapText } from './beatmap';
 import { loadDefaultSkin } from './skin';
 import { HitsoundPlayer, MusicPlayer } from './audio';
-import { PreviewBeatmap, OsuSkin, OsuMod } from './types';
+import { PreviewBeatmap, PreviewHitObject, OsuSkin, OsuMod } from './types';
 import { clamp } from './functions';
 import {
   toggleMod as toggleModHelper,
   setMod as setModHelper,
-  getPlaySpeed,
+  getEffectivePlaybackRate,
   computeMapProperties,
 } from './mods';
 
@@ -16,8 +16,85 @@ export type TickCallback = (state: {
   durationMs: number;
   isPlaying: boolean;
   playbackRate: number;
+  effectivePlaybackRate: number;
   hasAudioTrack: boolean;
 }) => void;
+
+export interface HitsoundTickInput {
+  hitObjects: PreviewHitObject[];
+  lastPlayedNoteIndex: number;
+  prevTimeMs: number;
+  curTimeMs: number;
+  effectivePlaybackRate: number;
+  isBackgroundTab?: boolean;
+  onPlayHit: (obj: PreviewHitObject, delaySec: number) => void;
+}
+
+/**
+ * Processes hitsounds for the current tick while:
+ * 1. Scheduling upcoming notes via Web Audio lookahead when in a background tab so notes keep playing in rhythm.
+ * 2. Preventing accumulated notes from bursting all at once when returning from a background tab or after a frame lag spike.
+ */
+export function processHitsoundTick({
+  hitObjects,
+  lastPlayedNoteIndex,
+  prevTimeMs,
+  curTimeMs,
+  effectivePlaybackRate,
+  isBackgroundTab = false,
+  onPlayHit,
+}: HitsoundTickInput): number {
+  const rate = Math.max(0.25, effectivePlaybackRate);
+  const maxCatchupWindowMs = 90 * rate;
+
+  // 1. Anti-burst guard: if a large time jump occurred (e.g. returning from background tab where RAF was paused),
+  // silently advance lastPlayedNoteIndex past all stale notes older than (curTimeMs - maxCatchupWindowMs).
+  const safeMinTimeMs = Math.max(prevTimeMs, curTimeMs - maxCatchupWindowMs);
+  let nextLastIndex = lastPlayedNoteIndex;
+
+  for (let i = nextLastIndex + 1; i < hitObjects.length; i++) {
+    const obj = hitObjects[i];
+    if (obj.time < safeMinTimeMs) {
+      nextLastIndex = i;
+    } else {
+      break;
+    }
+  }
+
+  // 2. Foreground immediate window [safeMinTimeMs, curTimeMs]:
+  // Play at most 1 immediate hitsound per frame (the latest note in the window) to guarantee zero headphone bursts.
+  let immediateCandidate: PreviewHitObject | null = null;
+  for (let i = nextLastIndex + 1; i < hitObjects.length; i++) {
+    const obj = hitObjects[i];
+    if (obj.time > curTimeMs) break;
+    if (obj.time >= safeMinTimeMs) {
+      immediateCandidate = obj;
+      nextLastIndex = i;
+    }
+  }
+
+  if (immediateCandidate) {
+    onPlayHit(immediateCandidate, 0);
+  }
+
+  // 3. Background tab Web Audio lookahead scheduling:
+  // When the document is hidden, browser timers may be throttled to ~1000ms.
+  // Schedule upcoming notes within the next 1150ms directly on the AudioContext hardware clock.
+  if (isBackgroundTab) {
+    const lookaheadHorizonMs = curTimeMs + 1150 * rate;
+    for (let i = nextLastIndex + 1; i < hitObjects.length; i++) {
+      const obj = hitObjects[i];
+      if (obj.time > lookaheadHorizonMs) break;
+      if (obj.time > curTimeMs) {
+        const delaySec = (obj.time - curTimeMs) / (1000 * rate);
+        onPlayHit(obj, delaySec);
+        nextLastIndex = i;
+      }
+    }
+  }
+
+  return nextLastIndex;
+}
 
 export class OsuPreviewController {
   private renderer: OsuPreviewRenderer;
@@ -30,10 +107,14 @@ export class OsuPreviewController {
 
   private currentTimeMs: number = 0;
   private isPlaying: boolean = false;
+  // Effective backend speed (basePlaybackRate * modSpeed)
   private playbackRate: number = 1.0;
+  // User UI speed selector (0.5x, 0.75x, 1.0x, 1.5x) - defaults to 1.0x even when DT is active
   private basePlaybackRate: number = 1.0;
   private lastRafTime: number = 0;
   private rafId: number | null = null;
+  private bgTimerId: ReturnType<typeof setInterval> | null = null;
+  private visibilityListener: (() => void) | null = null;
 
   private activeMods: Set<OsuMod> = new Set();
   private options: RenderOptions = {
@@ -61,9 +142,8 @@ export class OsuPreviewController {
   ): Promise<void> {
     if (initialMods) {
       this.activeMods = new Set(initialMods);
-      const modSpeed = getPlaySpeed(this.activeMods);
-      this.playbackRate = modSpeed !== 1.0 ? modSpeed : this.basePlaybackRate;
     }
+    this.playbackRate = getEffectivePlaybackRate(this.basePlaybackRate, this.activeMods);
 
     // 1. Initialize Unified Audio Engine
     this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -116,7 +196,8 @@ export class OsuPreviewController {
         currentTimeMs: this.currentTimeMs,
         durationMs: duration,
         isPlaying: this.isPlaying,
-        playbackRate: this.playbackRate,
+        playbackRate: this.basePlaybackRate,
+        effectivePlaybackRate: this.playbackRate,
         hasAudioTrack: this.musicPlayer.hasRealAudio,
       });
     }
@@ -142,7 +223,9 @@ export class OsuPreviewController {
 
   public pause(): void {
     this.isPlaying = false;
+    this.hitsoundPlayer.cancelScheduled();
     this.musicPlayer.pause();
+    this.lastPlayedNoteIndex = this.findLastNoteIndexBefore(this.currentTimeMs);
     this.notifyState();
   }
 
@@ -153,6 +236,7 @@ export class OsuPreviewController {
 
   public seek(timeMs: number): void {
     if (!this.beatmap) return;
+    this.hitsoundPlayer.cancelScheduled();
     this.currentTimeMs = clamp(0, timeMs, this.beatmap.duration);
     this.musicPlayer.seek(this.currentTimeMs);
     this.lastPlayedNoteIndex = this.findLastNoteIndexBefore(this.currentTimeMs);
@@ -160,7 +244,18 @@ export class OsuPreviewController {
     this.notifyState();
   }
 
+  /**
+   * Returns the user-selected UI speed multiplier (e.g. 0.5, 0.75, 1.0, 1.5).
+   * Remains 1.0 by default even when DT is active.
+   */
   public getPlaybackRate(): number {
+    return this.basePlaybackRate;
+  }
+
+  /**
+   * Returns the effective backend speed multiplier (user speed * mod speed).
+   */
+  public getEffectivePlaybackRate(): number {
     return this.playbackRate;
   }
 
@@ -170,12 +265,13 @@ export class OsuPreviewController {
 
   public setSpeed(rate: number): void {
     this.basePlaybackRate = clamp(0.25, rate, 3.0);
+    this.hitsoundPlayer.cancelScheduled();
+    this.lastPlayedNoteIndex = this.findLastNoteIndexBefore(this.currentTimeMs);
     this.updateEffectiveSpeed();
   }
 
   private updateEffectiveSpeed(): void {
-    const modSpeed = getPlaySpeed(this.activeMods);
-    this.playbackRate = clamp(0.25, this.basePlaybackRate * modSpeed, 3.0);
+    this.playbackRate = getEffectivePlaybackRate(this.basePlaybackRate, this.activeMods);
     this.musicPlayer.setSpeed(this.playbackRate);
     this.notifyState();
   }
@@ -192,6 +288,8 @@ export class OsuPreviewController {
   }
 
   private onModsChanged(): void {
+    this.hitsoundPlayer.cancelScheduled();
+    this.lastPlayedNoteIndex = this.findLastNoteIndexBefore(this.currentTimeMs);
     this.updateEffectiveSpeed();
     if (this.beatmap) {
       computeMapProperties(this.beatmap, this.activeMods);
@@ -245,54 +343,87 @@ export class OsuPreviewController {
     return idx;
   }
 
-  private checkHitsounds(prevTime: number, curTime: number): void {
+  private checkHitsounds(prevTime: number, curTime: number, isBackgroundTab: boolean): void {
     if (!this.beatmap) return;
-    const hitObjs = this.beatmap.HitObjects;
-    for (let i = this.lastPlayedNoteIndex + 1; i < hitObjs.length; i++) {
-      const obj = hitObjs[i];
-      if (obj.time > curTime) break;
-      if (obj.time >= prevTime) {
-        this.hitsoundPlayer.playHit(obj.hitSounds, obj.hitSample?.[0] || 2);
-        this.lastPlayedNoteIndex = i;
-      }
+    this.lastPlayedNoteIndex = processHitsoundTick({
+      hitObjects: this.beatmap.HitObjects,
+      lastPlayedNoteIndex: this.lastPlayedNoteIndex,
+      prevTimeMs: prevTime,
+      curTimeMs: curTime,
+      effectivePlaybackRate: this.playbackRate,
+      isBackgroundTab,
+      onPlayHit: (obj, delaySec) => {
+        this.hitsoundPlayer.playHit(obj.hitSounds, obj.hitSample?.[0] || 2, delaySec);
+      },
+    });
+  }
+
+  private stepSimulation(now: number, isBackgroundTab: boolean): void {
+    if (!this.isPlaying) return;
+
+    const prevTime = this.currentTimeMs;
+
+    if (this.musicPlayer.hasRealAudio) {
+      this.currentTimeMs = this.musicPlayer.currentTimeMs;
+    } else {
+      const deltaMs = Math.max(0, now - this.lastRafTime) * this.playbackRate;
+      this.currentTimeMs += deltaMs;
     }
+    this.lastRafTime = now;
+
+    if (this.loopRange && this.currentTimeMs >= this.loopRange.endMs) {
+      this.hitsoundPlayer.cancelScheduled();
+      this.currentTimeMs = this.loopRange.startMs;
+      this.musicPlayer.seek(this.currentTimeMs);
+      this.lastPlayedNoteIndex = this.findLastNoteIndexBefore(this.currentTimeMs);
+    } else if (this.beatmap && this.currentTimeMs >= this.beatmap.duration) {
+      this.currentTimeMs = this.beatmap.duration;
+      this.pause();
+    }
+
+    this.checkHitsounds(prevTime, this.currentTimeMs, isBackgroundTab);
   }
 
   private startLoop(): void {
     if (this.rafId !== null) return;
+
     const loop = (now: number) => {
       this.rafId = requestAnimationFrame(loop);
       if (!this.isPlaying) return;
-
-      const prevTime = this.currentTimeMs;
-
-      // Primary clock: hardware AudioContext currentTime for 100% sample-accurate sync
-      if (this.musicPlayer.hasRealAudio) {
-        this.currentTimeMs = this.musicPlayer.currentTimeMs;
-      } else {
-        // High-precision delta fallback
-        const deltaMs = (now - this.lastRafTime) * this.playbackRate;
-        this.currentTimeMs += deltaMs;
-      }
-      this.lastRafTime = now;
-
-      // Section Looping support
-      if (this.loopRange && this.currentTimeMs >= this.loopRange.endMs) {
-        this.currentTimeMs = this.loopRange.startMs;
-        this.musicPlayer.seek(this.currentTimeMs);
-        this.lastPlayedNoteIndex = this.findLastNoteIndexBefore(this.currentTimeMs);
-      } else if (this.beatmap && this.currentTimeMs >= this.beatmap.duration) {
-        this.currentTimeMs = this.beatmap.duration;
-        this.pause();
-      }
-
-      this.checkHitsounds(prevTime, this.currentTimeMs);
+      this.stepSimulation(now, false);
       this.drawCurrentFrame();
       this.notifyState();
     };
 
     this.lastRafTime = performance.now();
     this.rafId = requestAnimationFrame(loop);
+
+    // Background interval so hitsounds continue being scheduled on Web Audio even when tab is hidden
+    this.bgTimerId = setInterval(() => {
+      if (!this.isPlaying) return;
+      const isHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+      if (isHidden) {
+        this.stepSimulation(performance.now(), true);
+      }
+    }, 80);
+
+    if (typeof document !== 'undefined') {
+      this.visibilityListener = () => {
+        if (!this.isPlaying) return;
+        const isHidden = document.visibilityState === 'hidden';
+        if (isHidden) {
+          // Immediately schedule lookahead hitsounds when user switches away from the tab
+          this.stepSimulation(performance.now(), true);
+        } else {
+          // Returning to foreground: sync lastRafTime and draw frame without bursting old notes
+          this.lastRafTime = performance.now();
+          this.stepSimulation(this.lastRafTime, false);
+          this.drawCurrentFrame();
+          this.notifyState();
+        }
+      };
+      document.addEventListener('visibilitychange', this.visibilityListener);
+    }
   }
 
   private drawCurrentFrame(): void {
@@ -311,6 +442,15 @@ export class OsuPreviewController {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
+    if (this.bgTimerId !== null) {
+      clearInterval(this.bgTimerId);
+      this.bgTimerId = null;
+    }
+    if (this.visibilityListener && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.visibilityListener);
+      this.visibilityListener = null;
+    }
+    this.hitsoundPlayer.cancelScheduled();
     this.musicPlayer.destroy();
     if (this.audioCtx) {
       try {

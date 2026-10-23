@@ -1,6 +1,7 @@
 import { clamp, distance, easingFunctions, lerp, mod, range } from './functions';
 import { strokeSlider, getFollowPosition, getSliderTicks, ViewportTransform } from './slider';
 import { PreviewBeatmap, PreviewHitObject, OsuSkin, OsuMod } from './types';
+import { getHiddenAlpha } from './mods';
 
 export interface RenderOptions {
   BackgroundDim?: number;
@@ -208,23 +209,27 @@ export class OsuPreviewRenderer {
         bufferCtx.beginPath();
 
         let snake = 1;
+        let sliderAlpha = 1;
         const isFirstNoteOfMap = obj === beatmap.HitObjects[0];
         if (time < obj.time) {
           if (isFirstNoteOfMap || !isHidden) {
             approachQueue.push(obj);
           }
-          ctx.globalAlpha = clamp(0, (time - (obj.time - beatmap.preempt)) / beatmap.fadein, 1);
+          if (isHidden) {
+            sliderAlpha = getHiddenAlpha(time, obj.time, beatmap.preempt);
+          } else {
+            sliderAlpha = clamp(0, (time - (obj.time - beatmap.preempt)) / beatmap.fadein, 1);
+          }
           snake = clamp(0, (time - (obj.time - beatmap.preempt)) / beatmap.fadein, 0.5) * 2;
         } else {
           if (time < obj.time + (obj.duration || 0) * (obj.slides || 1) + 200) {
             followQueue.push(obj);
           }
           if (isHidden) {
-            ctx.globalAlpha = easingFunctions.easeIn(
-              clamp(0, (obj.endTime - time) / ((obj.duration || 1) * (obj.slides || 1)), 1)
-            );
+            // Linked to the first circle: once the head circle has disappeared, the slider body & end circle stay hidden
+            sliderAlpha = 0;
           } else {
-            ctx.globalAlpha = clamp(
+            sliderAlpha = clamp(
               0,
               (obj.time + (obj.duration || 0) * (obj.slides || 1) + beatmap.fadeout - time) /
                 beatmap.fadeout,
@@ -234,168 +239,175 @@ export class OsuPreviewRenderer {
           snake = 1;
         }
 
-        bufferCtx.moveTo(
-          this.toPixelsX(obj.x) + this.margins[0],
-          this.toPixelsY(obj.y, isHardRock) + this.margins[1]
-        );
-        strokeSlider(
-          obj,
-          (obj.pixelLength || 0) * snake,
-          true,
-          bufferCtx,
-          transform,
-          isHardRock
-        );
-
-        const diameter = ((beatmap.radius * 2) / 512) * this.fieldSize[0] * 0.8;
-        bufferCtx.lineJoin = 'round';
-        bufferCtx.lineCap = 'round';
-        bufferCtx.globalAlpha = 1;
-
-        // Slider Border
-        bufferCtx.lineWidth = diameter * 1.15;
-        bufferCtx.strokeStyle = `rgb(${skin.ini.Colours.SliderBorder || '255,255,255'})`;
-        bufferCtx.stroke();
-
-        // Destination-out inner cut
-        bufferCtx.lineWidth = diameter;
-        bufferCtx.globalCompositeOperation = 'destination-out';
-        bufferCtx.strokeStyle = 'black';
-        bufferCtx.stroke();
-
-        ctx.drawImage(this.bufferCanvas, 0, 0);
-
-        // Slider Inner Track
-        const comboColor =
-          skin.ini.combos[(obj.comboIndex || 0) % skin.ini.combos.length] || [255, 102, 170];
-        const inner = comboColor.map((x) => clamp(61, range(0, 170, 61, 255, x), 255));
-        const outer = comboColor.map((x) => x * 0.91);
-
-        bufferCtx.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
-        bufferCtx.globalCompositeOperation = 'source-over';
-
-        for (let divs = this.sliderGradientDivisions, i = divs; i > 0; i--) {
-          bufferCtx.lineWidth = (diameter * i) / divs;
-          bufferCtx.strokeStyle = `rgb(${inner.map((x, j) => lerp(x, outer[j], i / divs)).join(',')})`;
-          bufferCtx.stroke();
-        }
-
-        ctx.globalAlpha *= 0.75;
-        ctx.drawImage(this.bufferCanvas, 0, 0);
-
-        const slideN = Math.max(
-          Math.floor((time - obj.time) / Math.max(1, obj.duration || 1)),
-          0
-        );
-        const circleSprite =
-          skin.sliderendcircle[(obj.comboIndex || 0) % skin.sliderendcircle.length];
-        const overlaySprite = skin.sliderendcircleoverlay;
-
-        const _drawEnd = (
-          sprite: HTMLCanvasElement | HTMLImageElement,
-          position: [number, number, number, boolean?],
-          startTime: number
-        ) => {
-          const size = [
-            (this.toPixelsX(beatmap.radius) / 64) * sprite.width,
-            (this.toPixelsX(beatmap.radius) / 64) * sprite.height,
-          ];
-          ctx.globalAlpha = clamp(0, (time - startTime) / 150, 1);
-          ctx.drawImage(
-            sprite,
-            this.toPixelsX(position[0]) + this.margins[0] - size[0] / 2,
-            this.toPixelsY(position[1], isHardRock) + this.margins[1] - size[1] / 2,
-            size[0],
-            size[1]
+        if (sliderAlpha > 0) {
+          bufferCtx.moveTo(
+            this.toPixelsX(obj.x) + this.margins[0],
+            this.toPixelsY(obj.y, isHardRock) + this.margins[1]
           );
-        };
+          strokeSlider(
+            obj,
+            (obj.pixelLength || 0) * snake,
+            true,
+            bufferCtx,
+            transform,
+            isHardRock
+          );
 
-        const slides = obj.slides || 1;
-        if ((slideN < slides && slideN % 2 === 0) || slideN < slides - 1) {
-          const position = getFollowPosition(obj, obj.pixelLength || 0, isHardRock);
-          const startTime =
-            obj.time +
-            (obj.duration || 0) * (slideN === 0 || slideN % 2 ? slideN : slideN - 1) +
-            (slideN === 0 ? -beatmap.preempt + beatmap.fadein / 2 : 0);
-          if (circleSprite) _drawEnd(circleSprite, position, startTime);
-          if (overlaySprite) _drawEnd(overlaySprite, position, startTime);
-        }
+          const diameter = ((beatmap.radius * 2) / 512) * this.fieldSize[0] * 0.8;
+          bufferCtx.lineJoin = 'round';
+          bufferCtx.lineCap = 'round';
+          bufferCtx.globalAlpha = 1;
 
-        // Reverse Arrows
-        if (slides > 1) {
-          const reverse1 = slideN < slides - 1;
-          const reverse2 = slideN < slides - 2;
-          const arrowSprite = skin.reversearrow;
+          // Slider Border
+          bufferCtx.lineWidth = diameter * 1.15;
+          bufferCtx.strokeStyle = `rgb(${skin.ini.Colours.SliderBorder || '255,255,255'})`;
+          bufferCtx.stroke();
 
-          if (isDrawable(arrowSprite)) {
-            const arrowSize = [
-              (this.toPixelsX(beatmap.radius) / 64) * arrowSprite.width,
-              (this.toPixelsX(beatmap.radius) / 64) * arrowSprite.height,
+          // Destination-out inner cut
+          bufferCtx.lineWidth = diameter;
+          bufferCtx.globalCompositeOperation = 'destination-out';
+          bufferCtx.strokeStyle = 'black';
+          bufferCtx.stroke();
+
+          ctx.globalAlpha = sliderAlpha;
+          ctx.drawImage(this.bufferCanvas, 0, 0);
+
+          // Slider Inner Track
+          const comboColor =
+            skin.ini.combos[(obj.comboIndex || 0) % skin.ini.combos.length] || [255, 102, 170];
+          const inner = comboColor.map((x) => clamp(61, range(0, 170, 61, 255, x), 255));
+          const outer = comboColor.map((x) => x * 0.91);
+
+          bufferCtx.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
+          bufferCtx.globalCompositeOperation = 'source-over';
+
+          for (let divs = this.sliderGradientDivisions, i = divs; i > 0; i--) {
+            bufferCtx.lineWidth = (diameter * i) / divs;
+            bufferCtx.strokeStyle = `rgb(${inner.map((x, j) => lerp(x, outer[j], i / divs)).join(',')})`;
+            bufferCtx.stroke();
+          }
+
+          ctx.globalAlpha = sliderAlpha * 0.75;
+          ctx.drawImage(this.bufferCanvas, 0, 0);
+
+          const slideN = Math.max(
+            Math.floor((time - obj.time) / Math.max(1, obj.duration || 1)),
+            0
+          );
+          const circleSprite =
+            skin.sliderendcircle[(obj.comboIndex || 0) % skin.sliderendcircle.length];
+          const overlaySprite = skin.sliderendcircleoverlay;
+
+          const _drawEnd = (
+            sprite: HTMLCanvasElement | HTMLImageElement,
+            position: [number, number, number, boolean?],
+            startTime: number
+          ) => {
+            const size = [
+              (this.toPixelsX(beatmap.radius) / 64) * sprite.width,
+              (this.toPixelsX(beatmap.radius) / 64) * sprite.height,
             ];
+            ctx.globalAlpha = isHidden
+              ? sliderAlpha
+              : clamp(0, (time - startTime) / 150, 1) * sliderAlpha;
+            ctx.drawImage(
+              sprite,
+              this.toPixelsX(position[0]) + this.margins[0] - size[0] / 2,
+              this.toPixelsY(position[1], isHardRock) + this.margins[1] - size[1] / 2,
+              size[0],
+              size[1]
+            );
+          };
 
-            const _drawArrow = (
-              pos: [number, number, number, boolean?],
-              startTime: number,
-              flip: boolean
-            ) => {
-              const scale =
-                1 +
-                (1 - easingFunctions.easeOut(mod((time - startTime) / (obj.beatLength || 500), 1))) *
-                  0.3;
-              ctx.globalAlpha = clamp(0, (time - startTime) / 150, 1);
-              ctx.save();
-              ctx.translate(
-                this.toPixelsX(pos[0]) + this.margins[0],
-                this.toPixelsY(pos[1], isHardRock) + this.margins[1]
-              );
-              ctx.rotate(pos[2] * (isHardRock ? -1 : 1) + (flip ? Math.PI : 0));
-              ctx.drawImage(
-                arrowSprite,
-                (-arrowSize[0] / 2) * scale,
-                (-arrowSize[1] / 2) * scale,
-                arrowSize[0] * scale,
-                arrowSize[1] * scale
-              );
-              ctx.restore();
-            };
+          const slides = obj.slides || 1;
+          if ((slideN < slides && slideN % 2 === 0) || slideN < slides - 1) {
+            const position = getFollowPosition(obj, obj.pixelLength || 0, isHardRock);
+            const startTime =
+              obj.time +
+              (obj.duration || 0) * (slideN === 0 || slideN % 2 ? slideN : slideN - 1) +
+              (slideN === 0 ? -beatmap.preempt + beatmap.fadein / 2 : 0);
+            if (circleSprite) _drawEnd(circleSprite, position, startTime);
+            if (overlaySprite) _drawEnd(overlaySprite, position, startTime);
+          }
 
-            if ((slideN % 2 === 0 && reverse1) || (slideN % 2 === 1 && reverse2)) {
-              _drawArrow(
-                getFollowPosition(obj, obj.pixelLength || 0, isHardRock),
-                obj.time + (obj.duration || 0) * slideN,
-                true
-              );
-            }
-            if ((slideN % 2 === 0 && reverse2) || (slideN % 2 === 1 && reverse1)) {
-              _drawArrow(getFollowPosition(obj, 0, isHardRock), obj.time + (obj.duration || 0) * slideN, false);
+          // Reverse Arrows
+          if (slides > 1) {
+            const reverse1 = slideN < slides - 1;
+            const reverse2 = slideN < slides - 2;
+            const arrowSprite = skin.reversearrow;
+
+            if (isDrawable(arrowSprite)) {
+              const arrowSize = [
+                (this.toPixelsX(beatmap.radius) / 64) * arrowSprite.width,
+                (this.toPixelsX(beatmap.radius) / 64) * arrowSprite.height,
+              ];
+
+              const _drawArrow = (
+                pos: [number, number, number, boolean?],
+                startTime: number,
+                flip: boolean
+              ) => {
+                const scale =
+                  1 +
+                  (1 - easingFunctions.easeOut(mod((time - startTime) / (obj.beatLength || 500), 1))) *
+                    0.3;
+                ctx.globalAlpha = isHidden
+                  ? sliderAlpha
+                  : clamp(0, (time - startTime) / 150, 1) * sliderAlpha;
+                ctx.save();
+                ctx.translate(
+                  this.toPixelsX(pos[0]) + this.margins[0],
+                  this.toPixelsY(pos[1], isHardRock) + this.margins[1]
+                );
+                ctx.rotate(pos[2] * (isHardRock ? -1 : 1) + (flip ? Math.PI : 0));
+                ctx.drawImage(
+                  arrowSprite,
+                  (-arrowSize[0] / 2) * scale,
+                  (-arrowSize[1] / 2) * scale,
+                  arrowSize[0] * scale,
+                  arrowSize[1] * scale
+                );
+                ctx.restore();
+              };
+
+              if ((slideN % 2 === 0 && reverse1) || (slideN % 2 === 1 && reverse2)) {
+                _drawArrow(
+                  getFollowPosition(obj, obj.pixelLength || 0, isHardRock),
+                  obj.time + (obj.duration || 0) * slideN,
+                  true
+                );
+              }
+              if ((slideN % 2 === 0 && reverse2) || (slideN % 2 === 1 && reverse1)) {
+                _drawArrow(getFollowPosition(obj, 0, isHardRock), obj.time + (obj.duration || 0) * slideN, false);
+              }
             }
           }
-        }
 
-        // Slider Ticks
-        const ticks = getSliderTicks(obj, beatmap.Difficulty.SliderTickRate);
-        const tickSprite = skin.sliderscorepoint;
-        if (isDrawable(tickSprite)) {
-          for (const tick of ticks) {
-            const tickTime = obj.time + (slideN % 2 ? (obj.duration || 0) - tick : tick);
-            if (time < tickTime) {
-              const followPos = getFollowPosition(
-                obj,
-                (tick / Math.max(1, obj.duration || 1)) * (obj.pixelLength || 0),
-                isHardRock
-              );
-              const tickSize = [
-                ((this.toPixelsX(beatmap.radius) * 2) / 128) * tickSprite.width,
-                ((this.toPixelsX(beatmap.radius) * 2) / 128) * tickSprite.height,
-              ];
-              ctx.globalAlpha = 0.9;
-              ctx.drawImage(
-                tickSprite,
-                this.toPixelsX(followPos[0]) + this.margins[0] - tickSize[0] / 2,
-                this.toPixelsY(followPos[1], isHardRock) + this.margins[1] - tickSize[1] / 2,
-                tickSize[0],
-                tickSize[1]
-              );
+          // Slider Ticks
+          const ticks = getSliderTicks(obj, beatmap.Difficulty.SliderTickRate);
+          const tickSprite = skin.sliderscorepoint;
+          if (isDrawable(tickSprite)) {
+            for (const tick of ticks) {
+              const tickTime = obj.time + (slideN % 2 ? (obj.duration || 0) - tick : tick);
+              if (time < tickTime) {
+                const followPos = getFollowPosition(
+                  obj,
+                  (tick / Math.max(1, obj.duration || 1)) * (obj.pixelLength || 0),
+                  isHardRock
+                );
+                const tickSize = [
+                  ((this.toPixelsX(beatmap.radius) * 2) / 128) * tickSprite.width,
+                  ((this.toPixelsX(beatmap.radius) * 2) / 128) * tickSprite.height,
+                ];
+                ctx.globalAlpha = sliderAlpha * 0.9;
+                ctx.drawImage(
+                  tickSprite,
+                  this.toPixelsX(followPos[0]) + this.margins[0] - tickSize[0] / 2,
+                  this.toPixelsY(followPos[1], isHardRock) + this.margins[1] - tickSize[1] / 2,
+                  tickSize[0],
+                  tickSize[1]
+                );
+              }
             }
           }
         }
@@ -417,31 +429,10 @@ export class OsuPreviewRenderer {
         let circleScale = 1;
         const isFirstNote = obj === beatmap.HitObjects[0];
         if (isHidden) {
-          if (time <= obj.time) {
-            if (isFirstNote) {
-              approachQueue.push(obj);
-            }
-            const hiddenFadeInStart = obj.time - beatmap.preempt;
-            const hiddenFadeInEnd = obj.time - beatmap.preempt * 0.6;
-            ctx.globalAlpha = clamp(
-              0,
-              1 - (hiddenFadeInEnd - time) / Math.max(1, hiddenFadeInEnd - hiddenFadeInStart),
-              1
-            );
-
-            // Hidden hitobject body fadeout before hit time
-            const hiddenFadeOutStart = obj.time - beatmap.preempt * 0.6;
-            const hiddenFadeOutEnd = obj.time - beatmap.preempt * 0.3;
-            if (time >= hiddenFadeOutStart) {
-              ctx.globalAlpha = clamp(
-                0,
-                (hiddenFadeOutEnd - time) / Math.max(1, hiddenFadeOutEnd - hiddenFadeOutStart),
-                1
-              );
-            }
-          } else {
-            ctx.globalAlpha = 0;
+          if (time <= obj.time && isFirstNote) {
+            approachQueue.push(obj);
           }
+          ctx.globalAlpha = getHiddenAlpha(time, obj.time, beatmap.preempt);
           circleScale = 1;
         } else {
           if (time <= obj.time) {

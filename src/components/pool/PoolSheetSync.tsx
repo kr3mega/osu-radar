@@ -341,7 +341,7 @@ export const PoolSheetSync: React.FC = () => {
             <span className="btn-osu-big__content">
               <span className="btn-osu-big__left">
                 <span className="btn-osu-big__text-top">
-                  {isLoadingSheet ? 'Carregando...' : 'Carregar Planilha'}
+                  {isLoadingSheet ? 'Importando...' : 'Importar'}
                 </span>
               </span>
               <span className="btn-osu-big__icon">

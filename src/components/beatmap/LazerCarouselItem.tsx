@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BeatmapAnalysisResult } from '../../engine/types';
 import { getStarRatingColor, getStarRatingTextColor, TOURNAMENT_MOD_COLORS } from '../../utils/osuColors';
 import { formatTimestamp } from '../../engine/strains';
+import { previewAudioManager, PreviewAudioState } from '../../lib/osu-preview';
 
 interface LazerCarouselItemProps {
   map: BeatmapAnalysisResult;
@@ -20,6 +21,21 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   onRemove,
 }) => {
   const { metadata, stats, difficulty, modSlot, topSkills, skills } = map;
+
+  const [audioState, setAudioState] = useState<PreviewAudioState>('stopped');
+  const [audioProgress, setAudioProgress] = useState<number>(0);
+
+  useEffect(() => {
+    return previewAudioManager.subscribe((snap) => {
+      if (snap.activeMapId === map.id) {
+        setAudioState(snap.state);
+        setAudioProgress(snap.progress);
+      } else {
+        setAudioState('stopped');
+        setAudioProgress(0);
+      }
+    });
+  }, [map.id]);
 
   const listCoverUrl = metadata.beatmapSetId
     ? `https://assets.ppy.sh/beatmaps/${metadata.beatmapSetId}/covers/list.jpg`
@@ -40,9 +56,17 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   const modPrefix = (modSlot || 'NM').slice(0, 2).toUpperCase();
   const modColorConfig = TOURNAMENT_MOD_COLORS[modPrefix] || TOURNAMENT_MOD_COLORS.NM;
 
+  const handleTogglePreview = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    previewAudioManager.toggle(map);
+  };
+
   return (
     <div
       onClick={onSelect}
+      data-audio-state={audioState}
+      data-audio-over50={audioProgress > 0.5 ? '1' : '0'}
+      style={{ '--progress': audioProgress } as React.CSSProperties}
       className={`beatmapset-panel beatmapset-panel--size-normal ${
         isSelected ? 'beatmapset-panel--selected' : ''
       }`}
@@ -79,18 +103,34 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
 
       {/* Main Content (Play Area + Info Area + Menu Area) */}
       <div className="beatmapset-panel__content">
-        {/* Left Play Area */}
+        {/* Left Play Area (Official osu-web audio preview button + circular progress) */}
         <div className="beatmapset-panel__play-container">
+          {audioState === 'playing' && (
+            <div className="beatmapset-panel__play-progress">
+              <div className="circular-progress circular-progress--beatmapset-panel">
+                <div className="circular-progress__slice">
+                  <div className="circular-progress__circle" />
+                  <div className="circular-progress__circle circular-progress__circle--fill" />
+                </div>
+              </div>
+            </div>
+          )}
+
           <button
             type="button"
             className="beatmapset-panel__play"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect();
-            }}
-            title="Selecionar e abrir no Visualizador"
+            onClick={handleTogglePreview}
+            title={
+              audioState === 'playing' || audioState === 'loading'
+                ? 'Pausar preview da música'
+                : 'Ouvir preview da música'
+            }
           >
-            <span className="fas fa-play" />
+            {audioState === 'loading' ? (
+              <span className="fas fa-circle-notch fa-spin" />
+            ) : (
+              <span className="play-button" />
+            )}
           </button>
 
           <div className="beatmapset-panel__play-icons">
