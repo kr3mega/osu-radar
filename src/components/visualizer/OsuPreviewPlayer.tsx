@@ -19,6 +19,7 @@ import {
 import { parseOsuBeatmap } from '../../engine/parser';
 import { BeatmapAnalysisResult } from '../../engine/types';
 import { db } from '../../db';
+import { useAudioStore, registerVisualizerPauseCallback } from '../../store/useAudioStore';
 
 const SEVERITY_BADGES: Record<
   PatternSeverity,
@@ -85,8 +86,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const [currentTimeMs, setCurrentTimeMs] = useState<number>(initialTimeMs);
   const [durationMs, setDurationMs] = useState<number>(map.stats.durationMs || 1000);
   const [playbackRate, setPlaybackRate] = useState<number>(1.0);
-  const [volume, setVolume] = useState<number>(0.8);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const { volume, isMuted, getEffectiveVolume } = useAudioStore();
   const bgDim = 0.85;
   const [activeMods, setActiveMods] = useState<Set<OsuMod>>(new Set());
   const [copiedTime, setCopiedTime] = useState<boolean>(false);
@@ -94,7 +94,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [selectedPatternId, setSelectedPatternId] = useState<string | undefined>(initialPatternId);
   const [isLoopEnabled, setIsLoopEnabled] = useState<boolean>(false);
-  const [hasAudioTrack, setHasAudioTrack] = useState<boolean>(false);
+  const [_hasAudioTrack, setHasAudioTrack] = useState<boolean>(false);
   const [patternCategory, setPatternCategory] = useState<PatternCategory>('TODOS');
   const [audioStatus, setAudioStatus] = useState<AudioResolveStatus>({
     state: 'idle',
@@ -162,22 +162,31 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     });
   }, [detectedPatterns, patternCategory]);
 
-  const livePattern = useMemo(() => {
-    return (
-      detectedPatterns.find(
-        (p) => currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs
-      ) || null
+  // All patterns that are currently live ("AO VIVO" with glowing border)
+  const livePatterns = useMemo(() => {
+    return filteredPatterns.filter(
+      (p) => currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs
     );
-  }, [detectedPatterns, currentTimeMs]);
+  }, [filteredPatterns, currentTimeMs]);
+
+  // Primary live pattern holding 1st place (top position in view).
+  // When multiple patterns are active simultaneously, the first one keeps 1st place;
+  // subsequent patterns stay in 2nd place until the 1st exits scene.
+  const activeTopLivePattern = useMemo(() => {
+    if (livePatterns.length === 0) return null;
+    return livePatterns[0];
+  }, [livePatterns]);
+
+  const livePattern = activeTopLivePattern;
 
   const currentOrRecentPattern = useMemo(() => {
-    if (livePattern) return livePattern;
-    const pastPatterns = detectedPatterns.filter((p) => currentTimeMs >= p.startTimeMs);
+    if (activeTopLivePattern) return activeTopLivePattern;
+    const pastPatterns = filteredPatterns.filter((p) => currentTimeMs >= p.startTimeMs);
     if (pastPatterns.length > 0) {
       return pastPatterns[pastPatterns.length - 1];
     }
-    return detectedPatterns.find((p) => p.id === selectedPatternId) || null;
-  }, [detectedPatterns, currentTimeMs, livePattern, selectedPatternId]);
+    return filteredPatterns.find((p) => p.id === selectedPatternId) || null;
+  }, [filteredPatterns, currentTimeMs, activeTopLivePattern, selectedPatternId]);
 
   // Initialize OsuPreviewController
   useEffect(() => {
@@ -185,6 +194,9 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
 
     const controller = new OsuPreviewController(canvasRef.current);
     controllerRef.current = controller;
+    registerVisualizerPauseCallback(() => {
+      controller.pause();
+    });
 
     const initialMods = new Set<OsuMod>();
     if (slotMod) {
@@ -195,7 +207,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     controller
       .init(rawText, initialTimeMs, map.audioBlob || map.audioUrl, initialMods)
       .then(() => {
-        controller.setVolume(volume);
+        controller.setVolume(getEffectiveVolume());
+        controller.setMuted(isMuted);
         controller.setBackgroundDim(bgDim);
       });
 
@@ -231,6 +244,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
 
     return () => {
       isCancelled = true;
+      registerVisualizerPauseCallback(null);
       unsubscribe();
       window.removeEventListener('resize', handleResize);
       resizeObserver?.disconnect();
@@ -239,31 +253,61 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     };
   }, [map.id]);
 
-  // Auto-scroll list to active pattern
-  useEffect(() => {
-    const targetToScroll = livePattern || currentOrRecentPattern;
-    if (targetToScroll && isPlaying && patternsListRef.current) {
-      const container = patternsListRef.current;
-      const activeEl = document.getElementById(`pattern-row-${targetToScroll.id}`);
-      if (activeEl) {
-        const containerRect = container.getBoundingClientRect();
-        const elementRect = activeEl.getBoundingClientRect();
+  // Ref tracking which pattern currently holds the top scroll position
+  const lastScrolledPatternIdRef = useRef<string | null>(null);
 
-        if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
-          const offsetTop = activeEl.offsetTop - container.offsetTop;
-          container.scrollTo({
-            top: Math.max(0, offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2),
-            behavior: 'smooth',
-          });
-        }
+  // Auto-scroll list: Prioritizes keeping the active live pattern pinned at the top (1st place)
+  // When multiple patterns are active simultaneously, the first holds 1st place;
+  // when it exits, the subsequent active pattern assumes 1st place and scrolls the list up.
+  useEffect(() => {
+    if (!patternsListRef.current) return;
+    const container = patternsListRef.current;
+
+    const target = activeTopLivePattern;
+    if (!target) {
+      lastScrolledPatternIdRef.current = null;
+      return;
+    }
+
+    if (lastScrolledPatternIdRef.current === target.id) {
+      return;
+    }
+
+    const activeEl = document.getElementById(`pattern-row-${target.id}`);
+    if (activeEl) {
+      lastScrolledPatternIdRef.current = target.id;
+      const containerRect = container.getBoundingClientRect();
+      const activeRect = activeEl.getBoundingClientRect();
+      const relativeTop = activeRect.top - containerRect.top + container.scrollTop;
+      const targetTop = Math.max(0, relativeTop - 6);
+
+      if (Math.abs(container.scrollTop - targetTop) > 4) {
+        container.scrollTo({
+          top: targetTop,
+          behavior: 'smooth',
+        });
       }
     }
-  }, [livePattern?.id, currentOrRecentPattern?.id, isPlaying]);
+  }, [activeTopLivePattern?.id]);
 
   const jumpToPattern = useCallback(
     (p: DetectedPattern) => {
       previewAudioManager.stop();
       setSelectedPatternId(p.id);
+      lastScrolledPatternIdRef.current = p.id;
+      if (patternsListRef.current) {
+        const container = patternsListRef.current;
+        const activeEl = document.getElementById(`pattern-row-${p.id}`);
+        if (activeEl) {
+          const containerRect = container.getBoundingClientRect();
+          const activeRect = activeEl.getBoundingClientRect();
+          const relativeTop = activeRect.top - containerRect.top + container.scrollTop;
+          container.scrollTo({
+            top: Math.max(0, relativeTop - 6),
+            behavior: 'smooth',
+          });
+        }
+      }
       if (controllerRef.current) {
         controllerRef.current.seek(p.startTimeMs);
         controllerRef.current.play();
@@ -307,6 +351,25 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     if (controllerRef.current) {
       controllerRef.current.seek(val);
     }
+    const closest =
+      filteredPatterns.find((p) => val >= p.startTimeMs && val <= p.endTimeMs) ||
+      filteredPatterns.find((p) => p.startTimeMs >= val) ||
+      filteredPatterns[filteredPatterns.length - 1];
+
+    if (closest && patternsListRef.current) {
+      const container = patternsListRef.current;
+      const el = document.getElementById(`pattern-row-${closest.id}`);
+      if (el) {
+        lastScrolledPatternIdRef.current = closest.id;
+        const containerRect = container.getBoundingClientRect();
+        const activeRect = el.getBoundingClientRect();
+        const relativeTop = activeRect.top - containerRect.top + container.scrollTop;
+        container.scrollTo({
+          top: Math.max(0, relativeTop - 6),
+          behavior: 'smooth',
+        });
+      }
+    }
   };
 
   const handleStep = (deltaMs: number) => {
@@ -330,24 +393,14 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     setPlaybackRate(controllerRef.current.getPlaybackRate());
   };
 
-  const handleVolumeChange = (newVol: number) => {
-    setVolume(newVol);
+  // Synchronize visualizer audio with the page's global volume
+  useEffect(() => {
     if (controllerRef.current) {
-      controllerRef.current.setVolume(newVol);
-      if (newVol > 0 && isMuted) {
-        setIsMuted(false);
-        controllerRef.current.setMuted(false);
-      }
+      const eff = getEffectiveVolume();
+      controllerRef.current.setVolume(eff);
+      controllerRef.current.setMuted(isMuted);
     }
-  };
-
-  const handleToggleMute = () => {
-    const nextMuted = !isMuted;
-    setIsMuted(nextMuted);
-    if (controllerRef.current) {
-      controllerRef.current.setMuted(nextMuted);
-    }
-  };
+  }, [volume, isMuted, getEffectiveVolume]);
 
   const copyEditorTimestamp = () => {
     const text = formatOsuEditorTimestamp(currentTimeMs);
@@ -458,21 +511,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             {map.modSlot || 'NM'}
           </span>
 
-          {hasAudioTrack ? (
-            <span
-              className="osu-radar-mod-pill"
-              style={{
-                backgroundColor: 'hsl(var(--hsl-lime-3))',
-                color: '#fff',
-                fontSize: '9px',
-                gap: '4px',
-              }}
-              title="Música do beatmap sincronizada via AudioContext"
-            >
-              <i className="fas fa-music" />
-              <span>ÁUDIO ATIVO</span>
-            </span>
-          ) : audioStatus.state === 'loading' ? (
+          {audioStatus.state === 'loading' ? (
             <span
               className="osu-radar-mod-pill"
               style={{
@@ -550,7 +589,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             </div>
           )}
 
-          {livePattern && (
+          {activeTopLivePattern && (
             <div
               style={{
                 position: 'absolute',
@@ -568,7 +607,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               }}
             >
               <i className="fas fa-circle" style={{ color: 'hsl(var(--hsl-h1))', fontSize: '7px' }} />
-              <span>{livePattern.label}</span>
+              <span>
+                {activeTopLivePattern.label}
+                {livePatterns.length > 1 ? ` (+${livePatterns.length - 1})` : ''}
+              </span>
             </div>
           )}
         </div>
@@ -677,29 +719,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                 {speed}x
               </button>
             ))}
-          </div>
-
-          {/* Volume Control */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={handleToggleMute}
-              className="btn-osu-big btn-osu-big--rounded-small"
-              title={isMuted ? 'Desmutar áudio' : 'Mutar áudio'}
-            >
-              <i className={`fas fa-volume-${isMuted || volume === 0 ? 'mute' : 'up'}`} />
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={isMuted ? 0 : volume}
-              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-              className="osu-radar-player__range"
-              style={{ width: '75px' }}
-              title="Volume"
-            />
           </div>
         </div>
       </div>

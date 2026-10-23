@@ -20,9 +20,10 @@ const DEFAULT_SHEET_URL =
 
 export const PoolSheetSync: React.FC = () => {
   const [sheetUrl, setSheetUrl] = useState(DEFAULT_SHEET_URL);
+  const [tournamentName, setTournamentName] = useState('6 Digit World Cup 2026');
   const [isLoadingSheet, setIsLoadingSheet] = useState(false);
   const [stages, setStages] = useState<SheetStageGroup[]>([]);
-  const [selectedStageName, setSelectedStageName] = useState<string>('');
+  const [selectedStageNames, setSelectedStageNames] = useState<Set<string>>(new Set());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -31,16 +32,55 @@ export const PoolSheetSync: React.FC = () => {
   const folderInputRef = useRef<HTMLInputElement>(null);
   const { addBeatmaps, setPoolMetadata, setActiveTournamentFilter } = usePoolStore();
 
-  const selectedStage = stages.find((s) => s.stageName === selectedStageName) || stages[0];
+  const selectedStages = stages.filter((s) => selectedStageNames.has(s.stageName));
+  const totalMapCount = stages.reduce((acc, s) => acc + s.entries.length, 0);
+
+  // Flattened list of all entries from the selected stages
+  const selectedEntries = React.useMemo(() => {
+    const list: Array<SheetBeatmapEntry & { stageName: string }> = [];
+    for (const stage of selectedStages) {
+      for (const entry of stage.entries) {
+        list.push({
+          ...entry,
+          stageName: stage.stageName,
+        });
+      }
+    }
+    return list;
+  }, [selectedStages]);
+
+  const isAllSelected = stages.length > 0 && selectedStageNames.size === stages.length;
+
+  const toggleAllStages = () => {
+    if (isAllSelected) {
+      setSelectedStageNames(new Set());
+    } else {
+      setSelectedStageNames(new Set(stages.map((s) => s.stageName)));
+    }
+  };
+
+  const toggleStage = (stageName: string) => {
+    setSelectedStageNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(stageName)) {
+        next.delete(stageName);
+      } else {
+        next.add(stageName);
+      }
+      return next;
+    });
+  };
 
   React.useEffect(() => {
-    if (selectedStage && selectedStage.entries.length > 0) {
+    if (selectedEntries.length > 0) {
       setActiveTournamentFilter({
-        stageName: selectedStage.stageName,
-        entries: selectedStage.entries,
+        stageName: selectedStages.map((s) => s.stageName).join(', '),
+        entries: selectedEntries,
       });
+    } else {
+      setActiveTournamentFilter(null);
     }
-  }, [selectedStage, setActiveTournamentFilter]);
+  }, [selectedEntries, selectedStages, setActiveTournamentFilter]);
 
   const handleFetchSheet = async () => {
     setErrorMessage(null);
@@ -61,12 +101,10 @@ export const PoolSheetSync: React.FC = () => {
       }
 
       setStages(parsedStages);
-      setSelectedStageName(parsedStages[0].stageName);
-      setActiveTournamentFilter({
-        stageName: parsedStages[0].stageName,
-        entries: parsedStages[0].entries,
-      });
-      setStatusMessage(`Planilha carregada com sucesso! ${parsedStages.length} etapas encontradas.`);
+      // Select all stages by default for convenience
+      setSelectedStageNames(new Set(parsedStages.map((s) => s.stageName)));
+      const count = parsedStages.reduce((acc, s) => acc + s.entries.length, 0);
+      setStatusMessage(`Planilha carregada com sucesso! ${parsedStages.length} etapas encontradas (${count} mapas no total).`);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : String(err));
     } finally {
@@ -75,7 +113,12 @@ export const PoolSheetSync: React.FC = () => {
   };
 
   const handleLocalFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0 || !selectedStage) return;
+    if (!e.target.files || e.target.files.length === 0 || selectedEntries.length === 0) {
+      if (selectedEntries.length === 0) {
+        setErrorMessage('Selecione pelo menos uma etapa para importar.');
+      }
+      return;
+    }
 
     const files = Array.from(e.target.files);
     setErrorMessage(null);
@@ -83,12 +126,7 @@ export const PoolSheetSync: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      const requiredEntries = selectedStage.entries;
-      const idToEntry = new Map<number, SheetBeatmapEntry>();
-      for (const entry of requiredEntries) {
-        if (entry.beatmapId > 0) idToEntry.set(entry.beatmapId, entry);
-      }
-
+      const requiredEntries = selectedEntries;
       const osuFiles = files.filter((f) => f.name.toLowerCase().endsWith('.osu'));
       const oszFiles = files.filter((f) => f.name.toLowerCase().endsWith('.osz') || f.name.toLowerCase().endsWith('.zip'));
 
@@ -101,10 +139,10 @@ export const PoolSheetSync: React.FC = () => {
       const matchedOsuItems: Array<{
         text: string;
         fileName: string;
-        entry: SheetBeatmapEntry;
+        entry: SheetBeatmapEntry & { stageName: string };
         audioBlob?: Blob;
       }> = [];
-      const foundIds = new Set<number>();
+      const foundCompositeKeys = new Set<string>();
 
       for (let i = 0; i < osuFiles.length; i++) {
         const file = osuFiles[i];
@@ -119,26 +157,29 @@ export const PoolSheetSync: React.FC = () => {
 
         const text = await file.text();
         const meta = extractQuickOsuMeta(text);
-        const matched = matchOsuFileToTournamentEntry(meta, requiredEntries);
+        const matched = matchOsuFileToTournamentEntry(meta, requiredEntries) as (SheetBeatmapEntry & { stageName: string }) | undefined;
 
-        if (matched && !foundIds.has(matched.beatmapId)) {
-          foundIds.add(matched.beatmapId);
+        if (matched) {
+          const compKey = `${matched.stageName}-${matched.beatmapId || matched.slot}`;
+          if (!foundCompositeKeys.has(compKey)) {
+            foundCompositeKeys.add(compKey);
 
-          const dirPath = (file as any).webkitRelativePath
-            ? (file as any).webkitRelativePath.split('/').slice(0, -1).join('/')
-            : '';
-          let audioBlob: Blob | undefined;
-          if (dirPath) {
-            const companionAudio = files.find((f: any) => {
-              const fDir = f.webkitRelativePath ? f.webkitRelativePath.split('/').slice(0, -1).join('/') : '';
-              return fDir === dirPath && (f.name.endsWith('.mp3') || f.name.endsWith('.ogg'));
-            });
-            if (companionAudio) {
-              audioBlob = new Blob([await companionAudio.arrayBuffer()], { type: 'audio/mpeg' });
+            const dirPath = (file as any).webkitRelativePath
+              ? (file as any).webkitRelativePath.split('/').slice(0, -1).join('/')
+              : '';
+            let audioBlob: Blob | undefined;
+            if (dirPath) {
+              const companionAudio = files.find((f: any) => {
+                const fDir = f.webkitRelativePath ? f.webkitRelativePath.split('/').slice(0, -1).join('/') : '';
+                return fDir === dirPath && (f.name.endsWith('.mp3') || f.name.endsWith('.ogg'));
+              });
+              if (companionAudio) {
+                audioBlob = new Blob([await companionAudio.arrayBuffer()], { type: 'audio/mpeg' });
+              }
             }
-          }
 
-          matchedOsuItems.push({ text, fileName: file.name, entry: matched, audioBlob });
+            matchedOsuItems.push({ text, fileName: file.name, entry: matched, audioBlob });
+          }
         }
 
         if (matchedOsuItems.length === requiredEntries.length) break;
@@ -157,15 +198,18 @@ export const PoolSheetSync: React.FC = () => {
           const extracted = await extractOsuFilesFromZip(buf);
           for (const item of extracted) {
             const meta = extractQuickOsuMeta(item.text);
-            const matched = matchOsuFileToTournamentEntry(meta, requiredEntries);
-            if (matched && !foundIds.has(matched.beatmapId)) {
-              foundIds.add(matched.beatmapId);
-              matchedOsuItems.push({
-                text: item.text,
-                fileName: item.fileName,
-                entry: matched,
-                audioBlob: item.audioBlob,
-              });
+            const matched = matchOsuFileToTournamentEntry(meta, requiredEntries) as (SheetBeatmapEntry & { stageName: string }) | undefined;
+            if (matched) {
+              const compKey = `${matched.stageName}-${matched.beatmapId || matched.slot}`;
+              if (!foundCompositeKeys.has(compKey)) {
+                foundCompositeKeys.add(compKey);
+                matchedOsuItems.push({
+                  text: item.text,
+                  fileName: item.fileName,
+                  entry: matched,
+                  audioBlob: item.audioBlob,
+                });
+              }
             }
           }
         }
@@ -173,32 +217,37 @@ export const PoolSheetSync: React.FC = () => {
 
       if (matchedOsuItems.length === 0) {
         throw new Error(
-          `Nenhum dos ${requiredEntries.length} mapas da etapa "${selectedStage.stageName}" foi encontrado na pasta selecionada.`
+          `Nenhum dos ${requiredEntries.length} mapas das etapas selecionadas foi encontrado na pasta.`
         );
       }
 
       const results: BeatmapAnalysisResult[] = [];
+      const cleanTourney = tournamentName.trim() || 'Torneio';
+
       for (let i = 0; i < matchedOsuItems.length; i++) {
         const item = matchedOsuItems[i];
         setProcessProgress({
           current: i + 1,
           total: matchedOsuItems.length,
-          label: `Analisando física de ${item.entry.slot}: ${item.entry.songInfo.slice(0, 35)}...`,
+          label: `Analisando [${item.entry.stageName}] ${item.entry.slot}: ${item.entry.songInfo.slice(0, 30)}...`,
         });
         await new Promise((r) => setTimeout(r, 5));
 
         const analysis = await analyzeBeatmap(item.text, item.fileName, undefined, item.entry.sr, item.audioBlob);
         analysis.modSlot = item.entry.slot;
+        analysis.tournamentName = cleanTourney;
+        analysis.stageName = item.entry.stageName;
+        analysis.id = `${item.entry.beatmapId || analysis.id}_${cleanTourney}_${item.entry.stageName}`.replace(/[^a-zA-Z0-9_-]/g, '_');
         if (item.entry.sr) analysis.stats.starRating = item.entry.sr;
         if (item.entry.bpm) analysis.stats.bpmMode = item.entry.bpm;
         results.push(analysis);
       }
 
-      setPoolMetadata('6 Digit World Cup 2026', selectedStage.stageName);
+      setPoolMetadata(cleanTourney, selectedStages.map((s) => s.stageName).join(', '));
       await addBeatmaps(results);
 
       setStatusMessage(
-        `Sucesso! ${results.length} de ${requiredEntries.length} mapas da etapa "${selectedStage.stageName}" foram filtrados da sua pasta local e importados com seus slots exatos!`
+        `Sucesso! ${results.length} de ${requiredEntries.length} mapas das ${selectedStages.length} etapas selecionadas do torneio "${cleanTourney}" foram importados!`
       );
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : String(err));
@@ -210,43 +259,51 @@ export const PoolSheetSync: React.FC = () => {
   };
 
   const handleDownloadFromWeb = async () => {
-    if (!selectedStage) return;
+    if (selectedEntries.length === 0) {
+      setErrorMessage('Selecione pelo menos uma etapa para baixar.');
+      return;
+    }
+
     setErrorMessage(null);
     setStatusMessage(null);
     setIsProcessing(true);
 
     try {
-      const requiredEntries = selectedStage.entries;
+      const requiredEntries = selectedEntries;
       const results: BeatmapAnalysisResult[] = [];
       const errors: string[] = [];
+      const cleanTourney = tournamentName.trim() || 'Torneio';
 
       for (let i = 0; i < requiredEntries.length; i++) {
         const entry = requiredEntries[i];
         setProcessProgress({
           current: i + 1,
           total: requiredEntries.length,
-          label: `Baixando ${entry.slot} (#${entry.beatmapId}) via mirror...`,
+          label: `Baixando [${entry.stageName}] ${entry.slot} (#${entry.beatmapId}) via mirror...`,
         });
 
         try {
           const osuText = await fetchOsuFileById(entry.beatmapId);
           const analysis = await analyzeBeatmap(osuText, `${entry.slot}_${entry.beatmapId}.osu`, undefined, entry.sr);
           analysis.modSlot = entry.slot;
+          analysis.tournamentName = cleanTourney;
+          analysis.stageName = entry.stageName;
+          analysis.id = `${entry.beatmapId}_${cleanTourney}_${entry.stageName}`.replace(/[^a-zA-Z0-9_-]/g, '_');
           if (entry.sr) analysis.stats.starRating = entry.sr;
           if (entry.bpm) analysis.stats.bpmMode = entry.bpm;
           results.push(analysis);
         } catch {
-          errors.push(entry.slot);
+          errors.push(`[${entry.stageName}] ${entry.slot}`);
         }
 
         await new Promise((r) => setTimeout(r, 60));
       }
 
       if (results.length > 0) {
-        setPoolMetadata('6 Digit World Cup 2026', selectedStage.stageName);
+        setPoolMetadata(cleanTourney, selectedStages.map((s) => s.stageName).join(', '));
         await addBeatmaps(results);
         setStatusMessage(
-          `Download concluído! ${results.length} de ${requiredEntries.length} mapas foram baixados e analisados com sucesso.`
+          `Download concluído! ${results.length} de ${requiredEntries.length} mapas foram baixados para o torneio "${cleanTourney}"!`
         );
       }
 
@@ -275,8 +332,8 @@ export const PoolSheetSync: React.FC = () => {
         style={{ display: 'none' }}
       />
 
-      {/* URL Input Bar */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {/* Tournament Name & Sheet URL Input Bar */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <div
           style={{
             display: 'flex',
@@ -288,12 +345,15 @@ export const PoolSheetSync: React.FC = () => {
           }}
         >
           <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <i className="fas fa-link" style={{ color: 'hsl(var(--hsl-h1))' }} />
-            Link da Planilha de Torneio (Google Sheets)
+            <i className="fas fa-trophy" style={{ color: '#e5b32e' }} />
+            Importação de Planilhas e Etapas de Torneio (Google Sheets)
           </span>
           <button
             type="button"
-            onClick={() => setSheetUrl(DEFAULT_SHEET_URL)}
+            onClick={() => {
+              setSheetUrl(DEFAULT_SHEET_URL);
+              setTournamentName('6 Digit World Cup 2026');
+            }}
             style={{
               background: 'none',
               border: 'none',
@@ -311,37 +371,66 @@ export const PoolSheetSync: React.FC = () => {
           </button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            value={sheetUrl}
-            onChange={(e) => setSheetUrl(e.target.value)}
-            placeholder="Cole o link da planilha do Google Sheets aqui..."
-            style={{
-              flex: 1,
-              minWidth: '240px',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              backgroundColor: 'hsl(var(--hsl-b5))',
-              border: '1px solid hsl(var(--hsl-b2))',
-              color: '#fff',
-              fontSize: '12px',
-              fontFamily: 'AzeretMono, monospace',
-              outline: 'none',
-            }}
-          />
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
+          {/* Tournament Name Input */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '180px', flex: '0 1 240px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: 'hsl(var(--hsl-l2))' }}>
+              Nome do Torneio:
+            </label>
+            <input
+              type="text"
+              value={tournamentName}
+              onChange={(e) => setTournamentName(e.target.value)}
+              placeholder="Ex: 6WC 2026, OWC 2025..."
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                backgroundColor: 'hsl(var(--hsl-b5))',
+                border: '1px solid hsl(var(--hsl-b2))',
+                color: '#fff',
+                fontSize: '12px',
+                fontWeight: 600,
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          {/* Sheet URL Input */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '260px', flex: 1 }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: 'hsl(var(--hsl-l2))' }}>
+              Link da Planilha (Google Sheets):
+            </label>
+            <input
+              type="text"
+              value={sheetUrl}
+              onChange={(e) => setSheetUrl(e.target.value)}
+              placeholder="Cole o link da planilha do Google Sheets aqui..."
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                backgroundColor: 'hsl(var(--hsl-b5))',
+                border: '1px solid hsl(var(--hsl-b2))',
+                color: '#fff',
+                fontSize: '12px',
+                fontFamily: 'AzeretMono, monospace',
+                outline: 'none',
+              }}
+            />
+          </div>
 
           <button
             type="button"
             onClick={handleFetchSheet}
             disabled={isLoadingSheet || !sheetUrl.trim()}
             className="btn-osu-big btn-osu-big--beatmapset-header"
-            style={{ padding: '8px 18px', width: 'auto' }}
+            style={{ padding: '8px 18px', width: 'auto', height: '35px' }}
           >
             <span className="btn-osu-big__content">
               <span className="btn-osu-big__left">
                 <span className="btn-osu-big__text-top">
-                  {isLoadingSheet ? 'Importando...' : 'Importar'}
+                  {isLoadingSheet ? 'Importando...' : 'Carregar Planilha'}
                 </span>
               </span>
               <span className="btn-osu-big__icon">
@@ -353,7 +442,7 @@ export const PoolSheetSync: React.FC = () => {
       </div>
 
       {/* Stage Selector and Beatmap Checklist */}
-      {stages.length > 0 && selectedStage && (
+      {stages.length > 0 && (
         <div
           style={{
             display: 'flex',
@@ -364,35 +453,60 @@ export const PoolSheetSync: React.FC = () => {
             padding: '15px',
           }}
         >
-          {/* Stage Tabs using osu-web .sort */}
+          {/* Stage Tabs & Multi-select Buttons */}
           <div
             style={{
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: 'column',
               gap: '8px',
-              flexWrap: 'wrap',
               paddingBottom: '10px',
               borderBottom: '1px solid hsl(var(--hsl-b3))',
             }}
           >
-            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'hsl(var(--hsl-l2))' }}>
-              <i className="fas fa-layer-group" style={{ marginRight: '5px', color: 'hsl(var(--hsl-h1))' }} />
-              Etapas:
-            </span>
-            {stages.map((stage) => {
-              const isSelected = stage.stageName === selectedStage.stageName;
-              return (
-                <button
-                  key={stage.stageName}
-                  type="button"
-                  onClick={() => setSelectedStageName(stage.stageName)}
-                  className={`osu-radar-player__mod-btn ${isSelected ? 'osu-radar-player__mod-btn--active' : ''}`}
-                  style={{ padding: '4px 10px', fontSize: '11px' }}
-                >
-                  {stage.stageName} ({stage.entries.length})
-                </button>
-              );
-            })}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'hsl(var(--hsl-l2))' }}>
+                <i className="fas fa-layer-group" style={{ marginRight: '5px', color: 'hsl(var(--hsl-h1))' }} />
+                Selecionar Etapas para Importar:
+              </span>
+              <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-c1))', fontWeight: 600 }}>
+                {selectedStages.length === stages.length
+                  ? `Todas as ${stages.length} etapas selecionadas (${selectedEntries.length} mapas)`
+                  : `${selectedStages.length} de ${stages.length} etapas selecionadas (${selectedEntries.length} mapas)`}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              {/* Select All Button */}
+              <button
+                type="button"
+                onClick={toggleAllStages}
+                className={`osu-radar-player__mod-btn ${isAllSelected ? 'osu-radar-player__mod-btn--active' : ''}`}
+                style={{ padding: '5px 12px', fontSize: '11px', fontWeight: 800 }}
+              >
+                <i className={`fas ${isAllSelected ? 'fa-check-square' : 'fa-square'}`} style={{ marginRight: '6px' }} />
+                TODAS AS ETAPAS ({totalMapCount})
+              </button>
+
+              {/* Individual Stage Toggle Buttons */}
+              {stages.map((stage) => {
+                const isSelected = selectedStageNames.has(stage.stageName);
+                return (
+                  <button
+                    key={stage.stageName}
+                    type="button"
+                    onClick={() => toggleStage(stage.stageName)}
+                    className={`osu-radar-player__mod-btn ${isSelected ? 'osu-radar-player__mod-btn--active' : ''}`}
+                    style={{ padding: '4px 10px', fontSize: '11px' }}
+                  >
+                    <i
+                      className={`fas ${isSelected ? 'fa-check-circle' : 'fa-circle'}`}
+                      style={{ marginRight: '5px', fontSize: '9px', opacity: isSelected ? 1 : 0.4 }}
+                    />
+                    {stage.stageName} ({stage.entries.length})
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Action Buttons to Source the Beatmaps */}
@@ -405,7 +519,7 @@ export const PoolSheetSync: React.FC = () => {
           >
             <button
               type="button"
-              disabled={isProcessing}
+              disabled={isProcessing || selectedEntries.length === 0}
               onClick={() => folderInputRef.current?.click()}
               className="btn-osu-big btn-osu-big--beatmapset-header"
               style={{ padding: '10px 16px' }}
@@ -414,7 +528,7 @@ export const PoolSheetSync: React.FC = () => {
                 <span className="btn-osu-big__left">
                   <span className="btn-osu-big__text-top">Filtrar da Pasta do osu! (Songs)</span>
                   <span className="btn-osu-big__text-bottom">
-                    Importa somente os {selectedStage.entries.length} mapas desta etapa
+                    Importa os {selectedEntries.length} mapas das {selectedStages.length} etapas selecionadas
                   </span>
                 </span>
                 <span className="btn-osu-big__icon">
@@ -425,7 +539,7 @@ export const PoolSheetSync: React.FC = () => {
 
             <button
               type="button"
-              disabled={isProcessing}
+              disabled={isProcessing || selectedEntries.length === 0}
               onClick={handleDownloadFromWeb}
               className="btn-osu-big btn-osu-big--beatmapset-header"
               style={{ padding: '10px 16px' }}
@@ -434,7 +548,7 @@ export const PoolSheetSync: React.FC = () => {
                 <span className="btn-osu-big__left">
                   <span className="btn-osu-big__text-top">Baixar da Web via Mirrors</span>
                   <span className="btn-osu-big__text-bottom">
-                    Download direto dos {selectedStage.entries.length} arquivos .osu por ID
+                    Download direto dos {selectedEntries.length} arquivos .osu por ID
                   </span>
                 </span>
                 <span className="btn-osu-big__icon">
@@ -456,25 +570,25 @@ export const PoolSheetSync: React.FC = () => {
                 marginBottom: '8px',
               }}
             >
-              Mapas definidos para {selectedStage.stageName} ({selectedStage.entries.length} mapas):
+              Mapas a importar ({selectedEntries.length} mapas em {selectedStages.length} etapas):
             </span>
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
                 gap: '6px',
-                maxHeight: '190px',
+                maxHeight: '220px',
                 overflowY: 'auto',
                 paddingRight: '4px',
               }}
             >
-              {selectedStage.entries.map((entry) => {
+              {selectedEntries.map((entry) => {
                 const modPrefix = entry.slot.slice(0, 2).toUpperCase();
                 const modColor = TOURNAMENT_MOD_COLORS[modPrefix] || TOURNAMENT_MOD_COLORS.NM;
 
                 return (
                   <div
-                    key={`${entry.slot}-${entry.beatmapId}`}
+                    key={`${entry.stageName}-${entry.slot}-${entry.beatmapId}`}
                     style={{
                       padding: '6px 10px',
                       borderRadius: '6px',
@@ -493,8 +607,21 @@ export const PoolSheetSync: React.FC = () => {
                         {entry.slot}
                       </span>
                       <span
+                        style={{
+                          fontSize: '10px',
+                          padding: '1px 5px',
+                          borderRadius: '4px',
+                          backgroundColor: 'hsl(var(--hsl-b3))',
+                          color: 'hsl(var(--hsl-h1))',
+                          fontWeight: 700,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {entry.stageName}
+                      </span>
+                      <span
                         className="u-ellipsis-overflow"
-                        style={{ fontSize: '12px', color: '#fff', fontWeight: 600 }}
+                        style={{ fontSize: '11px', color: '#fff', fontWeight: 600 }}
                       >
                         {entry.songInfo}
                       </span>

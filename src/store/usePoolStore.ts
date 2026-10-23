@@ -22,6 +22,8 @@ export type SortOption =
   | 'fingerControl'
   | 'readingTech';
 
+export type SortDirection = 'asc' | 'desc';
+
 export interface AudioSyncStatus {
   isSyncing: boolean;
   current: number;
@@ -34,8 +36,11 @@ interface PoolState {
   currentPool: Mappool;
   selectedMapId: string | null;
   filterMod: string; // 'ALL', 'NM', 'HD', 'HR', 'DT', 'FM', 'TB'
+  filterTournament: string; // 'ALL' or specific tournament name
+  filterStage: string; // 'ALL' or specific stage name
   searchQuery: string;
   sortBy: SortOption;
+  sortDirection: SortDirection;
   tournamentTier: TournamentTier;
   isAnalyzing: boolean;
   progress: { current: number; total: number; fileName: string } | null;
@@ -50,8 +55,12 @@ interface PoolState {
   updateModSlot: (id: string, newSlot: string) => void;
   selectMap: (id: string | null) => void;
   setFilterMod: (mod: string) => void;
+  setFilterTournament: (tournament: string) => void;
+  setFilterStage: (stage: string) => void;
   setSearchQuery: (query: string) => void;
   setSortBy: (sort: SortOption) => void;
+  setSortDirection: (dir: SortDirection) => void;
+  toggleSort: (option: SortOption) => void;
   setTournamentTier: (tier: TournamentTier) => void;
   setIsMatchSimulatorOpen: (open: boolean) => void;
   setExpandedSetKey: (key: string | null) => void;
@@ -80,8 +89,11 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   },
   selectedMapId: null,
   filterMod: 'ALL',
+  filterTournament: 'ALL',
+  filterStage: 'ALL',
   searchQuery: '',
   sortBy: 'slot',
+  sortDirection: 'asc',
   tournamentTier: 'open_rank',
   isAnalyzing: false,
   progress: null,
@@ -152,8 +164,22 @@ export const usePoolStore = create<PoolState>((set, get) => ({
 
   selectMap: (id) => set({ selectedMapId: id }),
   setFilterMod: (filterMod) => set({ filterMod }),
+  setFilterTournament: (filterTournament) => set({ filterTournament }),
+  setFilterStage: (filterStage) => set({ filterStage }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSortBy: (sortBy) => set({ sortBy }),
+  setSortDirection: (sortDirection) => set({ sortDirection }),
+  toggleSort: (option) => {
+    const { sortBy, sortDirection } = get();
+    if (sortBy === option) {
+      set({ sortDirection: sortDirection === 'desc' ? 'asc' : 'desc' });
+    } else {
+      set({
+        sortBy: option,
+        sortDirection: 'desc', // User requested: newly clicked filter starts descending, next click toggles ascending
+      });
+    }
+  },
   setPoolMetadata: (name, stage) =>
     set((state) => ({
       currentPool: {
@@ -344,13 +370,26 @@ export function getFilteredAndSortedMaps(
   maps: BeatmapAnalysisResult[],
   filterMod: string,
   searchQuery: string,
-  sortBy: SortOption
+  sortBy: SortOption,
+  sortDirection: SortDirection = 'desc',
+  filterTournament: string = 'ALL',
+  filterStage: string = 'ALL'
 ): BeatmapAnalysisResult[] {
   let filtered = maps;
 
   // Filter by Mod
   if (filterMod !== 'ALL') {
     filtered = filtered.filter((m) => m.modSlot?.startsWith(filterMod));
+  }
+
+  // Filter by Tournament (when specific tournament is chosen)
+  if (filterTournament && filterTournament !== 'ALL') {
+    filtered = filtered.filter((m) => m.tournamentName === filterTournament);
+  }
+
+  // Filter by Stage / Pool difficulty (when specific stage is chosen)
+  if (filterStage && filterStage !== 'ALL') {
+    filtered = filtered.filter((m) => m.stageName === filterStage);
   }
 
   // Filter by Search Query
@@ -362,7 +401,9 @@ export function getFilteredAndSortedMaps(
         m.metadata.artist.toLowerCase().includes(q) ||
         m.metadata.version.toLowerCase().includes(q) ||
         m.metadata.creator.toLowerCase().includes(q) ||
-        (m.modSlot && m.modSlot.toLowerCase().includes(q))
+        (m.modSlot && m.modSlot.toLowerCase().includes(q)) ||
+        (m.tournamentName && m.tournamentName.toLowerCase().includes(q)) ||
+        (m.stageName && m.stageName.toLowerCase().includes(q))
     );
   }
 
@@ -378,24 +419,31 @@ export function getFilteredAndSortedMaps(
   };
 
   sorted.sort((a, b) => {
+    let diff = 0;
     if (sortBy === 'slot') {
       const modA = a.modSlot?.slice(0, 2) || 'ZZ';
       const modB = b.modSlot?.slice(0, 2) || 'ZZ';
       const orderDiff = (modOrder[modA] || 99) - (modOrder[modB] || 99);
-      if (orderDiff !== 0) return orderDiff;
-      return (a.modSlot || '').localeCompare(b.modSlot || '', undefined, { numeric: true });
+      if (orderDiff !== 0) {
+        diff = orderDiff;
+      } else {
+        diff = (a.modSlot || '').localeCompare(b.modSlot || '', undefined, { numeric: true });
+      }
+      return sortDirection === 'desc' ? -diff : diff;
     }
+
     if (sortBy === 'sr') {
-      return b.stats.starRating - a.stats.starRating;
+      diff = b.stats.starRating - a.stats.starRating;
+    } else if (sortBy === 'bpm') {
+      diff = b.stats.bpmMode - a.stats.bpmMode;
+    } else {
+      const skillKey = sortBy as keyof SkillAttributes;
+      if (skillKey in a.skills) {
+        diff = (b.skills[skillKey] || 0) - (a.skills[skillKey] || 0);
+      }
     }
-    if (sortBy === 'bpm') {
-      return b.stats.bpmMode - a.stats.bpmMode;
-    }
-    const skillKey = sortBy as keyof SkillAttributes;
-    if (skillKey in a.skills) {
-      return (b.skills[skillKey] || 0) - (a.skills[skillKey] || 0);
-    }
-    return 0;
+
+    return sortDirection === 'asc' ? -diff : diff;
   });
 
   return sorted;

@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { usePoolStore, getFilteredAndSortedMaps, SortOption } from './store/usePoolStore';
 import { LazerToolbar } from './components/layout/LazerToolbar';
 import { LazerBottomBar } from './components/layout/LazerBottomBar';
+import { LazerFloatingAudioPlayer } from './components/layout/LazerFloatingAudioPlayer';
 import { LazerWedge } from './components/beatmap/LazerWedge';
 import { LazerCarouselItem } from './components/beatmap/LazerCarouselItem';
 import { PoolOverview } from './components/pool/PoolOverview';
@@ -38,14 +39,20 @@ export const App: React.FC = () => {
     currentPool,
     selectedMapId,
     filterMod,
+    filterTournament,
+    filterStage,
     searchQuery,
     sortBy,
+    sortDirection,
+    toggleSort,
     selectMap,
     removeBeatmap,
     updateModSlot,
     setFilterMod,
+    setFilterTournament,
+    setFilterStage,
     setSearchQuery,
-    setSortBy,
+    setSortBy: _setSortBy,
     initFromDb,
     addBeatmaps,
     setIsAnalyzing,
@@ -79,7 +86,45 @@ export const App: React.FC = () => {
   }, [initFromDb]);
 
   const maps = currentPool.maps;
-  const filteredMaps = getFilteredAndSortedMaps(maps, filterMod, searchQuery, sortBy);
+
+  const availableTournaments = useMemo(() => {
+    return Array.from(
+      new Set(maps.map((m) => m.tournamentName).filter((t): t is string => Boolean(t && t.trim())))
+    );
+  }, [maps]);
+
+  const availableStages = useMemo(() => {
+    const pool =
+      filterTournament !== 'ALL'
+        ? maps.filter((m) => m.tournamentName === filterTournament)
+        : maps;
+    return Array.from(
+      new Set(pool.map((m) => m.stageName).filter((s): s is string => Boolean(s && s.trim())))
+    );
+  }, [maps, filterTournament]);
+
+  // Cleanly fallback if a selected tournament or stage filter was removed
+  useEffect(() => {
+    if (filterTournament !== 'ALL' && !availableTournaments.includes(filterTournament)) {
+      setFilterTournament('ALL');
+    }
+  }, [availableTournaments, filterTournament, setFilterTournament]);
+
+  useEffect(() => {
+    if (filterStage !== 'ALL' && !availableStages.includes(filterStage)) {
+      setFilterStage('ALL');
+    }
+  }, [availableStages, filterStage, setFilterStage]);
+
+  const filteredMaps = getFilteredAndSortedMaps(
+    maps,
+    filterMod,
+    searchQuery,
+    sortBy,
+    sortDirection,
+    filterTournament,
+    filterStage
+  );
   const activeMap = maps.find((m) => m.id === selectedMapId) || maps[0] || null;
 
   const activeCoverUrl = activeMap?.metadata.beatmapSetId
@@ -286,6 +331,92 @@ export const App: React.FC = () => {
                       })}
                     </div>
                   </div>
+
+                  {/* Tournament Filter Row (Shown when tournaments exist) */}
+                  {availableTournaments.length > 0 && (
+                    <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
+                      <span className="beatmapsets-search-filter__header">Torneio</span>
+                      <div className="beatmapsets-search-filter__items">
+                        <a
+                          href="#tourney-all"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setFilterTournament('ALL');
+                          }}
+                          className={`beatmapsets-search-filter__item ${
+                            filterTournament === 'ALL' ? 'beatmapsets-search-filter__item--active' : ''
+                          }`}
+                        >
+                          Todos os Torneios ({maps.length})
+                        </a>
+                        {availableTournaments.map((tourney: string) => {
+                          const cnt = maps.filter((m) => m.tournamentName === tourney).length;
+                          const isSelected = filterTournament === tourney;
+                          return (
+                            <a
+                              key={tourney}
+                              href={`#tourney-${tourney}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setFilterTournament(tourney);
+                              }}
+                              className={`beatmapsets-search-filter__item ${
+                                isSelected ? 'beatmapsets-search-filter__item--active' : ''
+                              }`}
+                            >
+                              <i className="fas fa-trophy" style={{ marginRight: '5px', fontSize: '10px', color: '#e5b32e' }} />
+                              {tourney} ({cnt})
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stage / Pool Difficulty Filter Row (Shown when stages exist) */}
+                  {availableStages.length > 0 && (
+                    <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
+                      <span className="beatmapsets-search-filter__header">Etapa / Dificuldade</span>
+                      <div className="beatmapsets-search-filter__items">
+                        <a
+                          href="#stage-all"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setFilterStage('ALL');
+                          }}
+                          className={`beatmapsets-search-filter__item ${
+                            filterStage === 'ALL' ? 'beatmapsets-search-filter__item--active' : ''
+                          }`}
+                        >
+                          Todas as Etapas ({filterTournament === 'ALL' ? maps.length : maps.filter(m => m.tournamentName === filterTournament).length})
+                        </a>
+                        {availableStages.map((stage: string) => {
+                          const cnt = maps.filter(
+                            (m) =>
+                              (filterTournament === 'ALL' || m.tournamentName === filterTournament) &&
+                              m.stageName === stage
+                          ).length;
+                          const isSelected = filterStage === stage;
+                          return (
+                            <a
+                              key={stage}
+                              href={`#stage-${stage}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setFilterStage(stage);
+                              }}
+                              className={`beatmapsets-search-filter__item ${
+                                isSelected ? 'beatmapsets-search-filter__item--active' : ''
+                              }`}
+                            >
+                              <i className="fas fa-layer-group" style={{ marginRight: '5px', fontSize: '10px' }} />
+                              {stage} ({cnt})
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -318,15 +449,20 @@ export const App: React.FC = () => {
                                 href={`#sort-${opt.value}`}
                                 onClick={(e) => {
                                   e.preventDefault();
-                                  setSortBy(opt.value);
+                                  toggleSort(opt.value);
                                 }}
                                 className={`sort__item sort__item--button ${
                                   active ? 'sort__item--active' : ''
                                 }`}
+                                title={`${opt.label}: Clique para alternar entre decrescente e crescente`}
                               >
                                 {opt.label}
                                 <span className="sort__item-arrow">
-                                  <i className="fas fa-caret-down" />
+                                  <i
+                                    className={`fas fa-caret-${
+                                      active && sortDirection === 'asc' ? 'up' : 'down'
+                                    }`}
+                                  />
                                 </span>
                               </a>
                             );
@@ -407,6 +543,9 @@ export const App: React.FC = () => {
         onBackClick={() => setActiveTab('select')}
         onOpenUpload={() => setIsUploaderOpen(true)}
       />
+
+      {/* 3.1 Official osu-web Floating Audio Player for Previews */}
+      <LazerFloatingAudioPlayer />
 
       {/* 4. Uploader Modal */}
       {isUploaderOpen && (

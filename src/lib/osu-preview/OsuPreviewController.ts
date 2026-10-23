@@ -10,6 +10,7 @@ import {
   getEffectivePlaybackRate,
   computeMapProperties,
 } from './mods';
+import { previewAudioManager } from './previewAudio';
 
 export type TickCallback = (state: {
   currentTimeMs: number;
@@ -205,6 +206,7 @@ export class OsuPreviewController {
 
   public play(): void {
     if (this.isPlaying) return;
+    previewAudioManager.stop();
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       this.audioCtx.resume().catch(() => {});
     }

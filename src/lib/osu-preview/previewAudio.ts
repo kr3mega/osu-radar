@@ -16,8 +16,25 @@ class BeatmapPreviewAudioManager {
   private activeMapId: string | null = null;
   private state: PreviewAudioState = 'stopped';
   private progress: number = 0;
+  private volume: number = 0.8;
   private listeners: Set<Listener> = new Set();
   private requestToken: number = 0;
+  private onPlayStart: (() => void) | null = null;
+
+  public setOnPlayStart(callback: (() => void) | null): void {
+    this.onPlayStart = callback;
+  }
+
+  public setVolume(vol: number): void {
+    this.volume = Math.min(1, Math.max(0, vol));
+    if (this.audio) {
+      this.audio.volume = this.volume;
+    }
+  }
+
+  public getVolume(): number {
+    return this.volume;
+  }
 
   public subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
@@ -69,6 +86,11 @@ class BeatmapPreviewAudioManager {
 
   public async play(map: BeatmapAnalysisResult): Promise<void> {
     this.stop();
+    if (this.onPlayStart) {
+      try {
+        this.onPlayStart();
+      } catch {}
+    }
     const currentToken = ++this.requestToken;
     this.activeMapId = map.id;
     this.state = 'loading';
@@ -120,7 +142,7 @@ class BeatmapPreviewAudioManager {
       }
 
       const audio = new Audio();
-      audio.volume = 0.7;
+      audio.volume = this.volume;
       audio.preload = 'auto';
 
       let settled = false;

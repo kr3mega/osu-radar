@@ -146,30 +146,67 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
               <div>
                 mapeado por <strong style={{ color: '#fff' }}>{metadata.creator}</strong>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                <span>slot do torneio:</span>
-                {onSlotChange ? (
-                  <select
-                    value={modSlot || 'NM1'}
-                    onChange={(e) => onSlotChange(map.id, e.target.value)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>slot do torneio:</span>
+                  {onSlotChange ? (
+                    <select
+                      value={modSlot || 'NM1'}
+                      onChange={(e) => onSlotChange(map.id, e.target.value)}
+                      style={{
+                        backgroundColor: 'hsl(var(--hsl-b5))',
+                        color: '#fff',
+                        border: '1px solid hsl(var(--hsl-b2))',
+                        borderRadius: '4px',
+                        padding: '1px 6px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {modSlotOptions.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <ModSlotBadge slot={modSlot} size="sm" />
+                  )}
+                </div>
+
+                {map.stageName && (
+                  <span
+                    className="osu-radar-mod-pill"
                     style={{
-                      backgroundColor: 'hsl(var(--hsl-b5))',
-                      color: '#fff',
-                      border: '1px solid hsl(var(--hsl-b2))',
-                      borderRadius: '4px',
-                      padding: '1px 6px',
-                      fontSize: '11px',
+                      backgroundColor: 'hsl(var(--hsl-b3))',
+                      color: 'hsl(var(--hsl-h1))',
                       fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
                     }}
+                    title={`Etapa: ${map.stageName}`}
                   >
-                    {modSlotOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <ModSlotBadge slot={modSlot} size="sm" />
+                    <i className="fas fa-layer-group" style={{ fontSize: '9px' }} />
+                    {map.stageName}
+                  </span>
+                )}
+
+                {map.tournamentName && (
+                  <span
+                    className="osu-radar-mod-pill"
+                    style={{
+                      backgroundColor: 'hsl(var(--hsl-b4))',
+                      color: 'hsl(var(--hsl-l1))',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                    title={`Torneio: ${map.tournamentName}`}
+                  >
+                    <i className="fas fa-trophy" style={{ fontSize: '9px', color: '#e5b32e' }} />
+                    {map.tournamentName}
+                  </span>
                 )}
               </div>
             </div>
@@ -329,7 +366,6 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
           >
             <i className="fas fa-chart-pie" style={{ marginRight: '6px', alignSelf: 'center' }} />
             <span>radar de skills</span>
-            <span className="page-mode-link__badge">{map.topSkills.slice(0, 2).join(' + ')}</span>
             <span className="page-mode-link__stripe" />
           </a>
         </li>
@@ -346,6 +382,30 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
             alignItems: 'center',
           }}
         >
+          {/* Centered top skills badge right below the header */}
+          {map.topSkills && map.topSkills.length > 0 && (
+            <div style={{ marginBottom: '14px', textAlign: 'center' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '4px 16px',
+                  borderRadius: '1000px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                  border: '1px solid hsl(var(--hsl-b2))',
+                  color: 'hsl(var(--hsl-l1))',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  letterSpacing: '0.5px',
+                }}
+              >
+                <i className="fas fa-bolt" style={{ color: 'hsl(var(--hsl-h1))' }} />
+                <span>{map.topSkills.slice(0, 2).join(' + ')}</span>
+              </span>
+            </div>
+          )}
+
           <StatHexagon
             skills={skills}
             comparisonSkills={poolAverageSkills}

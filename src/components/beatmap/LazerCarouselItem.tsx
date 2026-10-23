@@ -257,6 +257,39 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
               />
             </div>
 
+            {map.stageName && (
+              <div className="beatmapset-panel__extra-item">
+                <div
+                  className="beatmapset-status beatmapset-status--panel"
+                  style={{
+                    backgroundColor: 'hsl(var(--hsl-b3))',
+                    color: 'hsl(var(--hsl-h1))',
+                    fontWeight: 700,
+                  }}
+                  title={map.tournamentName ? `${map.tournamentName} • ${map.stageName}` : `Etapa: ${map.stageName}`}
+                >
+                  <i className="fas fa-layer-group" style={{ marginRight: '4px', fontSize: '9px' }} />
+                  {map.stageName}
+                </div>
+              </div>
+            )}
+
+            {map.tournamentName && (
+              <div className="beatmapset-panel__extra-item">
+                <div
+                  className="beatmapset-status beatmapset-status--panel"
+                  style={{
+                    backgroundColor: 'hsl(var(--hsl-b4))',
+                    color: 'hsl(var(--hsl-l1))',
+                  }}
+                  title={`Torneio: ${map.tournamentName}`}
+                >
+                  <i className="fas fa-trophy" style={{ marginRight: '4px', fontSize: '9px', color: '#e5b32e' }} />
+                  {map.tournamentName}
+                </div>
+              </div>
+            )}
+
             {topSkills.slice(0, 2).map((skillKey) => (
               <div key={skillKey} className="beatmapset-panel__extra-item">
                 <div

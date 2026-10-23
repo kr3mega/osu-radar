@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePoolStore } from '../../store/usePoolStore';
+import { useAudioStore } from '../../store/useAudioStore';
 import { formatTimestamp } from '../../engine/strains';
 
 interface LazerToolbarProps {
@@ -22,6 +23,8 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
     exportPoolJson,
     importPoolJson,
   } = usePoolStore();
+
+  const { volume, isMuted, setVolume, toggleMute } = useAudioStore();
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -221,6 +224,50 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                   >
                     <span className="fas fa-folder-open" />
                   </button>
+                </div>
+
+                {/* Global Page Volume Control */}
+                <div
+                  className="nav2__col"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '0 6px',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={toggleMute}
+                    className="nav-button"
+                    title={
+                      isMuted
+                        ? 'Som global mutado (Clique para ativar som)'
+                        : `Som Global da Página: ${Math.round(volume * 100)}% (Clique para mutar)`
+                    }
+                  >
+                    <span
+                      className={`fas fa-volume-${
+                        isMuted || volume === 0 ? 'mute' : volume < 0.5 ? 'down' : 'up'
+                      }`}
+                    />
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={isMuted ? 0 : volume}
+                    onChange={(e) => setVolume(parseFloat(e.target.value))}
+                    className="osu-radar-global-volume-slider"
+                    style={{
+                      width: '60px',
+                      height: '4px',
+                      cursor: 'pointer',
+                      accentColor: 'hsl(var(--hsl-h1))',
+                    }}
+                    title={`Som Global da Página: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
+                  />
                 </div>
 
                 {/* Audio Cache Status Pill (osu-web notification container style) */}

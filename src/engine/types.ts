@@ -92,6 +92,8 @@ export interface BeatmapAnalysisResult {
   audioUrl?: string;
   topSkills: Array<keyof SkillAttributes>;
   modSlot?: string; // "NM1", "HD2", "HR1", "DT1", "FM1", "TB"
+  tournamentName?: string; // e.g. "6WC 2026", "OWC 2025"
+  stageName?: string;      // e.g. "Grand Finals", "Finals", "Qualifiers"
   calculatedAt: number;
 }
 
