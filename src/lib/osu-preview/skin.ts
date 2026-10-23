@@ -9,6 +9,20 @@ const DEFAULT_COMBO_COLORS: Array<[number, number, number]> = [
   [189, 94, 255],  // Purple
 ];
 
+export function getSpriteLogicalWidth(
+  sprite: HTMLImageElement | HTMLCanvasElement
+): number {
+  const scale = (sprite as any).logicalScale ?? 1;
+  return sprite.width * scale;
+}
+
+export function getSpriteLogicalHeight(
+  sprite: HTMLImageElement | HTMLCanvasElement
+): number {
+  const scale = (sprite as any).logicalScale ?? 1;
+  return sprite.height * scale;
+}
+
 export function tintImage(
   img: HTMLImageElement | HTMLCanvasElement,
   color: [number, number, number]
@@ -16,9 +30,12 @@ export function tintImage(
   const canvas = document.createElement('canvas');
   canvas.width = img.width;
   canvas.height = img.height;
+  (canvas as any).logicalScale = (img as any).logicalScale ?? 1;
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas;
 
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, 0, 0);
 
   // Tinting via source-in composite
@@ -33,18 +50,46 @@ export function tintImage(
   return canvas;
 }
 
-export async function loadImage(url: string): Promise<HTMLImageElement> {
+export async function loadImage(url: string, logicalScale: number = 1): Promise<HTMLImageElement> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
+    (img as any).logicalScale = logicalScale;
     img.onload = () => resolve(img);
     img.onerror = () => {
       // Create empty 1x1 image fallback
       const fallback = new Image();
+      (fallback as any).logicalScale = 1;
       resolve(fallback);
     };
     img.src = url;
   });
+}
+
+/**
+ * Loads the high-resolution @2x sprite when available in the skin folder,
+ * preserving 1x logical dimensions via `logicalScale = 0.5` so playfield sizing
+ * stays identical while rendering with 4x the pixel density.
+ */
+export async function loadHiResSkinImage(
+  basePath: string,
+  name: string,
+  has2xVariant: boolean = true
+): Promise<HTMLImageElement> {
+  if (has2xVariant) {
+    const hiRes = await new Promise<HTMLImageElement | null>((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      (img as any).logicalScale = 0.5;
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = `${basePath}/${name}@2x.png`;
+    });
+    if (hiRes && hiRes.naturalWidth > 0) {
+      return hiRes;
+    }
+  }
+  return loadImage(`${basePath}/${name}.png`, 1);
 }
 
 export function parseSkinIni(text: string): SkinIni {
@@ -125,7 +170,7 @@ export async function loadDefaultSkin(basePath: string = '/skin/default'): Promi
 
     const ini = parseSkinIni(iniText);
 
-    // Load base images in parallel
+    // Load high-resolution (@2x) base images in parallel with 1x fallback
     const [
       hitcircleImg,
       hitcircleoverlayImg,
@@ -137,22 +182,22 @@ export async function loadDefaultSkin(basePath: string = '/skin/default'): Promi
       cursorImg,
       cursortrailImg,
     ] = await Promise.all([
-      loadImage(`${basePath}/hitcircle.png`),
-      loadImage(`${basePath}/hitcircleoverlay.png`),
-      loadImage(`${basePath}/approachcircle.png`),
-      loadImage(`${basePath}/sliderfollowcircle.png`),
-      loadImage(`${basePath}/sliderscorepoint.png`),
-      loadImage(`${basePath}/reversearrow.png`),
-      loadImage(`${basePath}/sliderb0.png`),
-      loadImage(`${basePath}/cursor.png`),
-      loadImage(`${basePath}/cursortrail.png`),
+      loadHiResSkinImage(basePath, 'hitcircle', true),
+      loadHiResSkinImage(basePath, 'hitcircleoverlay', true),
+      loadHiResSkinImage(basePath, 'approachcircle', true),
+      loadHiResSkinImage(basePath, 'sliderfollowcircle', true),
+      loadHiResSkinImage(basePath, 'sliderscorepoint', true),
+      loadHiResSkinImage(basePath, 'reversearrow', true),
+      loadHiResSkinImage(basePath, 'sliderb0', true),
+      loadHiResSkinImage(basePath, 'cursor', true),
+      loadHiResSkinImage(basePath, 'cursortrail', false),
     ]);
 
-    // Load combo numbers 0-9
+    // Load high-resolution (@2x) combo numbers 0-9
     const digits: Record<string, HTMLImageElement> = {};
     await Promise.all(
       Array.from({ length: 10 }, (_, i) =>
-        loadImage(`${basePath}/default-${i}.png`).then((img) => {
+        loadHiResSkinImage(basePath, `default-${i}`, true).then((img) => {
           digits[`default-${i}`] = img;
         })
       )

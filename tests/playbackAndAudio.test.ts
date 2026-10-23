@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { processHitsoundTick } from '../src/lib/osu-preview/OsuPreviewController';
 import { BeatmapPreviewAudioManager } from '../src/lib/osu-preview/previewAudio';
+import { getSpriteLogicalWidth, getSpriteLogicalHeight } from '../src/lib/osu-preview/skin';
 import { PreviewHitObject } from '../src/lib/osu-preview/types';
 
 function makeHitObjects(timesMs: number[]): PreviewHitObject[] {
@@ -104,5 +105,15 @@ describe('Background Tab Hitsound Scheduling & Anti-Burst Protection', () => {
     // Stop is idempotent and resets state
     manager.stop();
     expect(manager.getSnapshot().state).toBe('stopped');
+  });
+
+  it('preserves 1x logical playfield dimensions when rendering @2x HD skin textures', () => {
+    const hdHitCircle = { width: 256, height: 256, logicalScale: 0.5 } as any;
+    const sdHitCircle = { width: 128, height: 128, logicalScale: 1 } as any;
+
+    expect(getSpriteLogicalWidth(hdHitCircle)).toBe(128);
+    expect(getSpriteLogicalHeight(hdHitCircle)).toBe(128);
+    expect(getSpriteLogicalWidth(sdHitCircle)).toBe(128);
+    expect(getSpriteLogicalHeight(sdHitCircle)).toBe(128);
   });
 });

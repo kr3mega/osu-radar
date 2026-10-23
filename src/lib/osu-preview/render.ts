@@ -2,6 +2,7 @@ import { clamp, distance, easingFunctions, lerp, mod, range } from './functions'
 import { strokeSlider, getFollowPosition, getSliderTicks, ViewportTransform } from './slider';
 import { PreviewBeatmap, PreviewHitObject, OsuSkin, OsuMod } from './types';
 import { getHiddenAlpha } from './mods';
+import { getSpriteLogicalWidth, getSpriteLogicalHeight } from './skin';
 
 export interface RenderOptions {
   BackgroundDim?: number;
@@ -30,7 +31,7 @@ export class OsuPreviewRenderer {
   private minMargin: number = 4;
 
   private bezierSegmentMaxLengthSqrd: number = 100;
-  private sliderGradientDivisions: number = 16;
+  private sliderGradientDivisions: number = 24;
   private trailIntervalMs: number = 16;
   private maxRPM: number = 477;
 
@@ -57,20 +58,26 @@ export class OsuPreviewRenderer {
   }
 
   public resize(): void {
-    const dpr = window.devicePixelRatio || 1;
+    const rawDpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    // Supersample at minimum 2x so sprites, sliders, and circles stay razor-sharp even on 1080p (1x) displays
+    const dpr = Math.max(2, rawDpr);
     const rect = this.canvas.getBoundingClientRect();
-    const width = Math.max(320, rect.width || 640);
-    const height = Math.max(240, rect.height || 480);
+    const width = Math.max(320, Math.round(rect.width || 640));
+    const height = Math.max(240, Math.round(rect.height || 480));
 
-    this.canvas.width = width * dpr;
-    this.canvas.height = height * dpr;
+    this.canvas.width = Math.round(width * dpr);
+    this.canvas.height = Math.round(height * dpr);
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(dpr, dpr);
+    this.ctx.imageSmoothingEnabled = true;
+    this.ctx.imageSmoothingQuality = 'high';
 
-    this.bufferCanvas.width = width * dpr;
-    this.bufferCanvas.height = height * dpr;
+    this.bufferCanvas.width = Math.round(width * dpr);
+    this.bufferCanvas.height = Math.round(height * dpr);
     this.bufferCtx.setTransform(1, 0, 0, 1, 0, 0);
     this.bufferCtx.scale(dpr, dpr);
+    this.bufferCtx.imageSmoothingEnabled = true;
+    this.bufferCtx.imageSmoothingQuality = 'high';
 
     this.canvasSize = [width, height];
 
@@ -88,7 +95,7 @@ export class OsuPreviewRenderer {
       this.margins = [this.minMargin, (height - this.fieldSize[1]) / 2];
     }
 
-    const BEZIER_SEGMENT_MAX_LENGTH = 10;
+    const BEZIER_SEGMENT_MAX_LENGTH = 5;
     this.bezierSegmentMaxLengthSqrd =
       this.fieldSize[0] > this.fieldSize[1]
         ? ((BEZIER_SEGMENT_MAX_LENGTH / this.fieldSize[0]) * 512) ** 2
@@ -205,7 +212,7 @@ export class OsuPreviewRenderer {
       // SLIDER BODY
       if (obj.isSlider) {
         bufferCtx.globalCompositeOperation = 'source-over';
-        bufferCtx.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
+        bufferCtx.clearRect(0, 0, this.canvasSize[0], this.canvasSize[1]);
         bufferCtx.beginPath();
 
         let snake = 1;
@@ -270,7 +277,7 @@ export class OsuPreviewRenderer {
           bufferCtx.stroke();
 
           ctx.globalAlpha = sliderAlpha;
-          ctx.drawImage(this.bufferCanvas, 0, 0);
+          ctx.drawImage(this.bufferCanvas, 0, 0, this.canvasSize[0], this.canvasSize[1]);
 
           // Slider Inner Track
           const comboColor =
@@ -278,7 +285,7 @@ export class OsuPreviewRenderer {
           const inner = comboColor.map((x) => clamp(61, range(0, 170, 61, 255, x), 255));
           const outer = comboColor.map((x) => x * 0.91);
 
-          bufferCtx.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
+          bufferCtx.clearRect(0, 0, this.canvasSize[0], this.canvasSize[1]);
           bufferCtx.globalCompositeOperation = 'source-over';
 
           for (let divs = this.sliderGradientDivisions, i = divs; i > 0; i--) {
@@ -288,7 +295,7 @@ export class OsuPreviewRenderer {
           }
 
           ctx.globalAlpha = sliderAlpha * 0.75;
-          ctx.drawImage(this.bufferCanvas, 0, 0);
+          ctx.drawImage(this.bufferCanvas, 0, 0, this.canvasSize[0], this.canvasSize[1]);
 
           const slideN = Math.max(
             Math.floor((time - obj.time) / Math.max(1, obj.duration || 1)),
@@ -304,8 +311,8 @@ export class OsuPreviewRenderer {
             startTime: number
           ) => {
             const size = [
-              (this.toPixelsX(beatmap.radius) / 64) * sprite.width,
-              (this.toPixelsX(beatmap.radius) / 64) * sprite.height,
+              (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalWidth(sprite),
+              (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalHeight(sprite),
             ];
             ctx.globalAlpha = isHidden
               ? sliderAlpha
@@ -338,8 +345,8 @@ export class OsuPreviewRenderer {
 
             if (isDrawable(arrowSprite)) {
               const arrowSize = [
-                (this.toPixelsX(beatmap.radius) / 64) * arrowSprite.width,
-                (this.toPixelsX(beatmap.radius) / 64) * arrowSprite.height,
+                (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalWidth(arrowSprite),
+                (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalHeight(arrowSprite),
               ];
 
               const _drawArrow = (
@@ -396,8 +403,8 @@ export class OsuPreviewRenderer {
                   isHardRock
                 );
                 const tickSize = [
-                  ((this.toPixelsX(beatmap.radius) * 2) / 128) * tickSprite.width,
-                  ((this.toPixelsX(beatmap.radius) * 2) / 128) * tickSprite.height,
+                  ((this.toPixelsX(beatmap.radius) * 2) / 128) * getSpriteLogicalWidth(tickSprite),
+                  ((this.toPixelsX(beatmap.radius) * 2) / 128) * getSpriteLogicalHeight(tickSprite),
                 ];
                 ctx.globalAlpha = sliderAlpha * 0.9;
                 ctx.drawImage(
@@ -452,8 +459,8 @@ export class OsuPreviewRenderer {
 
         if (circleSprite) {
           const size = [
-            ((this.toPixelsX(beatmap.radius) * 2) / 128) * circleSprite.width * circleScale,
-            ((this.toPixelsX(beatmap.radius) * 2) / 128) * circleSprite.height * circleScale,
+            ((this.toPixelsX(beatmap.radius) * 2) / 128) * getSpriteLogicalWidth(circleSprite) * circleScale,
+            ((this.toPixelsX(beatmap.radius) * 2) / 128) * getSpriteLogicalHeight(circleSprite) * circleScale,
           ];
           ctx.drawImage(
             circleSprite,
@@ -466,8 +473,8 @@ export class OsuPreviewRenderer {
 
         if (overlaySprite) {
           const size = [
-            ((this.toPixelsX(beatmap.radius) * 2) / 128) * overlaySprite.width * circleScale,
-            ((this.toPixelsX(beatmap.radius) * 2) / 128) * overlaySprite.height * circleScale,
+            ((this.toPixelsX(beatmap.radius) * 2) / 128) * getSpriteLogicalWidth(overlaySprite) * circleScale,
+            ((this.toPixelsX(beatmap.radius) * 2) / 128) * getSpriteLogicalHeight(overlaySprite) * circleScale,
           ];
           ctx.drawImage(
             overlaySprite,
@@ -486,8 +493,8 @@ export class OsuPreviewRenderer {
         const comboStr = (obj.combo || 1).toString();
         const firstDigitSprite = (skin as any)[`default-${comboStr[0]}`];
         if (firstDigitSprite && firstDigitSprite.complete && firstDigitSprite.naturalWidth > 0) {
-          const width = firstDigitSprite.width;
-          const height = firstDigitSprite.height;
+          const width = getSpriteLogicalWidth(firstDigitSprite);
+          const height = getSpriteLogicalHeight(firstDigitSprite);
           const overlap = skin.ini.Fonts.HitCircleOverlap ?? -2;
           const totalWidth = width * comboStr.length - overlap * (comboStr.length - 1);
           const numberScale = (beatmap.radius / 80 / 512) * this.fieldSize[0];
@@ -539,8 +546,8 @@ export class OsuPreviewRenderer {
         skin.approachcircle[0];
       if (tinted) {
         const size = [
-          (this.toPixelsX(beatmap.radius) / 64) * tinted.width * approachScale,
-          (this.toPixelsX(beatmap.radius) / 64) * tinted.height * approachScale,
+          (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalWidth(tinted) * approachScale,
+          (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalHeight(tinted) * approachScale,
         ];
         ctx.drawImage(
           tinted,
@@ -570,8 +577,8 @@ export class OsuPreviewRenderer {
           const followScale =
             0.5 + easingFunctions.easeOut(clamp(0, (time - obj.time) / 150, 1)) * 0.5;
           const size = [
-            (this.toPixelsX(beatmap.radius) / 64) * followCircleSprite.width * followScale,
-            (this.toPixelsX(beatmap.radius) / 64) * followCircleSprite.height * followScale,
+            (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalWidth(followCircleSprite) * followScale,
+            (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalHeight(followCircleSprite) * followScale,
           ];
           ctx.globalAlpha = clamp(0, (time - obj.time) / 60, 1);
           ctx.drawImage(
@@ -590,8 +597,8 @@ export class OsuPreviewRenderer {
             sliderBallFrames[0][(obj.comboIndex || 0) % sliderBallFrames[0].length];
           if (ballSprite) {
             const ballSize = [
-              (this.toPixelsX(beatmap.radius) / 64) * ballSprite.width,
-              (this.toPixelsX(beatmap.radius) / 64) * ballSprite.height,
+              (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalWidth(ballSprite),
+              (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalHeight(ballSprite),
             ];
             ctx.globalAlpha = 1;
             ctx.save();
@@ -833,8 +840,8 @@ export class OsuPreviewRenderer {
     ctx.globalAlpha = 1;
     if (skin.cursor && skin.cursor.complete && skin.cursor.naturalWidth > 0) {
       const size = [
-        (this.toPixelsX(beatmap.radius) / 64) * skin.cursor.width,
-        (this.toPixelsX(beatmap.radius) / 64) * skin.cursor.height,
+        (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalWidth(skin.cursor),
+        (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalHeight(skin.cursor),
       ];
       ctx.drawImage(skin.cursor, px - size[0] / 2, py - size[1] / 2, size[0], size[1]);
     } else {
