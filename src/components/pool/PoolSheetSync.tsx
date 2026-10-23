@@ -32,8 +32,13 @@ export const PoolSheetSync: React.FC = () => {
   const folderInputRef = useRef<HTMLInputElement>(null);
   const { addBeatmaps, setPoolMetadata, setActiveTournamentFilter } = usePoolStore();
 
-  const selectedStages = stages.filter((s) => selectedStageNames.has(s.stageName));
-  const totalMapCount = stages.reduce((acc, s) => acc + s.entries.length, 0);
+  const selectedStages = React.useMemo(() => {
+    return stages.filter((s) => selectedStageNames.has(s.stageName));
+  }, [stages, selectedStageNames]);
+
+  const totalMapCount = React.useMemo(() => {
+    return stages.reduce((acc, s) => acc + s.entries.length, 0);
+  }, [stages]);
 
   // Flattened list of all entries from the selected stages
   const selectedEntries = React.useMemo(() => {
@@ -72,15 +77,13 @@ export const PoolSheetSync: React.FC = () => {
   };
 
   React.useEffect(() => {
-    if (selectedEntries.length > 0) {
+    if (stages.length > 0 && selectedEntries.length > 0) {
       setActiveTournamentFilter({
         stageName: selectedStages.map((s) => s.stageName).join(', '),
         entries: selectedEntries,
       });
-    } else {
-      setActiveTournamentFilter(null);
     }
-  }, [selectedEntries, selectedStages, setActiveTournamentFilter]);
+  }, [selectedEntries, selectedStages, stages.length, setActiveTournamentFilter]);
 
   const handleFetchSheet = async () => {
     setErrorMessage(null);

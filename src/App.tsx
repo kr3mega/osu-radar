@@ -11,6 +11,7 @@ import { SkillAttributes } from './engine/types';
 import { extractOsuFilesFromZip } from './utils/unzip';
 import { analyzeBeatmap } from './engine/analyzer';
 import { extractQuickOsuMeta, matchOsuFileToTournamentEntry } from './utils/sheetParser';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const MOD_FILTERS: Array<{ id: string; label: string }> = [
   { id: 'ALL', label: 'Qualquer' },
@@ -571,7 +572,9 @@ export const App: React.FC = () => {
               </button>
             </div>
             <div className="osu-radar-modal__body">
-              <PoolUploader />
+              <ErrorBoundary fallbackTitle="Erro ao carregar o importador de beatmaps">
+                <PoolUploader />
+              </ErrorBoundary>
             </div>
           </div>
         </div>

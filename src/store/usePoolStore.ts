@@ -105,7 +105,19 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   setTournamentTier: (tournamentTier) => set({ tournamentTier }),
   setIsMatchSimulatorOpen: (isMatchSimulatorOpen) => set({ isMatchSimulatorOpen }),
   setExpandedSetKey: (expandedSetKey) => set({ expandedSetKey }),
-  setActiveTournamentFilter: (activeTournamentFilter) => set({ activeTournamentFilter }),
+  setActiveTournamentFilter: (activeTournamentFilter) => {
+    const current = get().activeTournamentFilter;
+    if (!current && !activeTournamentFilter) return;
+    if (
+      current &&
+      activeTournamentFilter &&
+      current.stageName === activeTournamentFilter.stageName &&
+      current.entries.length === activeTournamentFilter.entries.length
+    ) {
+      return;
+    }
+    set({ activeTournamentFilter });
+  },
 
   addBeatmaps: async (results) => {
     // Avoid duplicate maps by ID
@@ -223,7 +235,27 @@ export const usePoolStore = create<PoolState>((set, get) => ({
 
   exportPoolJson: () => {
     const pool = get().currentPool;
-    return JSON.stringify(pool, null, 2);
+    const cleanMaps = pool.maps.map((m) => {
+      const copy = { ...m };
+      delete copy.audioBlob;
+      if (copy.audioUrl?.startsWith('blob:')) {
+        delete copy.audioUrl;
+      }
+      return copy;
+    });
+    return JSON.stringify(
+      {
+        id: pool.id || 'osu-radar-pool',
+        name: pool.name || 'Mappool de Torneio',
+        stage: pool.stage || 'Etapa Competitiva',
+        description: pool.description || 'Auditoria de habilidades e tensões físicas de beatmaps',
+        createdAt: pool.createdAt || Date.now(),
+        updatedAt: Date.now(),
+        maps: cleanMaps,
+      },
+      null,
+      2
+    );
   },
 
   importPoolJson: async (jsonStr) => {
@@ -232,11 +264,75 @@ export const usePoolStore = create<PoolState>((set, get) => ({
       if (!parsed || !Array.isArray(parsed.maps)) {
         return false;
       }
+      // Sanitize and validate every map to ensure none can crash the UI
+      const validMaps: BeatmapAnalysisResult[] = parsed.maps
+        .filter((m) => m && typeof m === 'object' && m.id && m.metadata)
+        .map((m) => ({
+          ...m,
+          audioBlob: undefined,
+          audioUrl: m.audioUrl?.startsWith('blob:') ? undefined : m.audioUrl,
+          modSlot: m.modSlot || 'NM1',
+          tournamentName: m.tournamentName || parsed.name || 'Torneio',
+          stageName: m.stageName || parsed.stage || 'Mappool',
+          stats: {
+            starRating: m.stats?.starRating ?? 5.0,
+            bpmMin: m.stats?.bpmMin ?? 120,
+            bpmMax: m.stats?.bpmMax ?? 120,
+            bpmMode: m.stats?.bpmMode ?? 120,
+            durationMs: m.stats?.durationMs ?? 120000,
+            drainTimeMs: m.stats?.drainTimeMs ?? 120000,
+            circleCount: m.stats?.circleCount ?? 0,
+            sliderCount: m.stats?.sliderCount ?? 0,
+            spinnerCount: m.stats?.spinnerCount ?? 0,
+            totalObjects: m.stats?.totalObjects ?? 0,
+            maxCombo: m.stats?.maxCombo ?? 0,
+          },
+          difficulty: {
+            cs: m.difficulty?.cs ?? 4,
+            hp: m.difficulty?.hp ?? 5,
+            od: m.difficulty?.od ?? 8,
+            ar: m.difficulty?.ar ?? 9,
+            sliderMultiplier: m.difficulty?.sliderMultiplier ?? 1.4,
+            sliderTickRate: m.difficulty?.sliderTickRate ?? 1,
+          },
+          skills: {
+            snapAim: m.skills?.snapAim ?? 0,
+            flowAim: m.skills?.flowAim ?? 0,
+            speed: m.skills?.speed ?? 0,
+            stamina: m.skills?.stamina ?? 0,
+            fingerControl: m.skills?.fingerControl ?? 0,
+            readingTech: m.skills?.readingTech ?? 0,
+          },
+          timeline: Array.isArray(m.timeline) ? m.timeline : [],
+          patterns: Array.isArray(m.patterns) ? m.patterns : [],
+          topSkills: Array.isArray(m.topSkills) ? m.topSkills : ['snapAim', 'flowAim'],
+        }));
+
+      if (validMaps.length === 0 && parsed.maps.length > 0) {
+        return false;
+      }
+
+      const newPool: Mappool = {
+        id: parsed.id || 'imported-pool',
+        name: parsed.name || 'Mappool Importada',
+        stage: parsed.stage || 'Etapa Competitiva',
+        description: parsed.description || 'Pool importada via arquivo JSON',
+        createdAt: parsed.createdAt || Date.now(),
+        updatedAt: Date.now(),
+        maps: validMaps,
+      };
+
       set({
-        currentPool: parsed,
-        selectedMapId: parsed.maps.length > 0 ? parsed.maps[0].id : null,
+        currentPool: newPool,
+        selectedMapId: validMaps.length > 0 ? validMaps[0].id : null,
       });
-      await cacheBeatmaps(parsed.maps);
+
+      try {
+        await cacheBeatmaps(validMaps);
+      } catch (e) {
+        console.warn('Could not cache imported maps to IndexedDB:', e);
+      }
+
       return true;
     } catch {
       return false;
