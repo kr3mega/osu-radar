@@ -28,3 +28,4 @@ dist-ssr
 .firebase/
 firebase-debug.log*
 /ppy-osu-oficial-project-repository
+osu_preview_extension/

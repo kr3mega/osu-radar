@@ -28,6 +28,7 @@ import {
   clamp,
   resolveBeatmapAudio,
   AudioResolveStatus,
+  getModFromSlot,
 } from '../../lib/osu-preview';
 import {
   DetectedPattern,
@@ -39,16 +40,6 @@ import {
 import { parseOsuBeatmap } from '../../engine/parser';
 import { BeatmapAnalysisResult } from '../../engine/types';
 import { db } from '../../db';
-
-export function getModFromSlot(modSlot?: string): OsuMod | null {
-  if (!modSlot) return null;
-  const upper = modSlot.toUpperCase().trim();
-  if (upper.startsWith('HD')) return 'hd';
-  if (upper.startsWith('HR')) return 'hr';
-  if (upper.startsWith('DT')) return 'dt';
-  if (upper.startsWith('EZ')) return 'ez';
-  return null;
-}
 
 const SEVERITY_BADGES: Record<
   PatternSeverity,
@@ -145,11 +136,13 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       nextMods.add(slotMod);
     }
     setActiveMods(nextMods);
-    setPlaybackRate(slotMod === 'dt' ? 1.5 : 1.0);
     if (controllerRef.current) {
-      (['ez', 'hr', 'dt', 'hd'] as OsuMod[]).forEach((m) => {
+      (['ez', 'hr', 'dt', 'hd', 'ht', 'fl'] as OsuMod[]).forEach((m) => {
         controllerRef.current?.setMod(m, nextMods.has(m));
       });
+      setPlaybackRate(controllerRef.current.getPlaybackRate());
+    } else {
+      setPlaybackRate(slotMod === 'dt' ? 1.5 : 1.0);
     }
   }, [map.id, map.modSlot, slotMod]);
 
@@ -348,29 +341,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
 
   const handleToggleMod = (modName: OsuMod) => {
     if (!controllerRef.current) return;
-    const newMods = new Set(activeMods);
-    if (newMods.has(modName)) {
-      newMods.delete(modName);
-      controllerRef.current.setMod(modName, false);
-      if (modName === 'dt') {
-        setPlaybackRate(1.0);
-      }
-    } else {
-      // HR and EZ are strictly mutually exclusive
-      if (modName === 'hr') {
-        newMods.delete('ez');
-        controllerRef.current.setMod('ez', false);
-      } else if (modName === 'ez') {
-        newMods.delete('hr');
-        controllerRef.current.setMod('hr', false);
-      }
-      newMods.add(modName);
-      controllerRef.current.setMod(modName, true);
-      if (modName === 'dt') {
-        setPlaybackRate(1.5);
-      }
-    }
-    setActiveMods(newMods);
+    controllerRef.current.toggleMod(modName);
+    const updatedMods = controllerRef.current.getActiveMods();
+    setActiveMods(updatedMods);
+    setPlaybackRate(controllerRef.current.getPlaybackRate());
   };
 
   const handleVolumeChange = (newVol: number) => {

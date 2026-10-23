@@ -6,5 +6,6 @@ export * from './skin';
 export * from './audio';
 export * from './beatmap';
 export * from './render';
+export * from './mods';
 export * from './OsuPreviewController';
 export * from './audioResolver';

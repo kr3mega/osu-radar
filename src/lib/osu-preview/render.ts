@@ -208,8 +208,9 @@ export class OsuPreviewRenderer {
         bufferCtx.beginPath();
 
         let snake = 1;
+        const isFirstNoteOfMap = obj === beatmap.HitObjects[0];
         if (time < obj.time) {
-          if (index === 0 || !isHidden) {
+          if (isFirstNoteOfMap || !isHidden) {
             approachQueue.push(obj);
           }
           ctx.globalAlpha = clamp(0, (time - (obj.time - beatmap.preempt)) / beatmap.fadein, 1);
@@ -414,20 +415,48 @@ export class OsuPreviewRenderer {
         }
 
         let circleScale = 1;
-        if (time <= obj.time) {
-          if (index === 0 || !isHidden) {
-            approachQueue.push(obj);
+        const isFirstNote = obj === beatmap.HitObjects[0];
+        if (isHidden) {
+          if (time <= obj.time) {
+            if (isFirstNote) {
+              approachQueue.push(obj);
+            }
+            const hiddenFadeInStart = obj.time - beatmap.preempt;
+            const hiddenFadeInEnd = obj.time - beatmap.preempt * 0.6;
+            ctx.globalAlpha = clamp(
+              0,
+              1 - (hiddenFadeInEnd - time) / Math.max(1, hiddenFadeInEnd - hiddenFadeInStart),
+              1
+            );
+
+            // Hidden hitobject body fadeout before hit time
+            const hiddenFadeOutStart = obj.time - beatmap.preempt * 0.6;
+            const hiddenFadeOutEnd = obj.time - beatmap.preempt * 0.3;
+            if (time >= hiddenFadeOutStart) {
+              ctx.globalAlpha = clamp(
+                0,
+                (hiddenFadeOutEnd - time) / Math.max(1, hiddenFadeOutEnd - hiddenFadeOutStart),
+                1
+              );
+            }
+          } else {
+            ctx.globalAlpha = 0;
           }
-          ctx.globalAlpha = clamp(0, (time - (obj.time - beatmap.preempt)) / beatmap.fadein, 1);
           circleScale = 1;
         } else {
-          ctx.globalAlpha = clamp(0, (obj.time + beatmap.fadeout - time) / beatmap.fadeout, 1);
-          circleScale =
-            1 +
-            easingFunctions.easeOut(
-              clamp(0, 1 - (obj.time + beatmap.fadeout - time) / beatmap.fadeout, 1)
-            ) *
-              0.35;
+          if (time <= obj.time) {
+            approachQueue.push(obj);
+            ctx.globalAlpha = clamp(0, (time - (obj.time - beatmap.preempt)) / beatmap.fadein, 1);
+            circleScale = 1;
+          } else {
+            ctx.globalAlpha = clamp(0, (obj.time + beatmap.fadeout - time) / beatmap.fadeout, 1);
+            circleScale =
+              1 +
+              easingFunctions.easeOut(
+                clamp(0, 1 - (obj.time + beatmap.fadeout - time) / beatmap.fadeout, 1)
+              ) *
+                0.35;
+          }
         }
 
         if (circleSprite) {

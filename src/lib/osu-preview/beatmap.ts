@@ -1,7 +1,8 @@
-import { clamp, distance } from './functions';
+import { distance } from './functions';
 import { HitObject } from './HitObject';
 import { PreviewBeatmap, PreviewHitObject, OsuMod } from './types';
 import { getFollowPosition } from './slider';
+import { computeMapProperties } from './mods';
 
 export function parseBeatmapText(
   text: string,
@@ -29,7 +30,7 @@ export function parseBeatmapText(
     radius: 32,
     preempt: 1200,
     fadein: 800,
-    fadeout: 240,
+    fadeout: 233,
     duration: 0,
   };
 
@@ -132,40 +133,30 @@ export function parseBeatmapText(
     }
   }
 
-  // Pre-calculate properties, combos, slider durations, and stacking
-  applyBeatmapCalculations(result, activeMods);
+  // 1. Sort timing points
+  result.TimingPoints.sort((a, b) => a[0] - b[0]);
+
+  // 2. Pre-calculate combos, slider durations, draw order, and stacking ONCE
+  setupCombosAndSliders(result);
+
+  // 3. Compute initial map properties based on activeMods
+  computeMapProperties(result, activeMods);
 
   return result;
 }
 
+/**
+ * Recomputes mod-dependent beatmap properties (radius, preempt, fadein)
+ * dynamically without mutating hitobject coordinates.
+ */
 export function applyBeatmapCalculations(
   beatmap: PreviewBeatmap,
   activeMods: Set<OsuMod> = new Set()
 ): void {
-  // Sort timing points by time
-  beatmap.TimingPoints.sort((a, b) => a[0] - b[0]);
+  computeMapProperties(beatmap, activeMods);
+}
 
-  // Radius (CS) - HR and EZ are strictly mutually exclusive
-  const isHR = activeMods.has('hr');
-  const isEZ = !isHR && activeMods.has('ez');
-  const effectiveCS = clamp(0, beatmap.Difficulty.CircleSize * (isEZ ? 0.5 : isHR ? 1.3 : 1), 10);
-  beatmap.radius = 54.4 - 4.48 * effectiveCS;
-
-  // AR, Preempt, FadeIn
-  const effectiveAR = clamp(0, beatmap.Difficulty.ApproachRate * (isEZ ? 0.5 : isHR ? 1.4 : 1), 10);
-  if (effectiveAR < 5) {
-    beatmap.preempt = 1200 + (600 * (5 - effectiveAR)) / 5;
-    beatmap.fadein = 800 + (400 * (5 - effectiveAR)) / 5;
-  } else if (effectiveAR === 5) {
-    beatmap.preempt = 1200;
-    beatmap.fadein = 800;
-  } else {
-    beatmap.preempt = 1200 - (750 * (effectiveAR - 5)) / 5;
-    beatmap.fadein = 800 - (500 * (effectiveAR - 5)) / 5;
-  }
-  beatmap.fadeout = 233;
-
-  // Calculate combo numbers and slider durations
+function setupCombosAndSliders(beatmap: PreviewBeatmap): void {
   let currentCombo = 1;
   let comboIndex = -1;
   let inheritedTPIndex = -1;
@@ -385,24 +376,26 @@ export function getOrReconstructBeatmapText(map: any): string {
     '[HitObjects]',
   ];
 
-  if (Array.isArray(map.hitObjects)) {
+  if (Array.isArray(map.hitObjects) && map.hitObjects.length > 0) {
     for (const ho of map.hitObjects) {
-      if (ho.type === 'slider' && ho.points && ho.points.length > 1) {
-        const curvePointsStr = ho.points.slice(1).map((p: any) => `${Math.round(p.x)}:${Math.round(p.y)}`).join('|');
+      if (ho.type === 'slider' && ho.points && ho.points.length > 0) {
         const curveType = ho.curveType || 'L';
-        const curveData = `${curveType}|${curvePointsStr}`;
-        const repeats = ho.repeats || 1;
-        const pixelLen = ho.pixelLength || 100;
-        lines.push(`${Math.round(ho.x)},${Math.round(ho.y)},${Math.round(ho.time)},2,0,${curveData},${repeats},${pixelLen}`);
+        const pointsStr = ho.points.map((p: any) => `${p.x}:${p.y}`).join('|');
+        lines.push(
+          `${Math.round(ho.x)},${Math.round(ho.y)},${Math.round(ho.time)},2,0,${curveType}|${pointsStr},${ho.repeats || 1},${ho.pixelLength || 100}`
+        );
       } else if (ho.type === 'spinner') {
-        const end = ho.endTime || ho.time + 1000;
-        lines.push(`${Math.round(ho.x)},${Math.round(ho.y)},${Math.round(ho.time)},8,0,${Math.round(end)}`);
+        lines.push(
+          `256,192,${Math.round(ho.time)},12,0,${Math.round(ho.endTime || ho.time + 1000)}`
+        );
       } else {
         lines.push(`${Math.round(ho.x)},${Math.round(ho.y)},${Math.round(ho.time)},1,0`);
       }
     }
+  } else {
+    lines.push('256,192,1000,1,0');
+    lines.push('300,200,2000,1,0');
   }
 
   return lines.join('\n');
 }
-
