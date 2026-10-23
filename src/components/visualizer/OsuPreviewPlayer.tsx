@@ -12,7 +12,6 @@ import {
   Minimize2,
   Copy,
   Check,
-  Sliders,
   Radio,
   Music,
   Loader2,
@@ -122,7 +121,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const [playbackRate, setPlaybackRate] = useState<number>(1.0);
   const [volume, setVolume] = useState<number>(0.8);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [bgDim, setBgDim] = useState<number>(0.85);
+  const bgDim = 0.85;
   const [activeMods, setActiveMods] = useState<Set<OsuMod>>(new Set());
   const [copiedTime, setCopiedTime] = useState<boolean>(false);
   const [copiedPatternId, setCopiedPatternId] = useState<string | null>(null);
@@ -390,13 +389,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     setIsMuted(nextMuted);
     if (controllerRef.current) {
       controllerRef.current.setMuted(nextMuted);
-    }
-  };
-
-  const handleBgDimChange = (dim: number) => {
-    setBgDim(dim);
-    if (controllerRef.current) {
-      controllerRef.current.setBackgroundDim(dim);
     }
   };
 
@@ -728,45 +720,30 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             ))}
           </div>
 
-          {/* Volume & Dim */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handleToggleMute}
-                className="text-white/50 hover:text-white"
-              >
-                {isMuted || volume === 0 ? (
-                  <VolumeX className="w-3.5 h-3.5 text-red-400" />
-                ) : (
-                  <Volume2 className="w-3.5 h-3.5" />
-                )}
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={isMuted ? 0 : volume}
-                onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                className="w-12 h-1 bg-white/10 rounded appearance-none cursor-pointer accent-osu-cyan"
-                title="Volume"
-              />
-            </div>
-
-            <div className="hidden sm:flex items-center gap-1 text-white/40 text-[9px]">
-              <Sliders className="w-3 h-3" />
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={bgDim}
-                onChange={(e) => handleBgDimChange(parseFloat(e.target.value))}
-                className="w-10 h-1 bg-white/10 rounded appearance-none cursor-pointer accent-white/40"
-                title="Escurecimento do Fundo"
-              />
-            </div>
+          {/* Volume */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleToggleMute}
+              className="text-white/50 hover:text-white transition-colors"
+              title={isMuted ? 'Desmutar áudio' : 'Mutar áudio'}
+            >
+              {isMuted || volume === 0 ? (
+                <VolumeX className="w-3.5 h-3.5 text-red-400" />
+              ) : (
+                <Volume2 className="w-3.5 h-3.5" />
+              )}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={isMuted ? 0 : volume}
+              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+              className="w-16 sm:w-20 h-1 bg-white/10 rounded appearance-none cursor-pointer accent-osu-cyan"
+              title="Volume"
+            />
           </div>
         </div>
       </div>
