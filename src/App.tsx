@@ -7,7 +7,6 @@ import {
   SortOption,
   countActiveTrainingFilters,
 } from './store/usePoolStore';
-import { useSkinStore } from './store/useSkinStore';
 import { LazerToolbar } from './components/layout/LazerToolbar';
 import { ElectronTitlebar } from './components/layout/ElectronTitlebar';
 import { LazerBottomBar } from './components/layout/LazerBottomBar';
@@ -18,9 +17,6 @@ import { TrainingFiltersPanel } from './components/beatmap/TrainingFiltersPanel'
 import { PoolOverview } from './components/pool/PoolOverview';
 import { PoolUploader, UploaderTab } from './components/pool/PoolUploader';
 import { SkillAttributes } from './engine/types';
-import { extractOsuFilesFromZip } from './utils/unzip';
-import { analyzeBeatmap } from './engine/analyzer';
-import { extractQuickOsuMeta, matchOsuFileToTournamentEntry } from './utils/sheetParser';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { buildBeatmapCoverCss } from './lib/osu-preview';
 
@@ -80,16 +76,11 @@ export const App: React.FC = () => {
     toggleExpandedSet,
     setSearchQuery,
     initFromDb,
-    addBeatmaps,
-    setIsAnalyzing,
-    setProgress,
-    activeTournamentFilter,
   } = usePoolStore();
 
   const [activeTab, setActiveTab] = useState<'select' | 'overview'>('select');
   const [isUploaderOpen, setIsUploaderOpen] = useState(false);
   const [uploaderInitialTab, setUploaderInitialTab] = useState<UploaderTab>('osu_songs');
-  const [isGlobalDragging, setIsGlobalDragging] = useState(false);
 
   const openUploader = (tab: UploaderTab = 'osu_songs') => {
     setUploaderInitialTab(tab);
@@ -261,111 +252,11 @@ export const App: React.FC = () => {
     return sum;
   }, [filteredMaps, maps]);
 
-  // Global Drag & Drop Handler
-  const handleWindowDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsGlobalDragging(true);
-  };
-
-  const handleWindowDragLeave = (e: React.DragEvent) => {
-    if (e.relatedTarget === null) {
-      setIsGlobalDragging(false);
-    }
-  };
-
-  const handleWindowDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsGlobalDragging(false);
-    if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
-
-    const files = Array.from(e.dataTransfer.files);
-    const oskFiles = files.filter((f) => f.name.toLowerCase().endsWith('.osk'));
-    const beatmapFiles = files.filter((f) => !f.name.toLowerCase().endsWith('.osk'));
-
-    if (oskFiles.length > 0) {
-      for (const osk of oskFiles) {
-        await useSkinStore.getState().importSkinOskOrZip(osk);
-      }
-    }
-
-    if (beatmapFiles.length === 0) return;
-    setIsAnalyzing(true);
-
-    try {
-      const pendingOsuFiles: Array<{ fileName: string; text: string; bytes?: Uint8Array }> = [];
-
-      for (const file of beatmapFiles) {
-        const lower = file.name.toLowerCase();
-        if (lower.endsWith('.osu')) {
-          const text = await file.text();
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          pendingOsuFiles.push({ fileName: file.name, text, bytes });
-        } else if (lower.endsWith('.osz') || lower.endsWith('.zip')) {
-          const buf = await file.arrayBuffer();
-          const extracted = await extractOsuFilesFromZip(buf);
-          pendingOsuFiles.push(...extracted);
-        }
-      }
-
-      let filesToAnalyze: Array<{
-        fileName: string;
-        text: string;
-        bytes?: Uint8Array;
-        officialSr?: number;
-        officialBpm?: number;
-        modSlot?: string;
-      }> = [];
-
-      if (activeTournamentFilter && activeTournamentFilter.entries.length > 0) {
-        const requiredEntries = activeTournamentFilter.entries;
-        for (const item of pendingOsuFiles) {
-          const meta = extractQuickOsuMeta(item.text);
-          const matched = matchOsuFileToTournamentEntry(meta, requiredEntries);
-          if (matched) {
-            filesToAnalyze.push({
-              fileName: item.fileName,
-              text: item.text,
-              bytes: item.bytes,
-              officialSr: matched.sr,
-              officialBpm: matched.bpm,
-              modSlot: matched.slot,
-            });
-          }
-        }
-      } else {
-        filesToAnalyze = pendingOsuFiles;
-      }
-
-      const results = [];
-      for (let i = 0; i < filesToAnalyze.length; i++) {
-        const item = filesToAnalyze[i];
-        setProgress({ current: i + 1, total: filesToAnalyze.length, fileName: item.fileName });
-        const res = await analyzeBeatmap(item.text, item.fileName, item.bytes, item.officialSr);
-        if (item.modSlot) res.modSlot = item.modSlot;
-        if (item.officialSr) res.stats.starRating = item.officialSr;
-        if (item.officialBpm) res.stats.bpmMode = item.officialBpm;
-        results.push(res);
-      }
-
-      if (results.length > 0) {
-        await addBeatmaps(results);
-      }
-    } finally {
-      setIsAnalyzing(false);
-      setProgress(null);
-    }
-  };
-
   const hasActiveTrainingFilters =
     countActiveTrainingFilters(trainingFilters) > 0 || prioritizedSkills.length > 0;
 
   return (
-    <div
-      onDragOver={handleWindowDragOver}
-      onDragLeave={handleWindowDragLeave}
-      onDrop={handleWindowDrop}
-      className="osu-radar-app"
-    >
+    <div className="osu-radar-app">
       {/* 0. Custom Frameless osu!lazer Titlebar (rendered only inside Electron) */}
       <ElectronTitlebar
         activeSubtitle={
@@ -853,27 +744,6 @@ export const App: React.FC = () => {
               </ErrorBoundary>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* 5. Fullscreen Drag Overlay */}
-      {isGlobalDragging && (
-        <div
-          className="osu-radar-modal-backdrop"
-          style={{
-            border: '4px dashed hsl(var(--hsl-h1))',
-            flexDirection: 'column',
-            gap: '12px',
-            pointerEvents: 'none',
-          }}
-        >
-          <i className="fas fa-cloud-upload-alt" style={{ fontSize: '54px', color: 'hsl(var(--hsl-h1))' }} />
-          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: '#fff' }}>
-            Solte seus beatmaps (.osz / .osu) ou skins (.osk) aqui
-          </h2>
-          <p style={{ margin: 0, fontSize: '14px', color: 'hsl(var(--hsl-c1))' }}>
-            O osu!radar importará mapas e skins automaticamente
-          </p>
         </div>
       )}
     </div>
