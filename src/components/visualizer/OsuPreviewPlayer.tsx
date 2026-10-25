@@ -595,22 +595,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       {/* Top Toolbar */}
       <div className="osu-radar-player__toolbar">
         <div className="osu-radar-player__toolbar-left">
-          {audioStatus.state === 'loading' ? (
-            <span
-              className="osu-radar-mod-pill"
-              style={{
-                backgroundColor: 'hsl(var(--hsl-orange-3))',
-                color: '#fff',
-                fontSize: '9px',
-                gap: '4px',
-                flexShrink: 0,
-              }}
-            >
-              <i className="fas fa-circle-notch fa-spin" />
-              <span>{audioStatus.message || 'Baixando áudio...'}</span>
-            </span>
-          ) : null}
-
           <input
             ref={audioInputRef}
             type="file"
@@ -625,10 +609,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             style={{ display: 'none' }}
             onChange={handleSkinFileSelect}
           />
-        </div>
 
-        <div className="osu-radar-player__toolbar-right">
-          {/* Custom Skin Selector Dropdown */}
+          {/* Custom Skin Selector Dropdown - Expanded and Left-Aligned */}
           <div className="osu-radar-skin-switcher" ref={skinDropdownRef}>
             <button
               type="button"
@@ -645,17 +627,19 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               <span className="osu-radar-skin-trigger__name">
                 {currentSkin ? currentSkin.name : 'Selecionar Skin'}
               </span>
-              {currentSkin?.source === 'local_osu' && (
-                <span className="osu-radar-skin-tag osu-radar-skin-tag--osu">osu!</span>
-              )}
-              {currentSkin?.source === 'imported' && (
-                <span className="osu-radar-skin-tag osu-radar-skin-tag--imported">.osk</span>
-              )}
-              <i
-                className={`fas fa-chevron-down osu-radar-skin-trigger__chevron ${
-                  isSkinDropdownOpen ? 'osu-radar-skin-trigger__chevron--open' : ''
-                }`}
-              />
+              <div className="osu-radar-skin-trigger__meta">
+                {currentSkin?.source === 'local_osu' && (
+                  <span className="osu-radar-skin-tag osu-radar-skin-tag--osu">osu!</span>
+                )}
+                {currentSkin?.source === 'imported' && (
+                  <span className="osu-radar-skin-tag osu-radar-skin-tag--imported">.osk</span>
+                )}
+                <i
+                  className={`fas fa-chevron-down osu-radar-skin-trigger__chevron ${
+                    isSkinDropdownOpen ? 'osu-radar-skin-trigger__chevron--open' : ''
+                  }`}
+                />
+              </div>
             </button>
 
             {isSkinDropdownOpen && (
@@ -788,6 +772,24 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               </div>
             )}
           </div>
+        </div>
+
+        <div className="osu-radar-player__toolbar-right">
+          {audioStatus.state === 'loading' ? (
+            <span
+              className="osu-radar-mod-pill"
+              style={{
+                backgroundColor: 'hsl(var(--hsl-orange-3))',
+                color: '#fff',
+                fontSize: '9px',
+                gap: '4px',
+                flexShrink: 0,
+              }}
+            >
+              <i className="fas fa-circle-notch fa-spin" />
+              <span>{audioStatus.message || 'Baixando áudio...'}</span>
+            </span>
+          ) : null}
 
           {/* Mod Buttons (EZ, HR, DT, HD) */}
           <div className="osu-radar-player__mods-group">
