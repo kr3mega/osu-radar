@@ -1161,3 +1161,122 @@
     }
   }
 }
+
+/* ==========================================================================
+   Standalone Electron Desktop Titlebar & Pinned Header Offsets
+   ========================================================================== */
+@osu-electron-titlebar-height: 30px;
+
+.osu-radar-titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: @osu-electron-titlebar-height;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline-start: 12px;
+  background: linear-gradient(90deg, #130f12 0%, #191318 65%, #130f12 100%);
+  border-bottom: 1px solid rgba(255, 102, 170, 0.22);
+  user-select: none;
+  -webkit-app-region: drag;
+
+  &__brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    flex: 1;
+    padding-inline-end: 16px;
+  }
+
+  &__logo {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 4px rgba(255, 102, 170, 0.55));
+  }
+
+  &__title {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: #ffffff;
+    flex-shrink: 0;
+  }
+
+  &__badge {
+    padding: 1px 6px;
+    border-radius: 999px;
+    background-color: hsla(var(--hsl-h1), 0.18);
+    border: 1px solid hsla(var(--hsl-h1), 0.45);
+    color: hsl(var(--hsl-h1));
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+
+  &__subtitle {
+    margin-inline-start: 6px;
+    padding-inline-start: 8px;
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    color: @osu-colour-l2;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  &__controls {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    flex-shrink: 0;
+    -webkit-app-region: no-drag;
+  }
+
+  &__btn {
+    width: 44px;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    color: @osu-colour-l1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 100ms ease, color 100ms ease;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.09);
+      color: #ffffff;
+    }
+
+    &:focus-visible {
+      outline: 2px solid hsl(var(--hsl-h1));
+      outline-offset: -2px;
+    }
+
+    &--close:hover {
+      background-color: #e81123;
+      color: #ffffff;
+    }
+  }
+}
+
+body.osu-radar-is-electron {
+  .osu-radar-app {
+    padding-top: @osu-electron-titlebar-height;
+  }
+
+  .nav2-header {
+    top: @osu-electron-titlebar-height;
+  }
+
+  .osu-radar-modal-backdrop {
+    top: @osu-electron-titlebar-height;
+  }
+}

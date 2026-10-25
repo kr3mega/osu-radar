@@ -3,11 +3,17 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "electron:build-main": "node scripts/build-electron.mjs",
+    "electron:build": "npm run build && npm run electron:build-main",
+    "electron:start": "electron .",
+    "electron:dev": "node scripts/dev-electron.mjs",
+    "app": "npm run electron:build && electron ."
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^5.15.4",
@@ -29,6 +35,7 @@
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.21",
+    "electron": "^45.0.0",
     "less": "^4.2.1",
     "postcss": "^8.5.3",
     "typescript": "^5.8.2",

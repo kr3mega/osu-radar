@@ -228,24 +228,49 @@ export const LocalSongsSyncPanel: React.FC = () => {
                   </span>
                 )}
               </div>
-              <input
-                id="osu-songs-path-input"
-                type="text"
-                value={songsPath}
-                disabled={isSyncing}
-                onChange={(e) => setSongsPath(e.target.value)}
-                placeholder="Ex: C:\Users\Usuário\AppData\Local\osu!\Songs"
-                style={{
-                  padding: '9px 12px',
-                  borderRadius: '6px',
-                  backgroundColor: 'hsl(var(--hsl-b6))',
-                  border: '1px solid hsl(var(--hsl-b2))',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontFamily: 'AzeretMono, monospace',
-                  outline: 'none',
-                }}
-              />
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <input
+                  id="osu-songs-path-input"
+                  type="text"
+                  value={songsPath}
+                  disabled={isSyncing}
+                  onChange={(e) => setSongsPath(e.target.value)}
+                  placeholder="Ex: C:\Users\Usuário\AppData\Local\osu!\Songs"
+                  style={{
+                    flex: 1,
+                    minWidth: '240px',
+                    padding: '9px 12px',
+                    borderRadius: '6px',
+                    backgroundColor: 'hsl(var(--hsl-b6))',
+                    border: '1px solid hsl(var(--hsl-b2))',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontFamily: 'AzeretMono, monospace',
+                    outline: 'none',
+                  }}
+                />
+                {typeof window !== 'undefined' && window.osuRadarDesktop?.isElectron && (
+                  <button
+                    type="button"
+                    disabled={isSyncing}
+                    onClick={async () => {
+                      const picked = await window.osuRadarDesktop?.selectDirectory({
+                        title: 'Selecionar pasta Songs do osu!',
+                        defaultPath: songsPath.trim() || undefined,
+                      });
+                      if (picked) {
+                        setSongsPath(picked);
+                      }
+                    }}
+                    className="btn-osu-big btn-osu-big--rounded-small"
+                    style={{ padding: '0 14px', backgroundColor: 'hsl(var(--hsl-b3))' }}
+                    title="Abrir seletor nativo de pastas do sistema"
+                  >
+                    <i className="fas fa-folder-open" style={{ marginRight: '6px' }} />
+                    <span>Procurar...</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>

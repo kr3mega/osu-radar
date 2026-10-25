@@ -9,6 +9,7 @@ import {
 } from './store/usePoolStore';
 import { useSkinStore } from './store/useSkinStore';
 import { LazerToolbar } from './components/layout/LazerToolbar';
+import { ElectronTitlebar } from './components/layout/ElectronTitlebar';
 import { LazerBottomBar } from './components/layout/LazerBottomBar';
 import { LazerFloatingAudioPlayer } from './components/layout/LazerFloatingAudioPlayer';
 import { LazerWedge } from './components/beatmap/LazerWedge';
@@ -361,6 +362,15 @@ export const App: React.FC = () => {
       onDrop={handleWindowDrop}
       className="osu-radar-app"
     >
+      {/* 0. Custom Frameless osu!lazer Titlebar (rendered only inside Electron) */}
+      <ElectronTitlebar
+        activeSubtitle={
+          activeMap
+            ? `${activeMap.metadata.artist} — ${activeMap.metadata.title} [${activeMap.metadata.version}]`
+            : undefined
+        }
+      />
+
       {/* 1. Official ppy/osu-web Pinned Navbar + Header v4 */}
       <LazerToolbar
         activeTab={activeTab}

@@ -288,7 +288,7 @@ function isSkinDirAuthorized(targetDir: string, authorizedRoots: Set<string>): b
   return false;
 }
 
-function createLocalSkinsMiddleware() {
+export function createLocalSkinsMiddleware() {
   const authorizedRoots = new Set<string>();
 
   detectDefaultOsuSkinsDir()

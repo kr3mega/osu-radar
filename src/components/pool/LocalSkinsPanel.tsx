@@ -144,6 +144,28 @@ export const LocalSkinsPanel: React.FC = () => {
                 fontSize: '12px',
               }}
             />
+            {typeof window !== 'undefined' && window.osuRadarDesktop?.isElectron && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const picked = await window.osuRadarDesktop?.selectDirectory({
+                    title: 'Selecionar pasta Skins do osu!',
+                    defaultPath: skinsDirInput.trim() || undefined,
+                  });
+                  if (picked) {
+                    setSkinsDirInput(picked);
+                    await refreshSkins(picked);
+                    setStatusMessage('Pasta Skins do osu! sincronizada com sucesso!');
+                  }
+                }}
+                className="btn-osu-big btn-osu-big--rounded-small"
+                style={{ padding: '0 14px', backgroundColor: 'hsl(var(--hsl-b3))' }}
+                title="Abrir seletor nativo de pastas do sistema"
+              >
+                <i className="fas fa-folder-open" style={{ marginRight: '6px' }} />
+                <span>Procurar...</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleScanLocalSkins}

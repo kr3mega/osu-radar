@@ -369,7 +369,7 @@ function sendJson(res: ServerResponse, statusCode: number, data: unknown) {
   res.end(JSON.stringify(data));
 }
 
-function createLocalSongsMiddleware() {
+export function createLocalSongsMiddleware() {
   const authorizedRoots = new Set<string>();
 
   // Pre-authorize default osu! Songs directory on startup if it exists
