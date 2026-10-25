@@ -467,9 +467,18 @@ export const usePoolStore = create<PoolState>((set, get) => ({
           : state.sortBy,
     }));
   },
-  setFilterMod: (filterMod) => set({ filterMod }),
-  setFilterTournament: (filterTournament) => set({ filterTournament }),
-  setFilterStage: (filterStage) => set({ filterStage }),
+  setFilterMod: (filterMod) => {
+    console.log('[PoolStore] Filtro por Mod:', filterMod);
+    set({ filterMod });
+  },
+  setFilterTournament: (filterTournament) => {
+    console.log('[PoolStore] Filtro por Torneio:', filterTournament);
+    set({ filterTournament });
+  },
+  setFilterStage: (filterStage) => {
+    console.log('[PoolStore] Filtro por Estágio/Tier:', filterStage);
+    set({ filterStage });
+  },
   setStarRatingRange: (srMin, srMax) => {
     const clampedMin = Math.max(0, Math.min(srMin, srMax));
     const clampedMax = Math.max(clampedMin, srMax);
@@ -526,6 +535,7 @@ export const usePoolStore = create<PoolState>((set, get) => ({
     const current = get().prioritizedSkills;
     const exists = current.includes(skill);
     const next = exists ? current.filter((s) => s !== skill) : [...current, skill];
+    console.log('[PoolStore] Habilidade priorizada alternada:', skill, 'Ativas:', next);
     set((state) => ({
       prioritizedSkills: next,
       activeTrainingPreset: null,
@@ -542,6 +552,7 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   },
   setPrioritizedSkills: (skills) => {
     const unique = Array.from(new Set(skills));
+    console.log('[PoolStore] Habilidades priorizadas definidas:', unique);
     set((state) => ({
       prioritizedSkills: unique,
       activeTrainingPreset: unique.length > 0 ? null : state.activeTrainingPreset,
@@ -556,7 +567,8 @@ export const usePoolStore = create<PoolState>((set, get) => ({
       sortDirection: unique.length > 0 ? 'desc' : state.sortDirection,
     }));
   },
-  clearPrioritizedSkills: () =>
+  clearPrioritizedSkills: () => {
+    console.log('[PoolStore] Habilidades priorizadas limpas');
     set((state) => ({
       prioritizedSkills: [],
       sortBy:
@@ -565,8 +577,10 @@ export const usePoolStore = create<PoolState>((set, get) => ({
             ? 'sr'
             : 'slot'
           : state.sortBy,
-    })),
-  resetTrainingFilters: () =>
+    }));
+  },
+  resetTrainingFilters: () => {
+    console.log('[PoolStore] Reset de filtros de treino');
     set((state) => ({
       trainingFilters: { ...DEFAULT_TRAINING_FILTERS },
       activeTrainingPreset: null,
@@ -577,20 +591,30 @@ export const usePoolStore = create<PoolState>((set, get) => ({
             ? 'sr'
             : 'slot'
           : state.sortBy,
-    })),
+    }));
+  },
   setSearchQuery: (searchQuery) => {
     if (searchQuery.trim()) {
       console.log('[PoolStore] Termo de busca:', searchQuery.trim());
     }
     set({ searchQuery });
   },
-  setSortBy: (sortBy) => set({ sortBy }),
-  setSortDirection: (sortDirection) => set({ sortDirection }),
+  setSortBy: (sortBy) => {
+    console.log('[PoolStore] Ordenação alterada para:', sortBy);
+    set({ sortBy });
+  },
+  setSortDirection: (sortDirection) => {
+    console.log('[PoolStore] Direção de ordenação alterada para:', sortDirection);
+    set({ sortDirection });
+  },
   toggleSort: (option) => {
     const { sortBy, sortDirection } = get();
     if (sortBy === option) {
-      set({ sortDirection: sortDirection === 'desc' ? 'asc' : 'desc' });
+      const nextDir = sortDirection === 'desc' ? 'asc' : 'desc';
+      console.log('[PoolStore] Invertendo direção de ordenação para:', nextDir);
+      set({ sortDirection: nextDir });
     } else {
+      console.log('[PoolStore] Alternando critério de ordenação para:', option, '(desc)');
       set({
         sortBy: option,
         sortDirection: 'desc', // User requested: newly clicked filter starts descending, next click toggles ascending
