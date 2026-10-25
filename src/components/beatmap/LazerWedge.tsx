@@ -113,20 +113,22 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
               </span>
             </div>
 
-            <span
-              className="beatmapset-status beatmapset-status--show"
-              style={{
-                backgroundColor: modColorConfig.bg,
-                color: modColorConfig.text,
-                fontWeight: 800,
-                fontSize: '10px',
-                padding: '1px 6px',
-                lineHeight: '16px',
-                marginLeft: '4px',
-              }}
-            >
-              {isLocalSong ? 'LOCAL' : modSlot || 'NM1'}
-            </span>
+            {!isLocalSong && (
+              <span
+                className="beatmapset-status beatmapset-status--show"
+                style={{
+                  backgroundColor: modColorConfig.bg,
+                  color: modColorConfig.text,
+                  fontWeight: 800,
+                  fontSize: '10px',
+                  padding: '1px 6px',
+                  lineHeight: '16px',
+                  marginLeft: '4px',
+                }}
+              >
+                {modSlot || 'NM1'}
+              </span>
+            )}
           </div>
 
           <button
@@ -370,17 +372,27 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
 
           {/* Right Box: Status Pill & Official .beatmapset-stats Table (resources/js/beatmapsets-show/stats.tsx) */}
           <div className="beatmapset-header__box beatmapset-header__box--stats">
-            <div className="beatmapset-header__status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-              <span
-                className="beatmapset-status beatmapset-status--show"
-                style={{
-                  backgroundColor: modColorConfig.bg,
-                  color: modColorConfig.text,
-                  fontWeight: 800,
-                }}
-              >
-                {isLocalSong ? 'LOCAL' : modSlot || 'NM1'}
-              </span>
+            <div
+              className="beatmapset-header__status"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: !isLocalSong ? 'space-between' : 'flex-end',
+                gap: '8px',
+              }}
+            >
+              {!isLocalSong && (
+                <span
+                  className="beatmapset-status beatmapset-status--show"
+                  style={{
+                    backgroundColor: modColorConfig.bg,
+                    color: modColorConfig.text,
+                    fontWeight: 800,
+                  }}
+                >
+                  {modSlot || 'NM1'}
+                </span>
+              )}
 
               <button
                 type="button"
