@@ -11,9 +11,19 @@ echo ===========================================================================
 echo                    osu!radar Desktop - Terminal de Logs Ao Vivo
 echo ================================================================================
 echo  * Este terminal exibe em tempo real todos os eventos e acoes do app.
-echo  * Os logs tambem sao salvos automaticamente em: logs\electron-desktop.log
+echo  * Os logs tambem sao salvos continuamente em: logs\electron-desktop.log
 echo ================================================================================
 echo.
+
+:: Verifica se o Electron ja esta em execucao no sistema
+tasklist /fi "imagename eq electron.exe" 2>nul | find /i "electron.exe" >nul
+if not errorlevel 1 (
+  echo [INFO] O osu!radar Desktop ja esta em execucao!
+  echo [INFO] Conectando diretamente ao fluxo de logs ao vivo do app ativo...
+  echo [INFO] Pressione Ctrl+C a qualquer momento para fechar este terminal.
+  echo.
+  goto stream_logs
+)
 
 if not exist "%APP_DIR%\dist\index.html" goto build_app
 if not exist "%APP_DIR%\dist-electron\electron\main.js" goto build_app
@@ -38,3 +48,12 @@ if exist "%APP_DIR%\node_modules\electron\cli.js" (
 echo.
 echo [INFO] osu!radar finalizado. Pressione qualquer tecla para fechar.
 pause
+exit /b 0
+
+:stream_logs
+if not exist "%APP_DIR%\logs\electron-desktop.log" (
+  echo [AVISO] Aguardando inicializacao do arquivo de logs...
+  timeout /t 2 >nul
+)
+powershell -NoProfile -Command "Get-Content -Path 'logs\electron-desktop.log' -Wait -Tail 30"
+

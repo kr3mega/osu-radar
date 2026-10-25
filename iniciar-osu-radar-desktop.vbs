@@ -13,8 +13,10 @@ appDir = fso.GetParentFolderName(WScript.ScriptFullName)
 electronExe = appDir & "\node_modules\electron\dist\electron.exe"
 mainJs = appDir & "\dist-electron\electron\main.js"
 
+WshShell.CurrentDirectory = appDir
+
 If Not fso.FileExists(mainJs) Then
-  WshShell.Run "cmd /c cd /d """ & appDir & """ && npm run electron:build", 0, True
+  WshShell.Run "cmd /c npm run electron:build", 0, True
 End If
 
 WshShell.Run """" & electronExe & """ """ & appDir & """", 0, False
