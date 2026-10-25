@@ -22,6 +22,7 @@ import { BeatmapAnalysisResult } from '../../engine/types';
 import { db } from '../../db';
 import { useAudioStore, registerVisualizerPauseCallback } from '../../store/useAudioStore';
 import { useSkinStore } from '../../store/useSkinStore';
+import { StatHexagon } from '../charts/StatHexagon';
 
 const SEVERITY_BADGES: Record<
   PatternSeverity,
@@ -107,6 +108,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const [selectedPatternId, setSelectedPatternId] = useState<string | undefined>(initialPatternId);
   const [_hasAudioTrack, setHasAudioTrack] = useState<boolean>(false);
   const [patternCategory, setPatternCategory] = useState<PatternCategory>('TODOS');
+  const [activeBottomTab, setActiveBottomTab] = useState<'patterns' | 'skills'>('patterns');
   const [audioStatus, setAudioStatus] = useState<AudioResolveStatus>({
     state: 'idle',
     message: '',
@@ -921,9 +923,55 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
         </div>
       </div>
 
-      {/* Algorithm-Detected Patterns Section */}
-      <div className="osu-skills-player__patterns">
-        <div className="osu-skills-player__patterns-header">
+      {/* Official ppy/osu-web .page-mode Sub-Navigation Bar (Ver Padrões vs Ver Skills) */}
+      <ul
+        className="page-mode page-mode--sticky-toolbar"
+        style={{
+          padding: '6px 15px 0',
+          backgroundColor: 'hsl(var(--hsl-b4))',
+          textAlign: 'left',
+          flexShrink: 0,
+        }}
+      >
+        <li className="page-mode__item">
+          <a
+            href="#patterns"
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveBottomTab('patterns');
+            }}
+            className={`page-mode-link ${
+              activeBottomTab === 'patterns' ? 'page-mode-link--is-active' : ''
+            }`}
+          >
+            <i className="fas fa-list-ul" style={{ marginRight: '6px', alignSelf: 'center' }} />
+            <span>Ver Padrões</span>
+            <span className="page-mode-link__stripe" />
+          </a>
+        </li>
+
+        <li className="page-mode__item">
+          <a
+            href="#skills"
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveBottomTab('skills');
+            }}
+            className={`page-mode-link ${
+              activeBottomTab === 'skills' ? 'page-mode-link--is-active' : ''
+            }`}
+          >
+            <i className="fas fa-chart-bar" style={{ marginRight: '6px', alignSelf: 'center' }} />
+            <span>Ver Skills</span>
+            <span className="page-mode-link__stripe" />
+          </a>
+        </li>
+      </ul>
+
+      {/* Alternating Lower Content: Ver Padrões OU Ver Skills */}
+      {activeBottomTab === 'patterns' ? (
+        <div className="osu-skills-player__patterns">
+          <div className="osu-skills-player__patterns-header">
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'hsl(var(--hsl-c1))' }}>
             <i className="fas fa-bolt" style={{ color: 'hsl(var(--hsl-h1))', marginRight: '6px' }} />
             <span>padrões detectados pelo algoritmo ({detectedPatterns.length})</span>
@@ -1105,6 +1153,11 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
           )}
         </div>
       </div>
-    </div>
-  );
+    ) : (
+      <div className="osu-skills-player__skills-wrapper">
+        <StatHexagon skills={map.skills} />
+      </div>
+    )}
+  </div>
+);
 };

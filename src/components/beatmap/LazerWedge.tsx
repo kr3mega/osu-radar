@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { BeatmapAnalysisResult, SkillAttributes } from '../../engine/types';
 import { getStarRatingColor, getStarRatingTextColor, TOURNAMENT_MOD_COLORS } from '../../utils/osuColors';
 import { ModSlotBadge } from './ModSlotBadge';
-import { StatHexagon } from '../charts/StatHexagon';
 import { OsuPreviewPlayer } from '../visualizer/OsuPreviewPlayer';
 import { formatTimestamp } from '../../engine/strains';
 import { buildBeatmapCoverCss } from '../../lib/osu-preview';
@@ -22,7 +21,6 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   onSlotChange,
   onSelectDifficulty,
 }) => {
-  const [activeWedgeTab, setActiveWedgeTab] = useState<'skills' | 'visualizer'>('visualizer');
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(false);
 
   if (!map) {
@@ -48,7 +46,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
     );
   }
 
-  const { metadata, stats, difficulty, skills, patterns = [], modSlot } = map;
+  const { metadata, stats, difficulty, patterns = [], modSlot } = map;
   const isLocalSong = map.origin === 'local_songs';
   const coverCss = buildBeatmapCoverCss(map, 'cover');
 
@@ -474,67 +472,8 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
         </div>
       )}
 
-      {/* Official ppy/osu-web .page-mode Sub-Navigation Bar */}
-      <ul
-        className="page-mode page-mode--sticky-toolbar"
-        style={{
-          padding: '8px 15px 0',
-          backgroundColor: 'hsl(var(--hsl-b4))',
-          textAlign: 'left',
-        }}
-      >
-        <li className="page-mode__item">
-          <a
-            href="#visualizer"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveWedgeTab('visualizer');
-            }}
-            className={`page-mode-link ${
-              activeWedgeTab === 'visualizer' ? 'page-mode-link--is-active' : ''
-            }`}
-          >
-            <i className="fas fa-play-circle" style={{ marginRight: '6px', alignSelf: 'center' }} />
-            <span>Assistir Preview</span>
-            <span className="page-mode-link__stripe" />
-          </a>
-        </li>
-
-        <li className="page-mode__item">
-          <a
-            href="#skills"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveWedgeTab('skills');
-            }}
-            className={`page-mode-link ${
-              activeWedgeTab === 'skills' ? 'page-mode-link--is-active' : ''
-            }`}
-          >
-            <i className="fas fa-chart-bar" style={{ marginRight: '6px', alignSelf: 'center' }} />
-            <span>Ver Skills</span>
-            <span className="page-mode-link__stripe" />
-          </a>
-        </li>
-      </ul>
-
-      {/* Tab Content */}
-      {activeWedgeTab === 'skills' ? (
-        <div
-          style={{
-            padding: '20px',
-            backgroundColor: 'hsl(var(--hsl-b5))',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            flex: '1 1 auto',
-          }}
-        >
-          <StatHexagon skills={skills} />
-        </div>
-      ) : (
-        <OsuPreviewPlayer map={map} patterns={patterns} />
-      )}
+      {/* Fixed Preview Player with Integrated Sub-Tabs (Padrões / Skills) */}
+      <OsuPreviewPlayer map={map} patterns={patterns} />
     </div>
   );
 };
