@@ -17,12 +17,43 @@ export interface StoredCustomSkin {
 }
 
 // Dexie database for caching beatmaps, saved mappools, and imported .osk skins offline
-export const db = new Dexie('osuRadarDB') as Dexie & {
+export const db = new Dexie('osuSkillsDB') as Dexie & {
   beatmaps: EntityTable<BeatmapAnalysisResult, 'id'>;
   mappools: EntityTable<Mappool, 'id'>;
   beatmapTexts: EntityTable<CachedBeatmapText, 'id'>;
   skins: EntityTable<StoredCustomSkin, 'id'>;
 };
+
+// Auto-migration from legacy osuRadarDB if osuSkillsDB is newly initialized
+if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+  (async () => {
+    try {
+      const count = await db.beatmaps.count();
+      if (count === 0) {
+        const legacyDb = new Dexie('osuRadarDB');
+        legacyDb.version(3).stores({
+          beatmaps: 'id, fileName, modSlot, origin, localOsuPath, calculatedAt',
+          mappools: 'id, name, stage, createdAt, updatedAt',
+          beatmapTexts: 'id',
+          skins: 'id, name, createdAt',
+        });
+        await legacyDb.open();
+        const oldMaps = await legacyDb.table('beatmaps').toArray();
+        if (oldMaps.length > 0) {
+          await db.beatmaps.bulkPut(oldMaps);
+          const oldPools = await legacyDb.table('mappools').toArray();
+          if (oldPools.length > 0) await db.mappools.bulkPut(oldPools);
+          const oldTexts = await legacyDb.table('beatmapTexts').toArray();
+          if (oldTexts.length > 0) await db.beatmapTexts.bulkPut(oldTexts);
+          const oldSkins = await legacyDb.table('skins').toArray();
+          if (oldSkins.length > 0) await db.skins.bulkPut(oldSkins);
+        }
+      }
+    } catch {
+      // Safe no-op on non-browser / test environments
+    }
+  })();
+}
 
 // Schema definition
 db.version(1).stores({

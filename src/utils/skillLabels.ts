@@ -13,7 +13,7 @@ export const ALL_SKILL_KEYS: Array<keyof SkillAttributes> = [
 ];
 
 /**
- * Canonical UI display labels across the entire osu!radar interface.
+ * Canonical UI display labels across the entire osu!skills interface.
  * Internal data key `snapAim` is globally presented as "Jump".
  */
 export const SKILL_LABELS: Record<keyof SkillAttributes, string> = {

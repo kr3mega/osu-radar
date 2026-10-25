@@ -154,7 +154,7 @@ export const BeatmapDetailModal: React.FC<BeatmapDetailModalProps> = ({ onClose 
             </div>
           </div>
 
-          {/* Hexagon Radar + Kinematic Channels Breakdown */}
+          {/* Hexagon Skills + Kinematic Channels Breakdown */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
             {/* Hexagon (with pool comparison) */}
             <div className="md:col-span-6 flex flex-col items-center p-4 bg-osu-base/60 rounded-card border border-osu-border">

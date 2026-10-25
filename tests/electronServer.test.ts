@@ -23,11 +23,11 @@ describe('Servidor Local Embutido do Electron (Standalone sem Navegador/Vite)', 
   });
 
   it('serve dist/, WASM, Range requests de áudio e pontes nativas /api/local-songs e /api/local-skins em 127.0.0.1', async () => {
-    tmpDist = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-radar-electron-dist-'));
+    tmpDist = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-skills-electron-dist-'));
     await fs.promises.mkdir(path.join(tmpDist, 'assets'), { recursive: true });
     await fs.promises.writeFile(
       path.join(tmpDist, 'index.html'),
-      '<!doctype html><html><body><div id="root">osu!radar</div></body></html>',
+      '<!doctype html><html><body><div id="root">osu!skills</div></body></html>',
       'utf8'
     );
     await fs.promises.writeFile(
@@ -45,7 +45,7 @@ describe('Servidor Local Embutido do Electron (Standalone sem Navegador/Vite)', 
     // 1. Root index.html
     const htmlRes = await fetch(`${running.url}/`);
     expect(htmlRes.status).toBe(200);
-    expect(await htmlRes.text()).toContain('osu!radar');
+    expect(await htmlRes.text()).toContain('osu!skills');
 
     // 2. WebAssembly MIME type (required by rosu-pp-js WebAssembly.instantiateStreaming)
     const wasmRes = await fetch(`${running.url}/assets/engine.wasm`);
@@ -72,7 +72,7 @@ describe('Servidor Local Embutido do Electron (Standalone sem Navegador/Vite)', 
   });
 
   it('permite recarregamento dinâmico da interface via endpoint /api/dev/reload disparando callback', async () => {
-    tmpDist = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-radar-reload-test-'));
+    tmpDist = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-skills-reload-test-'));
     let reloadTriggered = false;
 
     running = await startLocalAppServer({

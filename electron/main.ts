@@ -35,9 +35,9 @@ const DEFAULT_WINDOW_STATE: PersistedWindowState = {
 
 const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'osu:']);
 
-app.setName('osu!radar');
+app.setName('osu!skills');
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.osuradar.desktop');
+  app.setAppUserModelId('com.osuskills.desktop');
 }
 
 // Forçar Aceleração de Hardware por padrão no Chromium / Electron
@@ -259,13 +259,21 @@ function openExternalSafely(rawUrl: string): void {
 }
 
 function registerIpcHandlers(appLogger: DesktopLogger): void {
-  ipcMain.handle('osu-radar:window-minimize', (event) => {
+  const handleBoth = (
+    action: string,
+    handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any
+  ) => {
+    ipcMain.handle(`osu-skills:${action}`, handler);
+    ipcMain.handle(`osu-radar:${action}`, handler);
+  };
+
+  handleBoth('window-minimize', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     win?.minimize();
     appLogger.ipc('window-minimize', 'Comando de minimizar janela recebido via barra de título');
   });
 
-  ipcMain.handle('osu-radar:window-toggle-maximize', (event) => {
+  handleBoth('window-toggle-maximize', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return false;
     if (win.isMaximized()) {
@@ -278,21 +286,21 @@ function registerIpcHandlers(appLogger: DesktopLogger): void {
     return true;
   });
 
-  ipcMain.handle('osu-radar:window-close', (event) => {
+  handleBoth('window-close', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     appLogger.ipc('window-close', 'Comando de fechar janela recebido via barra de título');
     win?.close();
   });
 
-  ipcMain.handle('osu-radar:window-is-maximized', (event) => {
+  handleBoth('window-is-maximized', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     const max = Boolean(win?.isMaximized());
     appLogger.ipc('window-is-maximized', `Consulta de estado maximizado: ${max}`);
     return max;
   });
 
-  ipcMain.handle(
-    'osu-radar:select-directory',
+  handleBoth(
+    'select-directory',
     async (event, options?: { title?: string; defaultPath?: string }) => {
       const win = BrowserWindow.fromWebContents(event.sender);
       const dialogTitle = options?.title || 'Selecionar Pasta';
@@ -318,20 +326,20 @@ function registerIpcHandlers(appLogger: DesktopLogger): void {
     }
   );
 
-  ipcMain.handle('osu-radar:open-external', async (_event, url: string) => {
+  handleBoth('open-external', async (_event, url: string) => {
     appLogger.ipc('open-external', `Solicitação de link externo: ${url}`);
     if (typeof url === 'string' && url.trim()) {
       openExternalSafely(url.trim());
     }
   });
 
-  ipcMain.handle('osu-radar:get-gpu-status', () => {
+  handleBoth('get-gpu-status', () => {
     appLogger.ipc('get-gpu-status', 'Consulta de aceleração de hardware solicitada pela interface');
     return app.getGPUFeatureStatus();
   });
 
-  ipcMain.handle(
-    'osu-radar:log',
+  handleBoth(
+    'log',
     (_event, payload?: { level?: string; tag?: string; message?: string; extra?: any }) => {
       if (!payload || !payload.message) return;
       const level = (payload.level || 'info').toLowerCase();
@@ -384,7 +392,7 @@ function setupAutoReloadWatcher(
 
         appLogger.info(
           'AutoReload',
-          `[ATUALIZAÇÃO DETECTADA] ${reason}. Recarregando interface do osu!radar automaticamente...`
+          `[ATUALIZAÇÃO DETECTADA] ${reason}. Recarregando interface do osu!skills automaticamente...`
         );
         win.webContents.reloadIgnoringCache();
       } catch (err) {
@@ -490,7 +498,7 @@ async function createMainWindow(appLogger: DesktopLogger): Promise<void> {
     titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
     autoHideMenuBar: true,
     backgroundColor: '#171316',
-    title: 'osu!radar',
+    title: 'osu!skills',
     icon: resolveAppIcon(appRoot),
     webPreferences: {
       preload: preloadPath,
@@ -516,11 +524,13 @@ async function createMainWindow(appLogger: DesktopLogger): Promise<void> {
 
   win.on('maximize', () => {
     appLogger.info('Window', 'Janela maximizada pelo usuário');
+    win.webContents.send('osu-skills:maximized-changed', true);
     win.webContents.send('osu-radar:maximized-changed', true);
   });
 
   win.on('unmaximize', () => {
     appLogger.info('Window', 'Janela desmaximizada (restaurada)');
+    win.webContents.send('osu-skills:maximized-changed', false);
     win.webContents.send('osu-radar:maximized-changed', false);
   });
 
@@ -761,7 +771,7 @@ const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!hasSingleInstanceLock) {
   logger.warn('Main', '================================================================================');
-  logger.warn('Main', '[AVISO DE INSTÂNCIA DUPLICADA] Outra instância do osu!radar já está ativa no sistema.');
+  logger.warn('Main', '[AVISO DE INSTÂNCIA DUPLICADA] Outra instância do osu!skills já está ativa no sistema.');
   logger.warn('Main', 'Sinalizando restauração e foco para a janela já em execução.');
   logger.warn('Main', 'Encerrando esta nova instância para prevenir colisões de portas e bancos IndexedDB.');
   logger.warn('Main', '================================================================================');
@@ -801,7 +811,7 @@ if (!hasSingleInstanceLock) {
   app.on('window-all-closed', () => {
     logger.info('Main', 'Todas as janelas foram fechadas pelo usuário.');
     if (process.platform !== 'darwin') {
-      logger.info('Main', 'Encerrando ciclo de vida do osu!radar Desktop...');
+      logger.info('Main', 'Encerrando ciclo de vida do osu!skills Desktop...');
       app.quit();
     }
   });

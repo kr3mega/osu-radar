@@ -675,7 +675,7 @@ export const usePoolStore = create<PoolState>((set, get) => ({
     });
     return JSON.stringify(
       {
-        id: pool.id || 'osu-radar-pool',
+        id: pool.id || 'osu-skills-pool',
         name: pool.name || 'Mappool de Torneio',
         stage: pool.stage || 'Etapa Competitiva',
         description: pool.description || 'Auditoria de habilidades e tensões físicas de beatmaps',

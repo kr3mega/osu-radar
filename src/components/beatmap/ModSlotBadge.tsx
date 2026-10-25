@@ -20,7 +20,7 @@ export const ModSlotBadge: React.FC<ModSlotBadgeProps> = ({
 
   return (
     <span
-      className={`osu-radar-mod-pill ${className}`}
+      className={`osu-skills-mod-pill ${className}`}
       style={{
         backgroundColor: config.bg,
         color: config.text,

@@ -132,9 +132,9 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
 
   return (
     <div
-      className={`osu-radar-song-group ${
-        isExpanded ? 'osu-radar-song-group--expanded' : ''
-      } ${deferred && !isExpanded ? 'osu-radar-card-deferred' : ''}`}
+      className={`osu-skills-song-group ${
+        isExpanded ? 'osu-skills-song-group--expanded' : ''
+      } ${deferred && !isExpanded ? 'osu-skills-card-deferred' : ''}`}
     >
       <div
         onClick={handleCardClick}
@@ -220,7 +220,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
             {!isLocalSong && (
               <div className="beatmapset-panel__play-icons">
                 <span
-                  className="osu-radar-mod-pill"
+                  className="osu-skills-mod-pill"
                   style={{
                     backgroundColor: modColorConfig.bg,
                     color: modColorConfig.text,
@@ -245,8 +245,8 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
               >
                 {group && (
                   <span
-                    className={`osu-radar-diff-count-pill ${
-                      isExpanded ? 'osu-radar-diff-count-pill--open' : ''
+                    className={`osu-skills-diff-count-pill ${
+                      isExpanded ? 'osu-skills-diff-count-pill--open' : ''
                     }`}
                     title={
                       isExpanded
@@ -546,7 +546,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
 
       {/* Expandable Difficulties Drawer (shown when song is clicked) */}
       {group && isExpanded && (
-        <div className="osu-radar-diff-drawer" role="group" aria-label={`Dificuldades de ${metadata.title}`}>
+        <div className="osu-skills-diff-drawer" role="group" aria-label={`Dificuldades de ${metadata.title}`}>
           {difficulties.map((diffItem) => {
             const isDiffSelected = diffItem.id === selectedMapId;
             const diffStarBg = getStarRatingColor(diffItem.stats.starRating);
@@ -583,12 +583,12 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                     }
                   }
                 }}
-                className={`osu-radar-diff-row ${
-                  isDiffSelected ? 'osu-radar-diff-row--selected' : ''
+                className={`osu-skills-diff-row ${
+                  isDiffSelected ? 'osu-skills-diff-row--selected' : ''
                 }`}
               >
                 <span
-                  className="osu-radar-diff-row__star"
+                  className="osu-skills-diff-row__star"
                   style={{ backgroundColor: diffStarBg, color: diffStarText }}
                 >
                   ★ {diffItem.stats.starRating.toFixed(2).replace('.', ',')}
@@ -596,7 +596,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
 
                 {diffItem.origin !== 'local_songs' && diffItem.modSlot && (
                   <span
-                    className="osu-radar-mod-pill"
+                    className="osu-skills-mod-pill"
                     style={{
                       backgroundColor: diffModColors.bg,
                       color: diffModColors.text,
@@ -607,29 +607,29 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                   </span>
                 )}
 
-                <span className="osu-radar-diff-row__version u-ellipsis-overflow">
+                <span className="osu-skills-diff-row__version u-ellipsis-overflow">
                   [{diffItem.metadata.version}]
                 </span>
 
-                <span className="osu-radar-diff-row__stats">
+                <span className="osu-skills-diff-row__stats">
                   {diffItem.stats.bpmMode} BPM · CS {diffItem.difficulty.cs.toFixed(1)} · AR{' '}
                   {diffItem.difficulty.ar.toFixed(1)} · OD {diffItem.difficulty.od.toFixed(1)}
                 </span>
 
-                <span className="osu-radar-diff-row__skills">
+                <span className="osu-skills-diff-row__skills">
                   {prioritizedSkills.length >= 2 && (
-                    <span className="osu-radar-diff-row__skill osu-radar-diff-row__skill--synergy">
+                    <span className="osu-skills-diff-row__skill osu-skills-diff-row__skill--synergy">
                       {diffSynergy.toFixed(0)}%
                     </span>
                   )}
                   {diffSkills.map((sk) => (
-                    <span key={sk} className="osu-radar-diff-row__skill">
+                    <span key={sk} className="osu-skills-diff-row__skill">
                       {SKILL_SHORT_LABELS[sk]} {diffItem.skills[sk].toFixed(0)}%
                     </span>
                   ))}
                 </span>
 
-                <span className="osu-radar-diff-row__actions">
+                <span className="osu-skills-diff-row__actions">
                   {(diffItem.metadata.beatmapId || diffItem.metadata.beatmapSetId) && (
                     <a
                       href={
@@ -639,7 +639,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                       }
                       onClick={(e) => e.stopPropagation()}
                       title="Abrir esta dificuldade no osu!"
-                      className="osu-radar-diff-row__action-btn"
+                      className="osu-skills-diff-row__action-btn"
                     >
                       <i className="fas fa-gamepad" />
                     </a>
@@ -652,7 +652,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                         onRemoveDifficulty(diffItem.id);
                       }}
                       title="Remover dificuldade"
-                      className="osu-radar-diff-row__action-btn"
+                      className="osu-skills-diff-row__action-btn"
                     >
                       <i className="fas fa-trash" />
                     </button>

@@ -573,7 +573,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       ref={containerRef}
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleAudioDrop}
-      className="osu-radar-player"
+      className="osu-skills-player"
     >
       <input
         ref={audioInputRef}
@@ -591,17 +591,17 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       />
 
       {/* Playfield Stage */}
-      <div className="osu-radar-player__stage">
-        <div className="osu-radar-player__canvas-box" onClick={handleTogglePlay}>
+      <div className="osu-skills-player__stage">
+        <div className="osu-skills-player__canvas-box" onClick={handleTogglePlay}>
           <canvas ref={canvasRef} />
 
           {!isPlaying && (
-            <div className="osu-radar-player__play-overlay">
-              <div className="osu-radar-player__play-circle">
+            <div className="osu-skills-player__play-overlay">
+              <div className="osu-skills-player__play-circle">
                 <i className="fas fa-play" style={{ marginLeft: '2px' }} />
               </div>
               <span
-                className="osu-radar-mod-pill"
+                className="osu-skills-mod-pill"
                 style={{
                   backgroundColor: 'rgba(0,0,0,0.75)',
                   color: '#fff',
@@ -616,9 +616,9 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       </div>
 
       {/* Scrubber & Playback Controls */}
-      <div className="osu-radar-player__controls">
-        <div className="osu-radar-player__scrubber-row">
-          <span className="osu-radar-player__time">
+      <div className="osu-skills-player__controls">
+        <div className="osu-skills-player__scrubber-row">
+          <span className="osu-skills-player__time">
             {formatOsuEditorTimestamp(currentTimeMs)}
           </span>
 
@@ -628,10 +628,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             max={Math.max(1, durationMs)}
             value={currentTimeMs}
             onChange={(e) => handleSeek(parseFloat(e.target.value))}
-            className="osu-radar-player__range"
+            className="osu-skills-player__range"
           />
 
-          <span className="osu-radar-player__time osu-radar-player__time--muted">
+          <span className="osu-skills-player__time osu-skills-player__time--muted">
             {formatOsuEditorTimestamp(durationMs)}
           </span>
 
@@ -645,14 +645,14 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
           </button>
         </div>
 
-        <div className="osu-radar-player__buttons-row">
+        <div className="osu-skills-player__buttons-row">
           {/* Transport Buttons: [-1s], [Play/Pause], [+1s] */}
-          <div className="osu-radar-player__transport-group">
+          <div className="osu-skills-player__transport-group">
             <button
               type="button"
               onClick={() => handleStep(-1000)}
               title="-1s"
-              className="btn-osu-big btn-osu-big--rounded-small osu-radar-player__transport-btn"
+              className="btn-osu-big btn-osu-big--rounded-small osu-skills-player__transport-btn"
             >
               <i className="fas fa-step-backward" />
             </button>
@@ -661,7 +661,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               type="button"
               onClick={handleTogglePlay}
               title={isPlaying ? 'Pausar' : 'Reproduzir'}
-              className="btn-osu-big btn-osu-big--pink btn-osu-big--rounded-small osu-radar-player__play-btn"
+              className="btn-osu-big btn-osu-big--pink btn-osu-big--rounded-small osu-skills-player__play-btn"
             >
               <i className={`fas fa-${isPlaying ? 'pause' : 'play'}`} />
             </button>
@@ -670,17 +670,17 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               type="button"
               onClick={() => handleStep(1000)}
               title="+1s"
-              className="btn-osu-big btn-osu-big--rounded-small osu-radar-player__transport-btn"
+              className="btn-osu-big btn-osu-big--rounded-small osu-skills-player__transport-btn"
             >
               <i className="fas fa-step-forward" />
             </button>
           </div>
 
           {/* Skin Selector Dropdown - Flexible horizontal width positioned to the right of playback transport */}
-          <div className="osu-radar-skin-switcher osu-radar-skin-switcher--bottom" ref={skinDropdownRef}>
+          <div className="osu-skills-skin-switcher osu-skills-skin-switcher--bottom" ref={skinDropdownRef}>
             <button
               type="button"
-              className={`osu-radar-skin-trigger ${isSkinDropdownOpen ? 'osu-radar-skin-trigger--open' : ''}`}
+              className={`osu-skills-skin-trigger ${isSkinDropdownOpen ? 'osu-skills-skin-trigger--open' : ''}`}
               onClick={() => setIsSkinDropdownOpen(!isSkinDropdownOpen)}
               title="Alternar entre a Skin Padrão e suas Skins do osu!"
               aria-expanded={isSkinDropdownOpen}
@@ -690,31 +690,31 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                 className={isLoadingSkin ? 'fas fa-circle-notch fa-spin' : 'fas fa-palette'}
                 style={{ color: 'hsl(var(--hsl-h1))', fontSize: '11px', flexShrink: 0 }}
               />
-              <span className="osu-radar-skin-trigger__name">
+              <span className="osu-skills-skin-trigger__name">
                 {currentSkin ? currentSkin.name : 'Selecionar Skin'}
               </span>
-              <div className="osu-radar-skin-trigger__meta">
+              <div className="osu-skills-skin-trigger__meta">
                 {currentSkin?.source === 'local_osu' && (
-                  <span className="osu-radar-skin-tag osu-radar-skin-tag--osu">osu!</span>
+                  <span className="osu-skills-skin-tag osu-skills-skin-tag--osu">osu!</span>
                 )}
                 {currentSkin?.source === 'imported' && (
-                  <span className="osu-radar-skin-tag osu-radar-skin-tag--imported">.osk</span>
+                  <span className="osu-skills-skin-tag osu-skills-skin-tag--imported">.osk</span>
                 )}
                 <i
-                  className={`fas fa-chevron-up osu-radar-skin-trigger__chevron ${
-                    isSkinDropdownOpen ? 'osu-radar-skin-trigger__chevron--open' : ''
+                  className={`fas fa-chevron-up osu-skills-skin-trigger__chevron ${
+                    isSkinDropdownOpen ? 'osu-skills-skin-trigger__chevron--open' : ''
                   }`}
                 />
               </div>
             </button>
 
             {isSkinDropdownOpen && (
-              <div className="osu-radar-skin-dropdown osu-radar-skin-dropdown--upward" role="listbox">
-                <div className="osu-radar-skin-dropdown__header">
+              <div className="osu-skills-skin-dropdown osu-skills-skin-dropdown--upward" role="listbox">
+                <div className="osu-skills-skin-dropdown__header">
                   <span>Skins Disponíveis ({availableSkins.length})</span>
                   <button
                     type="button"
-                    className="osu-radar-skin-dropdown__refresh-btn"
+                    className="osu-skills-skin-dropdown__refresh-btn"
                     onClick={() => refreshSkins()}
                     title="Recarregar skins da pasta do osu!"
                   >
@@ -722,9 +722,9 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                   </button>
                 </div>
 
-                <div className="osu-radar-skin-dropdown__list">
+                <div className="osu-skills-skin-dropdown__list">
                   {/* Skin Padrão */}
-                  <div className="osu-radar-skin-dropdown__section-title">Padrão</div>
+                  <div className="osu-skills-skin-dropdown__section-title">Padrão</div>
                   {availableSkins
                     .filter((s) => s.source === 'default')
                     .map((s) => (
@@ -733,20 +733,20 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                         type="button"
                         role="option"
                         aria-selected={s.id === selectedSkinId}
-                        className={`osu-radar-skin-item ${
-                          s.id === selectedSkinId ? 'osu-radar-skin-item--active' : ''
+                        className={`osu-skills-skin-item ${
+                          s.id === selectedSkinId ? 'osu-skills-skin-item--active' : ''
                         }`}
                         onClick={() => {
                           selectSkin(s.id);
                           setIsSkinDropdownOpen(false);
                         }}
                       >
-                        <div className="osu-radar-skin-item__info">
-                          <i className="fas fa-star osu-radar-skin-item__icon" />
-                          <span className="osu-radar-skin-item__name">{s.name}</span>
+                        <div className="osu-skills-skin-item__info">
+                          <i className="fas fa-star osu-skills-skin-item__icon" />
+                          <span className="osu-skills-skin-item__name">{s.name}</span>
                         </div>
                         {s.id === selectedSkinId && (
-                          <i className="fas fa-check osu-radar-skin-item__check" />
+                          <i className="fas fa-check osu-skills-skin-item__check" />
                         )}
                       </button>
                     ))}
@@ -754,7 +754,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                   {/* Skins Locais do osu! */}
                   {availableSkins.filter((s) => s.source === 'local_osu').length > 0 && (
                     <>
-                      <div className="osu-radar-skin-dropdown__section-title">
+                      <div className="osu-skills-skin-dropdown__section-title">
                         Skins do seu osu! ({availableSkins.filter((s) => s.source === 'local_osu').length})
                       </div>
                       {availableSkins
@@ -765,8 +765,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                             type="button"
                             role="option"
                             aria-selected={s.id === selectedSkinId}
-                            className={`osu-radar-skin-item ${
-                              s.id === selectedSkinId ? 'osu-radar-skin-item--active' : ''
+                            className={`osu-skills-skin-item ${
+                              s.id === selectedSkinId ? 'osu-skills-skin-item--active' : ''
                             }`}
                             onClick={() => {
                               selectSkin(s.id);
@@ -774,12 +774,12 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                             }}
                             title={s.name}
                           >
-                            <div className="osu-radar-skin-item__info">
-                              <span className="osu-radar-skin-tag osu-radar-skin-tag--osu">osu!</span>
-                              <span className="osu-radar-skin-item__name">{s.name}</span>
+                            <div className="osu-skills-skin-item__info">
+                              <span className="osu-skills-skin-tag osu-skills-skin-tag--osu">osu!</span>
+                              <span className="osu-skills-skin-item__name">{s.name}</span>
                             </div>
                             {s.id === selectedSkinId && (
-                              <i className="fas fa-check osu-radar-skin-item__check" />
+                              <i className="fas fa-check osu-skills-skin-item__check" />
                             )}
                           </button>
                         ))}
@@ -789,7 +789,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                   {/* Skins Importadas */}
                   {availableSkins.filter((s) => s.source === 'imported').length > 0 && (
                     <>
-                      <div className="osu-radar-skin-dropdown__section-title">
+                      <div className="osu-skills-skin-dropdown__section-title">
                         Skins Importadas ({availableSkins.filter((s) => s.source === 'imported').length})
                       </div>
                       {availableSkins
@@ -800,8 +800,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                             type="button"
                             role="option"
                             aria-selected={s.id === selectedSkinId}
-                            className={`osu-radar-skin-item ${
-                              s.id === selectedSkinId ? 'osu-radar-skin-item--active' : ''
+                            className={`osu-skills-skin-item ${
+                              s.id === selectedSkinId ? 'osu-skills-skin-item--active' : ''
                             }`}
                             onClick={() => {
                               selectSkin(s.id);
@@ -809,12 +809,12 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                             }}
                             title={s.name}
                           >
-                            <div className="osu-radar-skin-item__info">
-                              <span className="osu-radar-skin-tag osu-radar-skin-tag--imported">.osk</span>
-                              <span className="osu-radar-skin-item__name">{s.name}</span>
+                            <div className="osu-skills-skin-item__info">
+                              <span className="osu-skills-skin-tag osu-skills-skin-tag--imported">.osk</span>
+                              <span className="osu-skills-skin-item__name">{s.name}</span>
                             </div>
                             {s.id === selectedSkinId && (
-                              <i className="fas fa-check osu-radar-skin-item__check" />
+                              <i className="fas fa-check osu-skills-skin-item__check" />
                             )}
                           </button>
                         ))}
@@ -822,10 +822,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                   )}
                 </div>
 
-                <div className="osu-radar-skin-dropdown__footer">
+                <div className="osu-skills-skin-dropdown__footer">
                   <button
                     type="button"
-                    className="osu-radar-skin-dropdown__upload-action"
+                    className="osu-skills-skin-dropdown__upload-action"
                     onClick={() => {
                       setIsSkinDropdownOpen(false);
                       skinInputRef.current?.click();
@@ -840,10 +840,10 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
           </div>
 
           {/* Right utility group: audio status, mods, unified speed */}
-          <div className="osu-radar-player__utility-group">
+          <div className="osu-skills-player__utility-group">
             {audioStatus.state === 'loading' && (
               <span
-                className="osu-radar-mod-pill"
+                className="osu-skills-mod-pill"
                 style={{
                   backgroundColor: 'hsl(var(--hsl-orange-3))',
                   color: '#fff',
@@ -858,7 +858,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             )}
 
             {/* Mod Buttons (EZ, HR, DT, HD) */}
-            <div className="osu-radar-player__mods-group">
+            <div className="osu-skills-player__mods-group">
               {(['ez', 'hr', 'dt', 'hd'] as OsuMod[]).map((modKey) => {
                 const active = activeMods.has(modKey);
                 return (
@@ -866,8 +866,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                     key={modKey}
                     type="button"
                     onClick={() => handleToggleMod(modKey)}
-                    className={`osu-radar-player__mod-btn ${
-                      active ? 'osu-radar-player__mod-btn--active' : ''
+                    className={`osu-skills-player__mod-btn ${
+                      active ? 'osu-skills-player__mod-btn--active' : ''
                     }`}
                   >
                     {modKey}
@@ -877,33 +877,33 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             </div>
 
             {/* Unified Speed Dropdown */}
-            <div className="osu-radar-speed-switcher" ref={speedDropdownRef}>
+            <div className="osu-skills-speed-switcher" ref={speedDropdownRef}>
               <button
                 type="button"
-                className={`osu-radar-speed-trigger ${isSpeedOpen ? 'osu-radar-speed-trigger--open' : ''}`}
+                className={`osu-skills-speed-trigger ${isSpeedOpen ? 'osu-skills-speed-trigger--open' : ''}`}
                 onClick={() => setIsSpeedOpen(!isSpeedOpen)}
                 title="Alterar velocidade de reprodução"
                 aria-expanded={isSpeedOpen}
               >
-                <span className="osu-radar-speed-trigger__label">{playbackRate}x</span>
+                <span className="osu-skills-speed-trigger__label">{playbackRate}x</span>
                 <i
-                  className={`fas fa-chevron-up osu-radar-speed-trigger__icon ${
-                    isSpeedOpen ? 'osu-radar-speed-trigger__icon--open' : ''
+                  className={`fas fa-chevron-up osu-skills-speed-trigger__icon ${
+                    isSpeedOpen ? 'osu-skills-speed-trigger__icon--open' : ''
                   }`}
                 />
               </button>
 
               {isSpeedOpen && (
-                <div className="osu-radar-speed-dropdown" role="listbox">
-                  <div className="osu-radar-speed-dropdown__title">Velocidade</div>
+                <div className="osu-skills-speed-dropdown" role="listbox">
+                  <div className="osu-skills-speed-dropdown__title">Velocidade</div>
                   {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((speed) => (
                     <button
                       key={speed}
                       type="button"
                       role="option"
                       aria-selected={playbackRate === speed}
-                      className={`osu-radar-speed-item ${
-                        playbackRate === speed ? 'osu-radar-speed-item--active' : ''
+                      className={`osu-skills-speed-item ${
+                        playbackRate === speed ? 'osu-skills-speed-item--active' : ''
                       }`}
                       onClick={() => {
                         handleSpeedChange(speed);
@@ -911,7 +911,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                       }}
                     >
                       <span>{speed}x</span>
-                      {playbackRate === speed && <i className="fas fa-check osu-radar-speed-item__check" />}
+                      {playbackRate === speed && <i className="fas fa-check osu-skills-speed-item__check" />}
                     </button>
                   ))}
                 </div>
@@ -922,8 +922,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       </div>
 
       {/* Algorithm-Detected Patterns Section */}
-      <div className="osu-radar-player__patterns">
-        <div className="osu-radar-player__patterns-header">
+      <div className="osu-skills-player__patterns">
+        <div className="osu-skills-player__patterns-header">
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'hsl(var(--hsl-c1))' }}>
             <i className="fas fa-bolt" style={{ color: 'hsl(var(--hsl-h1))', marginRight: '6px' }} />
             <span>padrões detectados pelo algoritmo ({detectedPatterns.length})</span>
@@ -953,7 +953,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
         </div>
 
         {/* Scrollable Patterns List */}
-        <div ref={patternsListRef} className="osu-radar-player__patterns-list">
+        <div ref={patternsListRef} className="osu-skills-player__patterns-list">
           {filteredPatterns.length > 0 ? (
             filteredPatterns.map((p) => {
               const isLive = currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs;
@@ -980,11 +980,11 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                   key={p.id}
                   id={`pattern-row-${p.id}`}
                   onClick={() => jumpToPattern(p)}
-                  className={`osu-radar-player__pattern-item ${
+                  className={`osu-skills-player__pattern-item ${
                     isLive
-                      ? 'osu-radar-player__pattern-item--active'
+                      ? 'osu-skills-player__pattern-item--active'
                       : isWaitingSelected
-                      ? 'osu-radar-player__pattern-item--selected'
+                      ? 'osu-skills-player__pattern-item--selected'
                       : ''
                   }`}
                 >
@@ -1043,7 +1043,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                     )}
 
                     <span
-                      className="osu-radar-mod-pill"
+                      className="osu-skills-mod-pill"
                       style={{
                         backgroundColor: sev.bg,
                         color: sev.color,

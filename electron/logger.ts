@@ -100,7 +100,7 @@ export function createDesktopLogger(options: {
   }
 
   // Session header banner
-  const sessionBanner = `\n================================================================================\n[${formatTimestamp()}] NOVO INÍCIO DE SESSÃO DO OSU!RADAR DESKTOP (PID: ${process.pid})\n================================================================================\n`;
+  const sessionBanner = `\n================================================================================\n[${formatTimestamp()}] NOVO INÍCIO DE SESSÃO DO OSU!SKILLS DESKTOP (PID: ${process.pid})\n================================================================================\n`;
 
   try {
     fs.appendFileSync(primaryLogFile, sessionBanner, 'utf8');

@@ -462,7 +462,7 @@ export const PoolSheetSync: React.FC = () => {
               <button
                 type="button"
                 onClick={toggleAllStages}
-                className={`osu-radar-player__mod-btn ${isAllSelected ? 'osu-radar-player__mod-btn--active' : ''}`}
+                className={`osu-skills-player__mod-btn ${isAllSelected ? 'osu-skills-player__mod-btn--active' : ''}`}
                 style={{ padding: '5px 12px', fontSize: '11px', fontWeight: 800 }}
               >
                 <i className={`fas ${isAllSelected ? 'fa-check-square' : 'fa-square'}`} style={{ marginRight: '6px' }} />
@@ -477,7 +477,7 @@ export const PoolSheetSync: React.FC = () => {
                     key={stage.stageName}
                     type="button"
                     onClick={() => toggleStage(stage.stageName)}
-                    className={`osu-radar-player__mod-btn ${isSelected ? 'osu-radar-player__mod-btn--active' : ''}`}
+                    className={`osu-skills-player__mod-btn ${isSelected ? 'osu-skills-player__mod-btn--active' : ''}`}
                     style={{ padding: '4px 10px', fontSize: '11px' }}
                   >
                     <i
@@ -583,7 +583,7 @@ export const PoolSheetSync: React.FC = () => {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                       <span
-                        className="osu-radar-mod-pill"
+                        className="osu-skills-mod-pill"
                         style={{ backgroundColor: modColor.bg, color: modColor.text }}
                       >
                         {entry.slot}

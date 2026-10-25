@@ -41,8 +41,8 @@ export const TrainingFiltersPanel: React.FC = () => {
                 type="button"
                 aria-pressed={isPrioritized}
                 onClick={() => togglePrioritizedSkill(skillKey)}
-                className={`osu-radar-skill-priority-pill ${
-                  isPrioritized ? 'osu-radar-skill-priority-pill--active' : ''
+                className={`osu-skills-skill-priority-pill ${
+                  isPrioritized ? 'osu-skills-skill-priority-pill--active' : ''
                 }`}
                 title={
                   isPrioritized
@@ -60,7 +60,7 @@ export const TrainingFiltersPanel: React.FC = () => {
             <button
               type="button"
               onClick={clearPrioritizedSkills}
-              className="osu-radar-player__mod-btn"
+              className="osu-skills-player__mod-btn"
               style={{ padding: '2px 8px', fontSize: '10px', textTransform: 'none' }}
               title="Desmarcar skills priorizadas"
             >

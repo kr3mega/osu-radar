@@ -191,7 +191,7 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
 
   if (effectiveGroups.length === 0) {
     return (
-      <div ref={containerRef} style={containerStyle} className="osu-radar-beatmapsets-list">
+      <div ref={containerRef} style={containerStyle} className="osu-skills-beatmapsets-list">
         {emptyState}
       </div>
     );
@@ -205,7 +205,7 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
         aria-label="Lista de músicas agrupadas"
         onKeyDown={handleKeyDown}
         style={containerStyle}
-        className="osu-radar-beatmapsets-list"
+        className="osu-skills-beatmapsets-list"
       >
         {effectiveGroups.map((grp, idx) => {
           const isSelected = grp.difficulties.some((d) => d.id === selectedMapId);
@@ -251,7 +251,7 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
       onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
       onKeyDown={handleKeyDown}
       style={containerStyle}
-      className="osu-radar-beatmapsets-list"
+      className="osu-skills-beatmapsets-list"
     >
       {topSpacerHeight > 0 && (
         <div

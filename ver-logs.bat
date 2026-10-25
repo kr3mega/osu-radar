@@ -1,5 +1,5 @@
 @echo off
-title osu!radar - Visualizador de Logs
+title osu!skills - Visualizador de Logs
 set "APP_DIR=%~dp0"
 if "%APP_DIR:~-1%"=="\" set "APP_DIR=%APP_DIR:~0,-1%"
 cd /d "%APP_DIR%"
@@ -11,7 +11,7 @@ if not exist "%APP_DIR%\logs\electron-desktop.log" (
 )
 
 echo ================================================================================
-echo           osu!radar - Exibindo Ultimos Eventos Gravados em Disco
+echo           osu!skills - Exibindo Ultimos Eventos Gravados em Disco
 echo ================================================================================
 echo Pressione Ctrl+C para sair do visualizador continuo.
 echo --------------------------------------------------------------------------------

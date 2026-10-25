@@ -387,7 +387,7 @@ export function createLocalSkinsMiddleware() {
 export function localSkinsPlugin(): Plugin {
   const middleware = createLocalSkinsMiddleware();
   return {
-    name: 'osu-radar-local-skins-bridge',
+    name: 'osu-skills-local-skins-bridge',
     configureServer(server) {
       server.middlewares.use(middleware);
     },

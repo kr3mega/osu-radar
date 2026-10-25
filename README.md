@@ -1,4 +1,4 @@
-# osu!Radar 🎯
+# osu!Skills 🎯
 
 > **A client-side beatmap skill analyzer and tournament pool auditing tool built with WebAssembly, TypeScript, and React.**
 
@@ -12,7 +12,7 @@
 
 ## 💡 Sobre o Projeto
 
-O **osu!Radar** é uma ferramenta analítica e cinemática *client-side* voltada para o cenário competitivo de *osu!*. Diferente de ferramentas que tentam substituir planilhas de gestão de torneio (Google Sheets), o **osu!Radar** resolve o gargalo que nenhuma planilha consegue sanar: **a dissecação física dos beatmaps em microssegundos**.
+O **osu!Skills** é uma ferramenta analítica e cinemática *client-side* voltada para o cenário competitivo de *osu!*. Diferente de ferramentas que tentam substituir planilhas de gestão de torneio (Google Sheets), o **osu!Skills** resolve o gargalo que nenhuma planilha consegue sanar: **a dissecação física dos beatmaps em microssegundos**.
 
 A aplicação calcula os atributos de RPG competitivos dos mapas diretamente no navegador do usuário, com **custo zero de servidor**, sem gargalos de *rate limit* da API oficial e sem expor credenciais privadas.
 
@@ -53,11 +53,11 @@ Janelas temporais deslizantes de 2 segundos com 50% de sobreposição mapeiam a 
 ## 📁 Estrutura do Repositório
 
 ```
-osu-radar/
+osu-skills/
 ├── src/
 │   ├── components/
 │   │   ├── beatmap/           # BeatmapCard, BeatmapList, ModSlotBadge, BeatmapDetailModal
-│   │   ├── charts/            # StatHexagon (Radar), StrainTimeline (Eletrocardiograma)
+│   │   ├── charts/            # StatHexagon (Skills), StrainTimeline (Eletrocardiograma)
 │   │   ├── layout/            # Navbar estilo osu-web com 1-click demos
 │   │   └── pool/              # PoolOverview (anomalias e médias), PoolUploader, PoolExportBar
 │   ├── db/                    # IndexedDB cache com Dexie.js
@@ -85,8 +85,8 @@ osu-radar/
 
 ### 1. Clonar e Instalar
 ```bash
-git clone https://github.com/seu-usuario/osu-radar.git
-cd osu-radar
+git clone https://github.com/seu-usuario/osu-skills.git
+cd osu-skills
 npm install
 ```
 

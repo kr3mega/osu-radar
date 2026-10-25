@@ -22,7 +22,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   onSlotChange,
   onSelectDifficulty,
 }) => {
-  const [activeWedgeTab, setActiveWedgeTab] = useState<'radar' | 'visualizer'>('visualizer');
+  const [activeWedgeTab, setActiveWedgeTab] = useState<'skills' | 'visualizer'>('visualizer');
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(false);
 
   if (!map) {
@@ -80,14 +80,14 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: '1 1 auto' }}>
       {/* Minimizable Song Information Card */}
       {isHeaderCollapsed ? (
-        <div className="osu-radar-collapsed-header">
+        <div className="osu-skills-collapsed-header">
           {coverCss && (
             <div
-              className="osu-radar-collapsed-header__cover-bg"
+              className="osu-skills-collapsed-header__cover-bg"
               style={{ backgroundImage: coverCss }}
             />
           )}
-          <div className="osu-radar-collapsed-header__left">
+          <div className="osu-skills-collapsed-header__left">
             <div
               className="difficulty-badge difficulty-badge--beatmapset"
               style={
@@ -106,7 +106,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
               </span>
             </div>
 
-            <div className="osu-radar-collapsed-header__meta">
+            <div className="osu-skills-collapsed-header__meta">
               <strong className="u-ellipsis-overflow" style={{ color: '#fff', fontSize: '13px' }}>
                 {metadata.title}
               </strong>
@@ -134,7 +134,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
           <button
             type="button"
             onClick={() => setIsHeaderCollapsed(false)}
-            className="osu-radar-minimize-header-btn"
+            className="osu-skills-minimize-header-btn"
             title="Expandir informações da música"
           >
             <i className="fas fa-chevron-down" />
@@ -239,7 +239,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
                   {isLocalSong ? (
                     <span
-                      className="osu-radar-mod-pill"
+                      className="osu-skills-mod-pill"
                       style={{
                         backgroundColor: 'hsl(var(--hsl-b3))',
                         color: 'hsl(var(--hsl-h1))',
@@ -284,7 +284,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
 
                   {map.stageName && (
                     <span
-                      className="osu-radar-mod-pill"
+                      className="osu-skills-mod-pill"
                       style={{
                         backgroundColor: 'hsl(var(--hsl-b3))',
                         color: 'hsl(var(--hsl-h1))',
@@ -302,7 +302,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
 
                   {map.tournamentName && (
                     <span
-                      className="osu-radar-mod-pill"
+                      className="osu-skills-mod-pill"
                       style={{
                         backgroundColor: 'hsl(var(--hsl-b4))',
                         color: 'hsl(var(--hsl-l1))',
@@ -387,7 +387,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
               <button
                 type="button"
                 onClick={() => setIsHeaderCollapsed(true)}
-                className="osu-radar-minimize-header-btn"
+                className="osu-skills-minimize-header-btn"
                 title="Minimizar informações da música"
               >
                 <i className="fas fa-chevron-up" />
@@ -502,13 +502,13 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
 
         <li className="page-mode__item">
           <a
-            href="#radar"
+            href="#skills"
             onClick={(e) => {
               e.preventDefault();
-              setActiveWedgeTab('radar');
+              setActiveWedgeTab('skills');
             }}
             className={`page-mode-link ${
-              activeWedgeTab === 'radar' ? 'page-mode-link--is-active' : ''
+              activeWedgeTab === 'skills' ? 'page-mode-link--is-active' : ''
             }`}
           >
             <i className="fas fa-chart-bar" style={{ marginRight: '6px', alignSelf: 'center' }} />
@@ -519,7 +519,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
       </ul>
 
       {/* Tab Content */}
-      {activeWedgeTab === 'radar' ? (
+      {activeWedgeTab === 'skills' ? (
         <div
           style={{
             padding: '20px',

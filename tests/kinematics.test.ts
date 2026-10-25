@@ -6,7 +6,7 @@ import { parseOsuBeatmap } from '../src/engine/parser';
 import { detectBeatmapPatterns } from '../src/engine/patterns';
 import { HitObject, TimingPoint } from '../src/engine/types';
 
-describe('osuRadar Kinematic Engine & Beatmap Analyzer', () => {
+describe('osuSkills Kinematic Engine & Beatmap Analyzer', () => {
   const jumpMapText = fs.readFileSync(path.join(__dirname, 'fixtures', 'jump_map.osu'), 'utf-8');
   const streamMapText = fs.readFileSync(path.join(__dirname, 'fixtures', 'stream_map.osu'), 'utf-8');
   const techMapText = fs.readFileSync(path.join(__dirname, 'fixtures', 'tech_map.osu'), 'utf-8');

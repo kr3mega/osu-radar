@@ -33,30 +33,30 @@ const SKILL_AXES: Array<{
  */
 export const StatHexagon: React.FC<StatHexagonProps> = ({ skills }) => {
   return (
-    <div className="osu-radar-skills-panel">
+    <div className="osu-skills-skills-panel">
       {/* 9-Dimensional Skills Bar Grid */}
-      <div className="osu-radar-skills-bars-grid">
+      <div className="osu-skills-skills-bars-grid">
         {SKILL_AXES.map((axis) => {
           const val = getSkillValue(skills, axis.key);
 
           return (
-            <div key={axis.key} className="osu-radar-skill-card" title={axis.desc}>
-              <div className="osu-radar-skill-card__header">
-                <div className="osu-radar-skill-card__title">
+            <div key={axis.key} className="osu-skills-skill-card" title={axis.desc}>
+              <div className="osu-skills-skill-card__header">
+                <div className="osu-skills-skill-card__title">
                   <i className={axis.icon} />
                   <span>{axis.label}</span>
                 </div>
-                <div className="osu-radar-skill-card__values">
-                  <span className="osu-radar-skill-card__score">
+                <div className="osu-skills-skill-card__values">
+                  <span className="osu-skills-skill-card__score">
                     {val.toFixed(1).replace('.', ',')}%
                   </span>
                 </div>
               </div>
 
               {/* Progress bar with standard solid osu! pink fill */}
-              <div className="osu-radar-skill-bar">
+              <div className="osu-skills-skill-bar">
                 <div
-                  className="osu-radar-skill-bar__fill"
+                  className="osu-skills-skill-bar__fill"
                   style={{ width: `${Math.min(100, Math.max(0, val))}%` }}
                 />
               </div>

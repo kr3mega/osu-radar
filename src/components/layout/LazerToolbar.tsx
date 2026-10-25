@@ -89,7 +89,7 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
     const text = await file.text();
     const ok = await importPoolJson(text);
     if (!ok) {
-      alert('Arquivo JSON inválido para osu!radar.');
+      alert('Arquivo JSON inválido para osu!skills.');
     }
     if (jsonInputRef.current) jsonInputRef.current.value = '';
   };
@@ -123,7 +123,7 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                       onTabChange('select');
                     }}
                     className="nav2__logo-link"
-                    title="osu!radar"
+                    title="osu!skills"
                   >
                     <div className="nav2__logo nav2__logo--bg" />
                     <div className="nav2__logo" />
@@ -149,7 +149,7 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                   </a>
                 </div>
 
-                {/* Menu Item 2: Rankings / Radar da Pool */}
+                {/* Menu Item 2: Rankings / Skills da Pool */}
                 <div className="nav2__col nav2__col--menu">
                   <a
                     href="#overview"
@@ -160,7 +160,7 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                     className={`nav2__menu-link-main ${activeTab === 'overview' ? 'js-menu--active' : ''}`}
                   >
                     <span className="u-relative">
-                      radar da pool
+                      skills da pool
                       {activeTab === 'overview' && (
                         <span className="nav2__menu-link-bar u-section--bg-normal" />
                       )}
@@ -256,7 +256,7 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                     step={0.01}
                     value={isMuted ? 0 : volume}
                     onChange={(e) => setVolume(parseFloat(e.target.value))}
-                    className="osu-radar-global-volume-slider"
+                    className="osu-skills-global-volume-slider"
                     style={{
                       width: '60px',
                       height: '4px',
@@ -420,7 +420,7 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                 <div className="header-v4__icon" />
                 <div className="header-v4__title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span>
-                    {activeTab === 'select' ? 'listagem de beatmaps' : 'radar & inteligência da pool'}
+                    {activeTab === 'select' ? 'listagem de beatmaps' : 'skills & inteligência da pool'}
                   </span>
                 </div>
               </div>
@@ -496,8 +496,8 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                       activeTab === 'overview' ? 'header-nav-v4__link--active' : ''
                     }`}
                   >
-                    <span className="fake-bold" data-content="radar de skills & anomalias">
-                      radar de skills & anomalias
+                    <span className="fake-bold" data-content="análise de skills & anomalias">
+                      análise de skills & anomalias
                     </span>
                   </a>
                 </li>
@@ -527,15 +527,15 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
       {/* Reset Confirmation Modal */}
       {showResetConfirm && (
         <div
-          className="osu-radar-modal-backdrop"
+          className="osu-skills-modal-backdrop"
           onClick={() => setShowResetConfirm(false)}
         >
           <div
-            className="osu-radar-modal"
+            className="osu-skills-modal"
             style={{ maxWidth: '460px' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="osu-radar-modal__header">
+            <div className="osu-skills-modal__header">
               <span style={{ fontWeight: 700, fontSize: '15px', color: '#fff' }}>
                 <i className="fas fa-exclamation-triangle" style={{ color: '#ed1221', marginRight: '8px' }} />
                 Resetar Mappool & Limpar Banco
@@ -549,7 +549,7 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
               </button>
             </div>
 
-            <div className="osu-radar-modal__body">
+            <div className="osu-skills-modal__body">
               <p style={{ fontSize: '13px', color: 'hsl(var(--hsl-l1))', marginBottom: '12px' }}>
                 Você tem certeza de que deseja apagar todos os beatmaps carregados e limpar o banco de dados IndexedDB?
               </p>

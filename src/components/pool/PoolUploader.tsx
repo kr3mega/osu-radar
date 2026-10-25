@@ -117,7 +117,7 @@ export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_so
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const safeName = (currentPool.name || 'osu-radar-pool').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+      const safeName = (currentPool.name || 'osu-skills-pool').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
       a.download = `${safeName}.json`;
       document.body.appendChild(a);
       a.click();
@@ -167,7 +167,7 @@ export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_so
           <button
             type="button"
             onClick={() => setActiveTab('osu_songs')}
-            className={`osu-radar-player__mod-btn ${activeTab === 'osu_songs' ? 'osu-radar-player__mod-btn--active' : ''}`}
+            className={`osu-skills-player__mod-btn ${activeTab === 'osu_songs' ? 'osu-skills-player__mod-btn--active' : ''}`}
             style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
           >
             <i className="fas fa-hdd" style={{ marginRight: '6px' }} />
@@ -177,7 +177,7 @@ export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_so
           <button
             type="button"
             onClick={() => setActiveTab('skins')}
-            className={`osu-radar-player__mod-btn ${activeTab === 'skins' ? 'osu-radar-player__mod-btn--active' : ''}`}
+            className={`osu-skills-player__mod-btn ${activeTab === 'skins' ? 'osu-skills-player__mod-btn--active' : ''}`}
             style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
           >
             <i className="fas fa-palette" style={{ marginRight: '6px' }} />
@@ -187,7 +187,7 @@ export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_so
           <button
             type="button"
             onClick={() => setActiveTab('sheet')}
-            className={`osu-radar-player__mod-btn ${activeTab === 'sheet' ? 'osu-radar-player__mod-btn--active' : ''}`}
+            className={`osu-skills-player__mod-btn ${activeTab === 'sheet' ? 'osu-skills-player__mod-btn--active' : ''}`}
             style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
           >
             <i className="fas fa-table" style={{ marginRight: '6px' }} />
@@ -538,7 +538,7 @@ export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_so
                     alignItems: 'center',
                   }}
                 >
-                  <span>Compatível com backups gerados pelo osu!radar (formato Mappool Schema v1).</span>
+                  <span>Compatível com backups gerados pelo osu!skills (formato Mappool Schema v1).</span>
                 </div>
 
                 <button

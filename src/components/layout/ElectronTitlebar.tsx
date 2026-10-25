@@ -6,10 +6,13 @@ interface ElectronTitlebarProps {
 
 /**
  * Custom frameless osu!lazer-inspired titlebar rendered exclusively inside the Electron desktop app.
- * In standard web browsers (`!window.osuRadarDesktop?.isElectron`), renders nothing.
+ * In standard web browsers (`!window.osuSkillsDesktop?.isElectron`), renders nothing.
  */
 export const ElectronTitlebar: React.FC<ElectronTitlebarProps> = ({ activeSubtitle }) => {
-  const bridge = typeof window !== 'undefined' ? window.osuRadarDesktop : undefined;
+  const bridge =
+    typeof window !== 'undefined'
+      ? (window.osuSkillsDesktop || window.osuRadarDesktop)
+      : undefined;
   const isCustomFrame = Boolean(bridge?.isElectron && bridge.platform !== 'darwin');
 
   const [isMaximized, setIsMaximized] = useState(false);
@@ -17,7 +20,7 @@ export const ElectronTitlebar: React.FC<ElectronTitlebarProps> = ({ activeSubtit
   useEffect(() => {
     if (!isCustomFrame || !bridge) return;
 
-    document.body.classList.add('osu-radar-is-electron');
+    document.body.classList.add('osu-skills-is-electron');
 
     let mounted = true;
     bridge.isMaximized().then((val) => {
@@ -31,7 +34,7 @@ export const ElectronTitlebar: React.FC<ElectronTitlebarProps> = ({ activeSubtit
     return () => {
       mounted = false;
       unsubscribe();
-      document.body.classList.remove('osu-radar-is-electron');
+      document.body.classList.remove('osu-skills-is-electron');
     };
   }, [isCustomFrame, bridge]);
 
@@ -40,27 +43,27 @@ export const ElectronTitlebar: React.FC<ElectronTitlebarProps> = ({ activeSubtit
   }
 
   return (
-    <header className="osu-radar-titlebar" role="banner" aria-label="Barra de janela osu!radar">
-      <div className="osu-radar-titlebar__brand">
+    <header className="osu-skills-titlebar" role="banner" aria-label="Barra de janela osu!skills">
+      <div className="osu-skills-titlebar__brand">
         <img
           src="/images/layout/osu-logo.png"
           alt=""
-          className="osu-radar-titlebar__logo"
+          className="osu-skills-titlebar__logo"
         />
-        <span className="osu-radar-titlebar__title">osu!radar</span>
-        <span className="osu-radar-titlebar__badge">desktop</span>
+        <span className="osu-skills-titlebar__title">osu!skills</span>
+        <span className="osu-skills-titlebar__badge">desktop</span>
         {activeSubtitle && (
-          <span className="osu-radar-titlebar__subtitle u-ellipsis-overflow">
+          <span className="osu-skills-titlebar__subtitle u-ellipsis-overflow">
             {activeSubtitle}
           </span>
         )}
       </div>
 
-      <div className="osu-radar-titlebar__controls">
+      <div className="osu-skills-titlebar__controls">
         <button
           type="button"
           onClick={() => bridge.minimize()}
-          className="osu-radar-titlebar__btn"
+          className="osu-skills-titlebar__btn"
           aria-label="Minimizar janela"
           title="Minimizar"
         >
@@ -75,7 +78,7 @@ export const ElectronTitlebar: React.FC<ElectronTitlebarProps> = ({ activeSubtit
             const next = await bridge.toggleMaximize();
             setIsMaximized(next);
           }}
-          className="osu-radar-titlebar__btn"
+          className="osu-skills-titlebar__btn"
           aria-label={isMaximized ? 'Restaurar janela' : 'Maximizar janela'}
           title={isMaximized ? 'Restaurar' : 'Maximizar'}
         >
@@ -106,8 +109,8 @@ export const ElectronTitlebar: React.FC<ElectronTitlebarProps> = ({ activeSubtit
         <button
           type="button"
           onClick={() => bridge.close()}
-          className="osu-radar-titlebar__btn osu-radar-titlebar__btn--close"
-          aria-label="Fechar osu!radar"
+          className="osu-skills-titlebar__btn osu-skills-titlebar__btn--close"
+          aria-label="Fechar osu!skills"
           title="Fechar"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">

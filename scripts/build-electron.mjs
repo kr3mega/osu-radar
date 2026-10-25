@@ -45,7 +45,7 @@ async function notifyRunningElectron() {
       },
       (res) => {
         if (res.statusCode === 200) {
-          console.log('[electron] Notificação enviada: Cliente osu!radar recarregado com sucesso!');
+          console.log('[electron] Notificação enviada: Cliente osu!skills recarregado com sucesso!');
         }
         resolve();
       }

@@ -119,13 +119,13 @@ export const StarRatingDualSlider: React.FC = () => {
     srMax >= SR_MAX_LIMIT ? `${SR_MAX_LIMIT.toFixed(1).replace('.', ',')}★+` : `${srMax.toFixed(2).replace('.', ',')}★`;
 
   return (
-    <div className="osu-radar-dual-slider" data-filtered={isFiltered ? '1' : '0'}>
+    <div className="osu-skills-dual-slider" data-filtered={isFiltered ? '1' : '0'}>
       {/* Left formatted value badge: direct click-to-edit support */}
       {isEditingMin ? (
         <input
           ref={minTextRef}
           type="text"
-          className="osu-radar-dual-slider__badge osu-radar-dual-slider__badge--input"
+          className="osu-skills-dual-slider__badge osu-skills-dual-slider__badge--input"
           style={{ backgroundColor: minBadgeBg, color: minBadgeText }}
           value={minInputVal}
           onChange={(e) => setMinInputVal(e.target.value)}
@@ -140,7 +140,7 @@ export const StarRatingDualSlider: React.FC = () => {
         <button
           type="button"
           onClick={startEditMin}
-          className="osu-radar-dual-slider__badge osu-radar-dual-slider__badge--clickable"
+          className="osu-skills-dual-slider__badge osu-skills-dual-slider__badge--clickable"
           style={{ backgroundColor: minBadgeBg, color: minBadgeText }}
           title="Clique para digitar a dificuldade mínima"
         >
@@ -151,12 +151,12 @@ export const StarRatingDualSlider: React.FC = () => {
       {/* Dual native <input type="range"> track container */}
       <div
         ref={trackWrapRef}
-        className="osu-radar-dual-slider__track-wrap"
+        className="osu-skills-dual-slider__track-wrap"
         onPointerDown={handleRailPointerDown}
       >
-        <div className="osu-radar-dual-slider__rail" aria-hidden="true">
+        <div className="osu-skills-dual-slider__rail" aria-hidden="true">
           <div
-            className="osu-radar-dual-slider__fill"
+            className="osu-skills-dual-slider__fill"
             style={{
               insetInlineStart: `${minPct}%`,
               inlineSize: `${Math.max(0, maxPct - minPct)}%`,
@@ -164,7 +164,7 @@ export const StarRatingDualSlider: React.FC = () => {
           />
         </div>
 
-        <label htmlFor={minInputId} className="osu-radar-sr-only">
+        <label htmlFor={minInputId} className="osu-skills-sr-only">
           Dificuldade mínima (estrelas)
         </label>
         <input
@@ -177,7 +177,7 @@ export const StarRatingDualSlider: React.FC = () => {
           value={srMin}
           aria-valuetext={`Mínimo ${srMin.toFixed(2).replace('.', ',')} estrelas`}
           onChange={handleMinChange}
-          className="osu-radar-dual-slider__input osu-radar-dual-slider__input--min"
+          className="osu-skills-dual-slider__input osu-skills-dual-slider__input--min"
           style={
             {
               '--attr-min': SR_MIN_LIMIT,
@@ -188,7 +188,7 @@ export const StarRatingDualSlider: React.FC = () => {
           }
         />
 
-        <label htmlFor={maxInputId} className="osu-radar-sr-only">
+        <label htmlFor={maxInputId} className="osu-skills-sr-only">
           Dificuldade máxima (estrelas)
         </label>
         <input
@@ -205,7 +205,7 @@ export const StarRatingDualSlider: React.FC = () => {
               : `Máximo ${srMax.toFixed(2).replace('.', ',')} estrelas`
           }
           onChange={handleMaxChange}
-          className="osu-radar-dual-slider__input osu-radar-dual-slider__input--max"
+          className="osu-skills-dual-slider__input osu-skills-dual-slider__input--max"
           style={
             {
               '--attr-min': SR_MIN_LIMIT,
@@ -222,7 +222,7 @@ export const StarRatingDualSlider: React.FC = () => {
         <input
           ref={maxTextRef}
           type="text"
-          className="osu-radar-dual-slider__badge osu-radar-dual-slider__badge--input"
+          className="osu-skills-dual-slider__badge osu-skills-dual-slider__badge--input"
           style={{ backgroundColor: maxBadgeBg, color: maxBadgeText }}
           value={maxInputVal}
           onChange={(e) => setMaxInputVal(e.target.value)}
@@ -237,7 +237,7 @@ export const StarRatingDualSlider: React.FC = () => {
         <button
           type="button"
           onClick={startEditMax}
-          className="osu-radar-dual-slider__badge osu-radar-dual-slider__badge--clickable"
+          className="osu-skills-dual-slider__badge osu-skills-dual-slider__badge--clickable"
           style={{ backgroundColor: maxBadgeBg, color: maxBadgeText }}
           title="Clique para digitar a dificuldade máxima"
         >
@@ -246,7 +246,7 @@ export const StarRatingDualSlider: React.FC = () => {
       )}
 
       {/* Stable Slot: Resetar ★ appears right beside max diff without pushing it to the side */}
-      <div className="osu-radar-dual-slider__reset-slot">
+      <div className="osu-skills-dual-slider__reset-slot">
         {isFiltered && (
           <button
             type="button"
@@ -256,7 +256,7 @@ export const StarRatingDualSlider: React.FC = () => {
                 DEFAULT_TRAINING_FILTERS.srMax
               )
             }
-            className="osu-radar-player__mod-btn"
+            className="osu-skills-player__mod-btn"
             style={{ padding: '2px 8px', fontSize: '10px', textTransform: 'none', flexShrink: 0 }}
             title="Remover limite de Star Rating (0,00★ – 12,0★+)"
           >

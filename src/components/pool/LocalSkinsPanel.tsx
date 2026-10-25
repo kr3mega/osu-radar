@@ -144,11 +144,13 @@ export const LocalSkinsPanel: React.FC = () => {
                 fontSize: '12px',
               }}
             />
-            {typeof window !== 'undefined' && window.osuRadarDesktop?.isElectron && (
+            {typeof window !== 'undefined' &&
+              (window.osuSkillsDesktop || window.osuRadarDesktop)?.isElectron && (
               <button
                 type="button"
                 onClick={async () => {
-                  const picked = await window.osuRadarDesktop?.selectDirectory({
+                  const bridge = window.osuSkillsDesktop || window.osuRadarDesktop;
+                  const picked = await bridge?.selectDirectory({
                     title: 'Selecionar pasta Skins do osu!',
                     defaultPath: skinsDirInput.trim() || undefined,
                   });
@@ -321,7 +323,7 @@ export const LocalSkinsPanel: React.FC = () => {
                     {skinOpt.name}
                   </span>
                   <span
-                    className="osu-radar-mod-pill"
+                    className="osu-skills-mod-pill"
                     style={{
                       backgroundColor: 'hsl(var(--hsl-b6))',
                       color: 'hsl(var(--hsl-l2))',

@@ -1,14 +1,13 @@
 @echo off
 setlocal enabledelayedexpansion
-title osu!radar Desktop - Terminal de Logs Ao Vivo
-
+title osu!skills Desktop - Terminal de Logs
 set "APP_DIR=%~dp0"
 if "%APP_DIR:~-1%"=="\" set "APP_DIR=%APP_DIR:~0,-1%"
 cd /d "%APP_DIR%"
 
 cls
 echo ================================================================================
-echo                    osu!radar Desktop - Terminal de Logs Ao Vivo
+echo                    osu!skills Desktop - Terminal de Logs
 echo ================================================================================
 echo  * Este terminal exibe em tempo real todos os eventos e acoes do app.
 echo  * Os logs tambem sao salvos continuamente em: logs\electron-desktop.log
@@ -18,8 +17,8 @@ echo.
 :: Verifica se o Electron ja esta em execucao no sistema
 tasklist /fi "imagename eq electron.exe" 2>nul | find /i "electron.exe" >nul
 if not errorlevel 1 (
-  echo [INFO] O osu!radar Desktop ja esta em execucao!
-  echo [INFO] Conectando diretamente ao fluxo de logs ao vivo do app ativo...
+  echo [INFO] O osu!skills Desktop ja esta em execucao!
+  echo [INFO] Conectando diretamente ao fluxo de logs do app ativo...
   echo [INFO] Pressione Ctrl+C a qualquer momento para fechar este terminal.
   echo.
   goto stream_logs
@@ -46,7 +45,7 @@ if exist "%APP_DIR%\node_modules\electron\cli.js" (
 )
 
 echo.
-echo [INFO] osu!radar finalizado. Pressione qualquer tecla para fechar.
+echo [INFO] osu!skills finalizado. Pressione qualquer tecla para fechar.
 pause
 exit /b 0
 

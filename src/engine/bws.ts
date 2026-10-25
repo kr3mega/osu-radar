@@ -100,7 +100,7 @@ export function calculateBWS(rank: number, badges: number): number {
 
 /**
  * Recalibrates a skill attribute vector based on the target tournament rank tier.
- * This scales the 0-100 radar so that tournament organizers see relative difficulty for their specific tier!
+ * This scales the 0-100 skills so that tournament organizers see relative difficulty for their specific tier!
  */
 export function calibrateSkillsForTier(
   rawSkills: SkillAttributes,

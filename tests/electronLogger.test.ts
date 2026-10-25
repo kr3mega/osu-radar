@@ -29,8 +29,8 @@ describe('Terminal Vivo de Logs & Persistência em Disco do Electron Desktop', (
   });
 
   it('grava sessões com timestamp, níveis e tags nos arquivos primário e secundário de log', async () => {
-    tmpRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-radar-logger-root-'));
-    tmpUserData = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-radar-logger-user-'));
+    tmpRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-skills-logger-root-'));
+    tmpUserData = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-skills-logger-user-'));
 
     const logger = createDesktopLogger({
       appRoot: tmpRoot,
@@ -44,7 +44,7 @@ describe('Terminal Vivo de Logs & Persistência em Disco do Electron Desktop', (
     expect(primaryPath).toBe(path.join(tmpRoot, 'logs', 'electron-desktop.log'));
     expect(secondaryPath).toBe(path.join(tmpUserData, 'logs', 'electron-desktop.log'));
 
-    logger.info('Main', 'osu!radar Desktop iniciado');
+    logger.info('Main', 'osu!skills Desktop iniciado');
     logger.warn('Window', 'Aviso de redimensionamento');
     logger.error('Renderer', 'Erro de renderização simulado');
     logger.debug('IPC', 'Mensagem de IPC de teste');
@@ -57,8 +57,8 @@ describe('Terminal Vivo de Logs & Persistência em Disco do Electron Desktop', (
       : '';
 
     // Verifica banner de início de sessão
-    expect(primaryContent).toContain('NOVO INÍCIO DE SESSÃO DO OSU!RADAR DESKTOP');
-    expect(primaryContent).toContain('[INFO ] [Main]         osu!radar Desktop iniciado');
+    expect(primaryContent).toContain('NOVO INÍCIO DE SESSÃO DO OSU!SKILLS DESKTOP');
+    expect(primaryContent).toContain('[INFO ] [Main]         osu!skills Desktop iniciado');
     expect(primaryContent).toContain('[WARN ] [Window]       Aviso de redimensionamento');
     expect(primaryContent).toContain('[ERROR] [Renderer]     Erro de renderização simulado');
     expect(primaryContent).toContain('[DEBUG] [IPC]          Mensagem de IPC de teste');
@@ -70,11 +70,11 @@ describe('Terminal Vivo de Logs & Persistência em Disco do Electron Desktop', (
   });
 
   it('servidor embutido reporta requisições HTTP e erros ao logger com status e duração', async () => {
-    tmpRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-radar-server-log-'));
+    tmpRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-skills-server-log-'));
     await fs.promises.mkdir(path.join(tmpRoot, 'dist'), { recursive: true });
     await fs.promises.writeFile(
       path.join(tmpRoot, 'dist', 'index.html'),
-      '<!doctype html><html><body>osu!radar UI</body></html>',
+      '<!doctype html><html><body>osu!skills UI</body></html>',
       'utf8'
     );
 
@@ -106,7 +106,7 @@ describe('Terminal Vivo de Logs & Persistência em Disco do Electron Desktop', (
   });
 
   it('formata adequadamente logs de sistema, IPC, performance e tags de stores', async () => {
-    tmpRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-radar-logger-detail-'));
+    tmpRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-skills-logger-detail-'));
 
     const logger = createDesktopLogger({
       appRoot: tmpRoot,

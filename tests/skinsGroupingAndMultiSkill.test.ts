@@ -205,7 +205,7 @@ HitCircleOverlap: 16 // px
     expect(extracted.files['soft-hitnormal.wav']).toBeDefined();
 
     // Test filesystem skin scanning & manifest with `#` in directory name
-    const tmpRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-radar-skins-'));
+    const tmpRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-skills-skins-'));
     try {
       const skinFolder = path.join(tmpRoot, '- # WhiteCat Test #-');
       const nestedDigitsDir = path.join(skinFolder, 'Assets', 'default');

@@ -1,9 +1,9 @@
 @echo off
-title osu!radar - Servidor Local
+title osu!skills - Servidor Local
 cd /d "%~dp0"
 
 echo ====================================================
-echo             osu!radar - Servidor Local
+echo             osu!skills - Servidor Local
 echo ====================================================
 echo.
 echo  Acessivel em: http://localhost:3000/

@@ -48,7 +48,7 @@ export async function resolveBeatmapSetId(map: BeatmapAnalysisResult): Promise<n
     // 3. Nerinyan exact beatmap ID lookup (?b=)
     try {
       const res = await fetch(`https://api.nerinyan.moe/search?b=${beatmapId}`, {
-        headers: { 'User-Agent': 'osuRadar/2.0' },
+        headers: { 'User-Agent': 'osuSkills/2.0' },
       });
       if (res.ok) {
         const json = await res.json();
@@ -63,7 +63,7 @@ export async function resolveBeatmapSetId(map: BeatmapAnalysisResult): Promise<n
     // 4. Catboy v2 beatmap lookup
     try {
       const res = await fetch(`https://catboy.best/api/v2/b/${beatmapId}`, {
-        headers: { 'User-Agent': 'osuRadar/2.0' },
+        headers: { 'User-Agent': 'osuSkills/2.0' },
       });
       if (res.ok) {
         const json = await res.json();
@@ -79,7 +79,7 @@ export async function resolveBeatmapSetId(map: BeatmapAnalysisResult): Promise<n
     // 5. osu.direct raw .osu fetch to read BeatmapSetID header
     try {
       const res = await fetch(`https://osu.direct/api/osu/${beatmapId}`, {
-        headers: { 'User-Agent': 'osuRadar/2.0' },
+        headers: { 'User-Agent': 'osuSkills/2.0' },
       });
       if (res.ok) {
         const text = await res.text();
@@ -100,7 +100,7 @@ export async function resolveBeatmapSetId(map: BeatmapAnalysisResult): Promise<n
   if (query.length > 2) {
     try {
       const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(query)}`, {
-        headers: { 'User-Agent': 'osuRadar/2.0' },
+        headers: { 'User-Agent': 'osuSkills/2.0' },
       });
       if (res.ok) {
         const list = await res.json();
@@ -145,7 +145,7 @@ export async function downloadBeatmapAudio(
 
       const res = await fetch(mirror.url, {
         signal: ctrl.signal,
-        headers: { 'User-Agent': 'Mozilla/5.0 osuRadar/2.0' },
+        headers: { 'User-Agent': 'Mozilla/5.0 osuSkills/2.0' },
       });
       clearTimeout(timeout);
 

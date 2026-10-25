@@ -191,7 +191,7 @@ export const PoolOverview: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Grid: Radar Hexagon da Pool + Detecção de Anomalias */}
+      {/* Main Grid: Skills Hexagon da Pool + Detecção de Anomalias */}
       <div
         style={{
           display: 'grid',
@@ -200,7 +200,7 @@ export const PoolOverview: React.FC = () => {
           alignItems: 'start',
         }}
       >
-        {/* Left: Aggregated Pool Radar */}
+        {/* Left: Aggregated Pool Skills */}
         <div
           style={{
             display: 'flex',

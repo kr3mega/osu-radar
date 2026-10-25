@@ -489,7 +489,7 @@ export function createLocalSongsMiddleware() {
 export function localSongsPlugin(): Plugin {
   const middleware = createLocalSongsMiddleware();
   return {
-    name: 'osu-radar-local-songs-bridge',
+    name: 'osu-skills-local-songs-bridge',
     configureServer(server) {
       server.middlewares.use(middleware);
     },

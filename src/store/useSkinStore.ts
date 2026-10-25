@@ -16,8 +16,10 @@ export interface AvailableSkinOption {
   dbSkinId?: string;
 }
 
-const SELECTED_SKIN_STORAGE_KEY = 'osu_radar_selected_skin_id';
-const CUSTOM_SKINS_DIR_STORAGE_KEY = 'osu_radar_custom_skins_dir';
+const SELECTED_SKIN_STORAGE_KEY = 'osu_skills_selected_skin_id';
+const CUSTOM_SKINS_DIR_STORAGE_KEY = 'osu_skills_custom_skins_dir';
+const LEGACY_SELECTED_SKIN_STORAGE_KEY = 'osu_radar_selected_skin_id';
+const LEGACY_CUSTOM_SKINS_DIR_STORAGE_KEY = 'osu_radar_custom_skins_dir';
 
 const loadedSkinsMemoryCache = new Map<string, OsuSkin>();
 const importedSkinObjectUrls = new Map<string, string[]>();
@@ -54,13 +56,17 @@ interface SkinStoreState {
 
 const DEFAULT_SKIN_OPTION: AvailableSkinOption = {
   id: 'default',
-  name: 'osu!radar (Padrão)',
+  name: 'osu!skills (Padrão)',
   source: 'default',
 };
 
 function readInitialSelectedSkin(): string {
   try {
-    return localStorage.getItem(SELECTED_SKIN_STORAGE_KEY) || 'default';
+    return (
+      localStorage.getItem(SELECTED_SKIN_STORAGE_KEY) ||
+      localStorage.getItem(LEGACY_SELECTED_SKIN_STORAGE_KEY) ||
+      'default'
+    );
   } catch {
     return 'default';
   }
@@ -68,7 +74,11 @@ function readInitialSelectedSkin(): string {
 
 function readSavedCustomSkinsDir(): string {
   try {
-    return localStorage.getItem(CUSTOM_SKINS_DIR_STORAGE_KEY) || '';
+    return (
+      localStorage.getItem(CUSTOM_SKINS_DIR_STORAGE_KEY) ||
+      localStorage.getItem(LEGACY_CUSTOM_SKINS_DIR_STORAGE_KEY) ||
+      ''
+    );
   } catch {
     return '';
   }

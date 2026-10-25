@@ -143,7 +143,7 @@ export const LocalSongsSyncPanel: React.FC = () => {
 
   return (
     <div
-      className="osu-radar-training-form"
+      className="osu-skills-training-form"
       style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
     >
       <input
@@ -198,7 +198,7 @@ export const LocalSongsSyncPanel: React.FC = () => {
 
           {localMapsCount > 0 && (
             <span
-              className="osu-radar-mod-pill"
+              className="osu-skills-mod-pill"
               style={{
                 backgroundColor: 'hsl(var(--hsl-b3))',
                 color: 'hsl(var(--hsl-lime-1))',
@@ -249,12 +249,14 @@ export const LocalSongsSyncPanel: React.FC = () => {
                     outline: 'none',
                   }}
                 />
-                {typeof window !== 'undefined' && window.osuRadarDesktop?.isElectron && (
+                {typeof window !== 'undefined' &&
+                  (window.osuSkillsDesktop || window.osuRadarDesktop)?.isElectron && (
                   <button
                     type="button"
                     disabled={isSyncing}
                     onClick={async () => {
-                      const picked = await window.osuRadarDesktop?.selectDirectory({
+                      const bridge = window.osuSkillsDesktop || window.osuRadarDesktop;
+                      const picked = await bridge?.selectDirectory({
                         title: 'Selecionar pasta Songs do osu!',
                         defaultPath: songsPath.trim() || undefined,
                       });
@@ -276,13 +278,13 @@ export const LocalSongsSyncPanel: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
               <label
                 htmlFor="force-reindex-checkbox"
-                className="osu-radar-brand-checkbox"
+                className="osu-skills-brand-checkbox"
                 style={{ fontSize: '12px', color: 'hsl(var(--hsl-l1))', cursor: 'pointer' }}
               >
                 <input
                   id="force-reindex-checkbox"
                   type="checkbox"
-                  className="osu-radar-fallback-check"
+                  className="osu-skills-fallback-check"
                   checked={forceReindex}
                   disabled={isSyncing}
                   onChange={(e) => setForceReindex(e.target.checked)}
@@ -334,7 +336,7 @@ export const LocalSongsSyncPanel: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => clearLocalSongs()}
-                    className="osu-radar-player__mod-btn"
+                    className="osu-skills-player__mod-btn"
                     style={{ padding: '8px 12px', fontSize: '11px' }}
                     title="Remove apenas os mapas indexados da pasta Songs, mantendo suas pools de torneios intactas"
                   >
@@ -378,7 +380,7 @@ export const LocalSongsSyncPanel: React.FC = () => {
           </div>
 
           <progress
-            className="osu-radar-progress"
+            className="osu-skills-progress"
             max={100}
             value={syncProgress.totalToAnalyze > 0 ? progressRatio : 15}
             style={{ width: '100%' }}
@@ -431,7 +433,7 @@ export const LocalSongsSyncPanel: React.FC = () => {
           type="button"
           disabled={isSyncing}
           onClick={() => browserFolderRef.current?.click()}
-          className="osu-radar-player__mod-btn"
+          className="osu-skills-player__mod-btn"
           style={{ padding: '8px 14px', fontSize: '11px', fontWeight: 700 }}
         >
           <i className="fas fa-folder-open" style={{ marginRight: '6px' }} />

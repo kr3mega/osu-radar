@@ -1,13 +1,15 @@
 import { create } from 'zustand';
 import { previewAudioManager } from '../lib/osu-preview/previewAudio';
 
-const STORAGE_KEY = 'osu_radar_global_volume';
-const MUTE_KEY = 'osu_radar_global_muted';
+const STORAGE_KEY = 'osu_skills_global_volume';
+const MUTE_KEY = 'osu_skills_global_muted';
+const LEGACY_STORAGE_KEY = 'osu_radar_global_volume';
+const LEGACY_MUTE_KEY = 'osu_radar_global_muted';
 
 function getInitialVolume(): number {
   if (typeof localStorage !== 'undefined') {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
       if (saved !== null) {
         const parsed = parseFloat(saved);
         if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
@@ -22,7 +24,8 @@ function getInitialVolume(): number {
 function getInitialMuted(): boolean {
   if (typeof localStorage !== 'undefined') {
     try {
-      return localStorage.getItem(MUTE_KEY) === 'true';
+      const val = localStorage.getItem(MUTE_KEY) ?? localStorage.getItem(LEGACY_MUTE_KEY);
+      return val === 'true';
     } catch {}
   }
   return false;

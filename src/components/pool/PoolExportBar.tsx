@@ -13,7 +13,7 @@ export const PoolExportBar: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const safeName = (currentPool.name || 'osu-radar-pool').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+    const safeName = (currentPool.name || 'osu-skills-pool').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
     a.download = `${safeName}.json`;
     document.body.appendChild(a);
     a.click();
@@ -34,7 +34,7 @@ export const PoolExportBar: React.FC = () => {
     const text = await file.text();
     const success = await importPoolJson(text);
     if (!success) {
-      alert('Arquivo JSON inválido para formato de mappool do osu!Radar.');
+      alert('Arquivo JSON inválido para formato de mappool do osu!Skills.');
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };

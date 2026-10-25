@@ -256,7 +256,7 @@ export const App: React.FC = () => {
     countActiveTrainingFilters(trainingFilters) > 0 || prioritizedSkills.length > 0;
 
   return (
-    <div className="osu-radar-app">
+    <div className="osu-skills-app">
       {/* 0. Custom Frameless osu!lazer Titlebar (rendered only inside Electron) */}
       <ElectronTitlebar
         activeSubtitle={
@@ -515,9 +515,9 @@ export const App: React.FC = () => {
 
             {/* Main Split Workspace inside .osu-page */}
             <div className="osu-page">
-              <div className="osu-radar-workspace">
-                {/* Left Column: Selected Beatmapset Header + Live Visualizer / Radar */}
-                <div ref={wedgeContainerRef} className="osu-radar-left-col">
+              <div className="osu-skills-workspace">
+                {/* Left Column: Selected Beatmapset Header + Visualizer / Skills */}
+                <div ref={wedgeContainerRef} className="osu-skills-left-col">
                   <LazerWedge
                     map={activeMap}
                     siblingDifficulties={activeSiblingDifficulties}
@@ -528,7 +528,7 @@ export const App: React.FC = () => {
                 </div>
 
                 {/* Right Column: Official .beatmapsets Toolbar + Virtualized .beatmapset-panel List */}
-                <div className="osu-radar-right-col">
+                <div className="osu-skills-right-col">
                   {/* Official ppy/osu-web .beatmapsets__toolbar & .sort (resources/js/beatmaps/search-sort.tsx) */}
                   <div className="beatmapsets__toolbar">
                     <div className="beatmapsets__toolbar-item" style={{ flex: '1 1 auto', minWidth: 0, width: '100%' }}>
@@ -572,7 +572,7 @@ export const App: React.FC = () => {
                             );
                           })}
 
-                          <div className="osu-radar-toolbar-count">
+                          <div className="osu-skills-toolbar-count">
                             <span>
                               <strong style={{ color: '#fff' }}>
                                 {groupedSets.length.toLocaleString('pt-BR')}
@@ -699,14 +699,14 @@ export const App: React.FC = () => {
       {/* 4. Uploader & Songs Sync Modal */}
       {isUploaderOpen && (
         <div
-          className="osu-radar-modal-backdrop"
+          className="osu-skills-modal-backdrop"
           onClick={() => setIsUploaderOpen(false)}
         >
           <div
-            className="osu-radar-modal"
+            className="osu-skills-modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="osu-radar-modal__header">
+            <div className="osu-skills-modal__header">
               <span style={{ fontWeight: 700, fontSize: '16px', color: 'hsl(var(--hsl-c1))' }}>
                 <i className="fas fa-hdd" style={{ marginRight: '8px', color: 'hsl(var(--hsl-h1))' }} />
                 Biblioteca osu! Songs, Skins & Importador de Mappools
@@ -719,7 +719,7 @@ export const App: React.FC = () => {
                 <i className="fas fa-times" />
               </button>
             </div>
-            <div className="osu-radar-modal__body">
+            <div className="osu-skills-modal__body">
               <ErrorBoundary fallbackTitle="Erro ao carregar o sincronizador de beatmaps">
                 <PoolUploader key={uploaderInitialTab} initialTab={uploaderInitialTab} />
               </ErrorBoundary>

@@ -1,4 +1,4 @@
-export interface OsuRadarDesktopBridge {
+export interface OsuSkillsDesktopBridge {
   isElectron: boolean;
   platform: string;
   minimize: () => Promise<void>;
@@ -20,9 +20,12 @@ export interface OsuRadarDesktopBridge {
   getGPUStatus?: () => Promise<Record<string, string>>;
 }
 
+export type OsuRadarDesktopBridge = OsuSkillsDesktopBridge;
+
 declare global {
   interface Window {
-    osuRadarDesktop?: OsuRadarDesktopBridge;
+    osuSkillsDesktop?: OsuSkillsDesktopBridge;
+    osuRadarDesktop?: OsuSkillsDesktopBridge;
   }
 }
 
