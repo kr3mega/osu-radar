@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { BeatmapAnalysisResult, SkillAttributes } from '../../engine/types';
 import { getStarRatingColor, getStarRatingTextColor, TOURNAMENT_MOD_COLORS } from '../../utils/osuColors';
-import { ModSlotBadge } from './ModSlotBadge';
 import { OsuPreviewPlayer } from '../visualizer/OsuPreviewPlayer';
 import { formatTimestamp } from '../../engine/strains';
 import { buildBeatmapCoverCss } from '../../lib/osu-preview';
@@ -18,7 +17,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   map,
   siblingDifficulties,
   poolAverageSkills: _poolAverageSkills,
-  onSlotChange,
+  onSlotChange: _onSlotChange,
   onSelectDifficulty,
 }) => {
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(false);
@@ -56,15 +55,6 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   const modColorConfig = isLocalSong
     ? { bg: 'hsl(var(--hsl-h1))', text: 'hsl(var(--hsl-b6))' }
     : TOURNAMENT_MOD_COLORS[modPrefix] || TOURNAMENT_MOD_COLORS.NM;
-
-  const modSlotOptions = [
-    'NM', 'NM1', 'NM2', 'NM3', 'NM4', 'NM5', 'NM6',
-    'HD', 'HD1', 'HD2', 'HD3',
-    'HR', 'HR1', 'HR2', 'HR3',
-    'DT', 'DT1', 'DT2', 'DT3', 'DT4',
-    'FM', 'FM1', 'FM2', 'FM3',
-    'TB',
-  ];
 
   const statRows = [
     { key: 'cs', label: 'Tam. Círculo (CS)', val: difficulty.cs, max: 10, isStar: false },
@@ -223,126 +213,8 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
               <span className="beatmapset-header__details-text-link">{metadata.artist}</span>
             </span>
 
-            <div className="beatmapset-mapping">
-              <div className="beatmapset-mapping__user">
-                <span
-                  className="avatar avatar--beatmapset"
-                  style={{
-                    backgroundImage: 'url(/images/layout/avatar-guest@2x.png)',
-                  }}
-                />
-              </div>
-              <div className="beatmapset-mapping__content">
-                <div>
-                  mapeado por <strong style={{ color: '#fff' }}>{metadata.creator}</strong>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-                  {isLocalSong ? (
-                    <span
-                      className="osu-skills-mod-pill"
-                      style={{
-                        backgroundColor: 'hsl(var(--hsl-b3))',
-                        color: 'hsl(var(--hsl-h1))',
-                        fontWeight: 700,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                      title={map.localOsuPath || 'Pasta Songs do osu!'}
-                    >
-                      <i className="fas fa-hdd" style={{ fontSize: '9px' }} />
-                      Pasta Songs (Local)
-                    </span>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>slot do torneio:</span>
-                      {onSlotChange ? (
-                        <select
-                          value={modSlot || 'NM1'}
-                          onChange={(e) => onSlotChange(map.id, e.target.value)}
-                          style={{
-                            backgroundColor: 'hsl(var(--hsl-b5))',
-                            color: '#fff',
-                            border: '1px solid hsl(var(--hsl-b2))',
-                            borderRadius: '4px',
-                            padding: '1px 6px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {modSlotOptions.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <ModSlotBadge slot={modSlot} size="sm" />
-                      )}
-                    </div>
-                  )}
-
-                  {map.stageName && (
-                    <span
-                      className="osu-skills-mod-pill"
-                      style={{
-                        backgroundColor: 'hsl(var(--hsl-b3))',
-                        color: 'hsl(var(--hsl-h1))',
-                        fontWeight: 700,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                      title={`Etapa: ${map.stageName}`}
-                    >
-                      <i className="fas fa-layer-group" style={{ fontSize: '9px' }} />
-                      {map.stageName}
-                    </span>
-                  )}
-
-                  {map.tournamentName && (
-                    <span
-                      className="osu-skills-mod-pill"
-                      style={{
-                        backgroundColor: 'hsl(var(--hsl-b4))',
-                        color: 'hsl(var(--hsl-l1))',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                      title={`Torneio: ${map.tournamentName}`}
-                    >
-                      <i className="fas fa-trophy" style={{ fontSize: '9px', color: '#e5b32e' }} />
-                      {map.tournamentName}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="beatmapset-header__buttons" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {(metadata.beatmapId || metadata.beatmapSetId) && (
-                <a
-                  href={
-                    metadata.beatmapId
-                      ? `osu://b/${metadata.beatmapId}`
-                      : `osu://s/${metadata.beatmapSetId}`
-                  }
-                  className="btn-osu-big btn-osu-big--beatmapset-header"
-                  title="Selecionar este mapa diretamente dentro do cliente osu!"
-                >
-                  <div className="btn-osu-big__content">
-                    <div className="btn-osu-big__left">
-                      <span className="btn-osu-big__text-top">Abrir no osu!</span>
-                      <span className="btn-osu-big__text-bottom">osu!direct</span>
-                    </div>
-                    <div className="btn-osu-big__icon">
-                      <span className="fas fa-gamepad" />
-                    </div>
-                  </div>
-                </a>
-              )}
-
+            {/* Action Buttons: Página Oficial first, Abrir no osu! second */}
+            <div className="beatmapset-header__buttons" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
               {(metadata.beatmapId || metadata.beatmapSetId) && (
                 <a
                   href={
@@ -363,6 +235,28 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                     </div>
                     <div className="btn-osu-big__icon">
                       <span className="fas fa-external-link-alt" />
+                    </div>
+                  </div>
+                </a>
+              )}
+
+              {(metadata.beatmapId || metadata.beatmapSetId) && (
+                <a
+                  href={
+                    metadata.beatmapId
+                      ? `osu://b/${metadata.beatmapId}`
+                      : `osu://s/${metadata.beatmapSetId}`
+                  }
+                  className="btn-osu-big btn-osu-big--beatmapset-header"
+                  title="Selecionar este mapa diretamente dentro do cliente osu!"
+                >
+                  <div className="btn-osu-big__content">
+                    <div className="btn-osu-big__left">
+                      <span className="btn-osu-big__text-top">Abrir no osu!</span>
+                      <span className="btn-osu-big__text-bottom">osu!direct</span>
+                    </div>
+                    <div className="btn-osu-big__icon">
+                      <span className="fas fa-gamepad" />
                     </div>
                   </div>
                 </a>
