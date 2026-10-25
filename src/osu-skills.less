@@ -150,7 +150,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 16px;
+  height: 48px;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 0 16px;
+  padding-right: 95px;
   background-color: @osu-colour-b4;
   border-bottom: 1px solid @osu-colour-b3;
   overflow: hidden;
@@ -196,12 +200,16 @@
 
 .osu-skills-minimize-header-btn {
   .reset-input();
-  position: relative;
-  z-index: 1;
+  position: absolute;
+  top: 13px;
+  right: 16px;
+  z-index: 10;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 2px 8px;
+  height: 22px;
+  padding: 0 8px;
   border-radius: 4px;
   background-color: hsla(var(--hsl-b6), 0.7);
   border: 1px solid hsla(var(--hsl-b2), 0.5);
@@ -210,6 +218,7 @@
   font-weight: 700;
   cursor: pointer;
   flex-shrink: 0;
+  line-height: 1;
   transition: all 120ms ease;
 
   &:hover {
@@ -221,6 +230,15 @@
   i {
     font-size: 9px;
     color: hsl(var(--hsl-h1));
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+  }
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
   }
 }
 
@@ -1457,37 +1475,38 @@
   .reset-input();
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 10px;
+  justify-content: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
   border-radius: 10000px;
   background-color: @osu-colour-b6;
-  border: 1px solid @osu-colour-b3;
+  border: none;
   color: @osu-colour-l2;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   cursor: pointer;
   transition: all 120ms ease;
+  line-height: 1;
 
   &:hover {
     color: #fff;
-    background-color: @osu-colour-b4;
-    border-color: @osu-colour-b2;
+    background-color: @osu-colour-b3;
   }
 
   &--open {
     color: #fff;
-    background-color: @osu-colour-b4;
-    border-color: hsl(var(--hsl-h1));
+    background-color: @osu-colour-b3;
   }
 
   &__label {
     letter-spacing: 0.3px;
+    line-height: 1;
   }
 
   &__icon {
-    font-size: 9px;
+    font-size: 8px;
     transition: transform 150ms ease;
 
     &--open {

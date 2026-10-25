@@ -264,18 +264,28 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
             </div>
           </div>
 
+          {/* Minimize header button anchored top-right */}
+          <button
+            type="button"
+            onClick={() => setIsHeaderCollapsed(true)}
+            className="osu-skills-minimize-header-btn"
+            title="Minimizar informações da música"
+          >
+            <i className="fas fa-chevron-up" />
+            <span>Minimizar</span>
+          </button>
+
           {/* Right Box: Status Pill & Official .beatmapset-stats Table (resources/js/beatmapsets-show/stats.tsx) */}
           <div className="beatmapset-header__box beatmapset-header__box--stats">
-            <div
-              className="beatmapset-header__status"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: !isLocalSong ? 'space-between' : 'flex-end',
-                gap: '8px',
-              }}
-            >
-              {!isLocalSong && (
+            {!isLocalSong && (
+              <div
+                className="beatmapset-header__status"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '10px',
+                }}
+              >
                 <span
                   className="beatmapset-status beatmapset-status--show"
                   style={{
@@ -286,18 +296,8 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                 >
                   {modSlot || 'NM1'}
                 </span>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setIsHeaderCollapsed(true)}
-                className="osu-skills-minimize-header-btn"
-                title="Minimizar informações da música"
-              >
-                <i className="fas fa-chevron-up" />
-                <span>Minimizar</span>
-              </button>
-            </div>
+              </div>
+            )}
 
             <div className="beatmapset-stats">
               <div className="beatmapset-stats__row beatmapset-stats__row--basic">
