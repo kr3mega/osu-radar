@@ -2,6 +2,7 @@ import { Mappool, BeatmapAnalysisResult } from './types';
 import { MatchSimulationReport } from './scouting';
 import { TournamentTier, TOURNAMENT_TIERS } from './bws';
 import { formatTimestamp } from './strains';
+import { formatSkillLabel } from '../utils/skillLabels';
 
 /**
  * Generates an analytical briefing for tournament casters and stream commentators.
@@ -16,7 +17,7 @@ export function generateCasterBriefing(map: BeatmapAnalysisResult): {
   const secondarySkill = map.topSkills[1];
 
   const skillTitles: Record<string, string> = {
-    snapAim: 'Mira de Precisão (Snap Jumps)',
+    snapAim: 'Mira de Precisão (Jumps)',
     flowAim: 'Flow Aim e Curvatura',
     speed: 'Velocidade Pura (High BPM)',
     stamina: 'Resistência Física (Deathstreams)',
@@ -58,7 +59,7 @@ export function generateDiscordMappoolSummary(
     const slot = (m.modSlot || 'NM1').padEnd(4, ' ');
     const sr = `★${m.stats.starRating.toFixed(2)}`.padEnd(6, ' ');
     const bpm = `${m.stats.bpmMode}BPM`.padEnd(7, ' ');
-    const top = `${m.topSkills[0]} (${m.skills[m.topSkills[0]].toFixed(0)})`;
+    const top = `${formatSkillLabel(m.topSkills[0])} (${m.skills[m.topSkills[0]].toFixed(0)})`;
     const title = m.metadata.title.slice(0, 22).padEnd(22, ' ');
     text += `${slot} | ${sr} | ${bpm} | ${title} | ${top}\n`;
   }

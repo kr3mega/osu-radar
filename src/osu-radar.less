@@ -720,3 +720,444 @@
     border-radius: 4px;
   }
 }
+
+/* ==========================================================================
+   Screen-reader-only label helper
+   ========================================================================== */
+.osu-radar-sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   Dual-Thumb Draggable Star Rating Bar (modern-web-guidance: slider)
+   ========================================================================== */
+.osu-radar-dual-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  inline-size: 100%;
+  max-inline-size: 620px;
+
+  &__badge {
+    min-inline-size: 56px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.4;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  }
+
+  &__track-wrap {
+    position: relative;
+    flex: 1;
+    min-inline-size: 140px;
+    block-size: 28px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    touch-action: pan-y;
+  }
+
+  &__rail {
+    position: absolute;
+    inset-inline: 0;
+    block-size: 6px;
+    border-radius: 999px;
+    background-color: @osu-colour-b2;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  &__fill {
+    position: absolute;
+    inset-block: 0;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      #4290fb 0%,
+      #7cff4f 28%,
+      #f6f05c 52%,
+      hsl(var(--hsl-h1)) 78%,
+      #aa88ff 100%
+    );
+    box-shadow: 0 0 8px hsla(var(--hsl-h1), 0.45);
+  }
+}
+
+.osu-radar-dual-slider__input {
+  --slider-track-size: 6px;
+  --slider-thumb-size: 16px;
+  --slider-track-radius: 999px;
+  --slider-thumb-radius: 50%;
+  --slider-track-color: transparent;
+  --slider-fill-color: hsl(var(--hsl-h1));
+  --slider-thumb-color: #ffffff;
+  --slider-direction: to right;
+  --attr-min: 0;
+  --attr-max: 12;
+  --control-value: 0;
+  --slider-progress: ~"calc(progress(var(--control-value), var(--attr-min), var(--attr-max)) * 100%)";
+
+  &:dir(rtl) {
+    --slider-direction: to left;
+  }
+
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  pointer-events: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--slider-fill-color);
+    outline-offset: 4px;
+    border-radius: 999px;
+  }
+}
+
+/* WebKit/Blink — declared separately from Firefox so vendor rules are never dropped */
+.osu-radar-dual-slider__input::-webkit-slider-runnable-track {
+  block-size: var(--slider-track-size);
+  border: 0;
+  border-radius: var(--slider-track-radius);
+  background: transparent;
+}
+
+.osu-radar-dual-slider__input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  cursor: grab;
+  box-sizing: border-box;
+  inline-size: var(--slider-thumb-size);
+  block-size: var(--slider-thumb-size);
+  margin-block-start: ~"calc((var(--slider-track-size) - var(--slider-thumb-size)) / 2)";
+  border: 2.5px solid var(--slider-fill-color);
+  border-radius: var(--slider-thumb-radius);
+  background: var(--slider-thumb-color);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  transition: transform 100ms ease, box-shadow 100ms ease;
+}
+
+.osu-radar-dual-slider__input::-webkit-slider-thumb:hover {
+  transform: scale(1.14);
+  box-shadow: 0 0 0 4px hsla(var(--hsl-h1), 0.25);
+}
+
+.osu-radar-dual-slider__input::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.2);
+}
+
+/* Firefox — declared separately from WebKit */
+.osu-radar-dual-slider__input::-moz-range-track {
+  block-size: var(--slider-track-size);
+  border: 0;
+  border-radius: var(--slider-track-radius);
+  background: transparent;
+}
+
+.osu-radar-dual-slider__input::-moz-range-progress {
+  block-size: var(--slider-track-size);
+  border-radius: var(--slider-track-radius);
+  background: transparent;
+}
+
+.osu-radar-dual-slider__input::-moz-range-thumb {
+  pointer-events: auto;
+  cursor: grab;
+  box-sizing: border-box;
+  inline-size: var(--slider-thumb-size);
+  block-size: var(--slider-thumb-size);
+  border: 2.5px solid var(--slider-fill-color);
+  border-radius: var(--slider-thumb-radius);
+  background: var(--slider-thumb-color);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  transition: transform 100ms ease, box-shadow 100ms ease;
+}
+
+.osu-radar-dual-slider__input::-moz-range-thumb:hover {
+  transform: scale(1.14);
+  box-shadow: 0 0 0 4px hsla(var(--hsl-h1), 0.25);
+}
+
+.osu-radar-dual-slider__input::-moz-range-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.2);
+}
+
+@supports not (opacity: progress(1, 0, 100)) {
+  .osu-radar-dual-slider__input {
+    --slider-progress: ~"calc((var(--control-value) - var(--attr-min)) / (var(--attr-max) - var(--attr-min)) * 100%)";
+  }
+}
+
+/* ==========================================================================
+   Multi-Skill Priority Pills & Synergy Tag
+   ========================================================================== */
+.osu-radar-skill-priority-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid @osu-colour-b3;
+  background-color: @osu-colour-b5;
+  color: @osu-colour-l1;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 120ms ease;
+
+  &:hover {
+    background-color: @osu-colour-b4;
+    border-color: hsl(var(--hsl-h1));
+    color: #ffffff;
+  }
+
+  &:focus-visible {
+    outline: 2px solid hsl(var(--hsl-h1));
+    outline-offset: 2px;
+  }
+
+  &--active {
+    background-color: hsla(var(--hsl-h1), 0.18);
+    border-color: hsl(var(--hsl-h1));
+    color: #ffffff;
+    box-shadow: 0 0 10px hsla(var(--hsl-h1), 0.25);
+  }
+
+  &__order {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: 15px;
+    block-size: 15px;
+    padding: 0 3px;
+    border-radius: 999px;
+    background-color: hsl(var(--hsl-h1));
+    color: @osu-colour-b6;
+    font-size: 9px;
+    font-weight: 800;
+  }
+}
+
+.osu-radar-synergy-active-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background-color: hsla(var(--hsl-h1), 0.14);
+  border: 1px dashed hsla(var(--hsl-h1), 0.6);
+  color: hsl(var(--hsl-h1));
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   Live OsuPreviewPlayer Skin Switcher
+   ========================================================================== */
+.osu-radar-skin-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 8px;
+  border-radius: 6px;
+  background-color: @osu-colour-b5;
+  border: 1px solid @osu-colour-b3;
+}
+
+.osu-radar-skin-select {
+  max-inline-size: 170px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background-color: transparent;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+
+  option {
+    background-color: @osu-colour-b5;
+    color: #ffffff;
+  }
+
+  &:focus-visible {
+    outline: 2px solid hsl(var(--hsl-h1));
+    outline-offset: 2px;
+  }
+}
+
+/* ==========================================================================
+   Grouped Song Cards & Expandable Difficulty Drawer
+   ========================================================================== */
+.osu-radar-song-group {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.osu-radar-diff-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background-color: rgba(15, 20, 28, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: @osu-colour-c1;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease;
+
+  &--open {
+    background-color: hsla(var(--hsl-h1), 0.22);
+    border-color: hsl(var(--hsl-h1));
+    color: #ffffff;
+  }
+}
+
+.osu-radar-diff-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 6px;
+  border-radius: 8px;
+  background-color: @osu-colour-b5;
+  border: 1px solid @osu-colour-b3;
+  box-sizing: border-box;
+}
+
+.osu-radar-diff-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  block-size: 38px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background-color: @osu-colour-b4;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: background-color 100ms ease, border-color 100ms ease;
+
+  &:hover {
+    background-color: @osu-colour-b3;
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+
+  &:focus-visible {
+    outline: 2px solid hsl(var(--hsl-h1));
+    outline-offset: -2px;
+  }
+
+  &--selected {
+    background-color: hsla(var(--hsl-h1), 0.14);
+    border-color: hsl(var(--hsl-h1));
+  }
+
+  &__star {
+    min-inline-size: 52px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+
+  &__version {
+    flex: 1;
+    min-inline-size: 80px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  &__stats {
+    color: @osu-colour-l2;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+
+    @media (max-width: 720px) {
+      display: none;
+    }
+  }
+
+  &__skills {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  &__skill {
+    padding: 2px 6px;
+    border-radius: 4px;
+    background-color: @osu-colour-b5;
+    color: @osu-colour-c1;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+
+    &--synergy {
+      background-color: hsl(var(--hsl-h1));
+      color: @osu-colour-b6;
+      font-weight: 800;
+    }
+  }
+
+  &__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  &__action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 24px;
+    block-size: 24px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: @osu-colour-l2;
+    font-size: 11px;
+    cursor: pointer;
+    text-decoration: none;
+
+    &:hover {
+      background-color: @osu-colour-b2;
+      color: #ffffff;
+    }
+  }
+}

@@ -10,7 +10,7 @@ interface StatHexagonProps {
 }
 
 const AXES: Array<{ key: keyof SkillAttributes; label: string; desc: string }> = [
-  { key: 'snapAim', label: 'Snap Aim', desc: 'Jumps agudos & desaceleração' },
+  { key: 'snapAim', label: 'Jump', desc: 'Jumps agudos & desaceleração' },
   { key: 'flowAim', label: 'Flow Aim', desc: 'Curvatura & arcos contínuos' },
   { key: 'speed', label: 'Speed', desc: 'Frequência bruta de tapping' },
   { key: 'stamina', label: 'Stamina', desc: 'Resistência a streams longas' },

@@ -11,6 +11,10 @@ import { startBackgroundPoolAudioSync, clearAudioCache as clearDbAudioCache } fr
 
 import { TournamentTier } from '../engine/bws';
 import { SheetBeatmapEntry } from '../utils/sheetParser';
+import {
+  computeMultiSkillSynergy,
+  matchesPrioritizedSkills,
+} from '../utils/skillLabels';
 
 export interface ActiveTournamentFilter {
   stageName: string;
@@ -93,7 +97,7 @@ export const TRAINING_PRESETS: TrainingPresetDefinition[] = [
   },
   {
     id: 'jump_aim',
-    label: 'Jump / Snap Aim',
+    label: 'Jump',
     description: 'Muitos jumps angulares com pouca ou nenhuma stream',
     icon: 'fas fa-crosshairs',
     sortBy: 'snapAim',
@@ -165,6 +169,7 @@ export type SortOption =
   | 'bpm'
   | 'od'
   | 'drain'
+  | 'synergy'
   | 'snapAim'
   | 'flowAim'
   | 'speed'
@@ -173,6 +178,17 @@ export type SortOption =
   | 'readingTech';
 
 export type SortDirection = 'asc' | 'desc';
+
+export interface BeatmapSetGroup {
+  groupKey: string;
+  title: string;
+  artist: string;
+  creator: string;
+  beatmapSetId?: number;
+  representative: BeatmapAnalysisResult;
+  difficulties: BeatmapAnalysisResult[];
+  synergyScore: number;
+}
 
 export interface AudioSyncStatus {
   isSyncing: boolean;
@@ -191,6 +207,7 @@ interface PoolState {
   filterStage: string; // 'ALL' or specific stage name
   trainingFilters: TrainingFilterState;
   activeTrainingPreset: TrainingPresetId | null;
+  prioritizedSkills: Array<keyof SkillAttributes>;
   searchQuery: string;
   sortBy: SortOption;
   sortDirection: SortDirection;
@@ -199,6 +216,7 @@ interface PoolState {
   progress: { current: number; total: number; fileName: string } | null;
   isMatchSimulatorOpen: boolean;
   expandedSetKey: string | null;
+  expandedSetKeys: Record<string, boolean>;
   activeTournamentFilter: ActiveTournamentFilter | null;
   audioSyncStatus: AudioSyncStatus | null;
 
@@ -213,8 +231,12 @@ interface PoolState {
   setFilterMod: (mod: string) => void;
   setFilterTournament: (tournament: string) => void;
   setFilterStage: (stage: string) => void;
+  setStarRatingRange: (srMin: number, srMax: number) => void;
   setTrainingFilters: (partial: Partial<TrainingFilterState>) => void;
   applyTrainingPreset: (presetId: TrainingPresetId | null) => void;
+  togglePrioritizedSkill: (skill: keyof SkillAttributes) => void;
+  setPrioritizedSkills: (skills: Array<keyof SkillAttributes>) => void;
+  clearPrioritizedSkills: () => void;
   resetTrainingFilters: () => void;
   setSearchQuery: (query: string) => void;
   setSortBy: (sort: SortOption) => void;
@@ -223,6 +245,8 @@ interface PoolState {
   setTournamentTier: (tier: TournamentTier) => void;
   setIsMatchSimulatorOpen: (open: boolean) => void;
   setExpandedSetKey: (key: string | null) => void;
+  toggleExpandedSet: (key: string) => void;
+  collapseAllSets: () => void;
   setActiveTournamentFilter: (filter: ActiveTournamentFilter | null) => void;
   setPoolMetadata: (name: string, stage?: string) => void;
   clearPool: () => void;
@@ -253,6 +277,7 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   filterStage: 'ALL',
   trainingFilters: { ...DEFAULT_TRAINING_FILTERS },
   activeTrainingPreset: null,
+  prioritizedSkills: [],
   searchQuery: '',
   sortBy: 'slot',
   sortDirection: 'asc',
@@ -261,12 +286,29 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   progress: null,
   isMatchSimulatorOpen: false,
   expandedSetKey: null,
+  expandedSetKeys: {},
   activeTournamentFilter: null,
   audioSyncStatus: null,
 
   setTournamentTier: (tournamentTier) => set({ tournamentTier }),
   setIsMatchSimulatorOpen: (isMatchSimulatorOpen) => set({ isMatchSimulatorOpen }),
-  setExpandedSetKey: (expandedSetKey) => set({ expandedSetKey }),
+  setExpandedSetKey: (expandedSetKey) =>
+    set({
+      expandedSetKey,
+      expandedSetKeys: expandedSetKey ? { [expandedSetKey]: true } : {},
+    }),
+  toggleExpandedSet: (key) =>
+    set((state) => {
+      const nextOpen = !state.expandedSetKeys[key];
+      const nextMap = { ...state.expandedSetKeys };
+      if (nextOpen) nextMap[key] = true;
+      else delete nextMap[key];
+      return {
+        expandedSetKey: nextOpen ? key : null,
+        expandedSetKeys: nextMap,
+      };
+    }),
+  collapseAllSets: () => set({ expandedSetKey: null, expandedSetKeys: {} }),
   setActiveTournamentFilter: (activeTournamentFilter) => {
     const current = get().activeTournamentFilter;
     if (!current && !activeTournamentFilter) return;
@@ -422,6 +464,18 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   setFilterMod: (filterMod) => set({ filterMod }),
   setFilterTournament: (filterTournament) => set({ filterTournament }),
   setFilterStage: (filterStage) => set({ filterStage }),
+  setStarRatingRange: (srMin, srMax) =>
+    set((state) => {
+      const clampedMin = Math.max(0, Math.min(srMin, srMax));
+      const clampedMax = Math.max(clampedMin, srMax);
+      return {
+        trainingFilters: {
+          ...state.trainingFilters,
+          srMin: Math.round(clampedMin * 100) / 100,
+          srMax: Math.round(clampedMax * 100) / 100,
+        },
+      };
+    }),
   setTrainingFilters: (partial) =>
     set((state) => ({
       trainingFilters: {
@@ -431,9 +485,15 @@ export const usePoolStore = create<PoolState>((set, get) => ({
       activeTrainingPreset: null,
     })),
   applyTrainingPreset: (presetId) => {
+    const prevSrMin = get().trainingFilters.srMin;
+    const prevSrMax = get().trainingFilters.srMax;
     if (!presetId || get().activeTrainingPreset === presetId) {
       set({
-        trainingFilters: { ...DEFAULT_TRAINING_FILTERS },
+        trainingFilters: {
+          ...DEFAULT_TRAINING_FILTERS,
+          srMin: prevSrMin,
+          srMax: prevSrMax,
+        },
         activeTrainingPreset: null,
       });
       return;
@@ -444,17 +504,71 @@ export const usePoolStore = create<PoolState>((set, get) => ({
       trainingFilters: {
         ...DEFAULT_TRAINING_FILTERS,
         ...def.filters,
+        srMin: prevSrMin,
+        srMax: prevSrMax,
       },
       activeTrainingPreset: presetId,
+      prioritizedSkills: [],
       sortBy: def.sortBy,
       sortDirection: 'desc',
     });
   },
+  togglePrioritizedSkill: (skill) => {
+    const current = get().prioritizedSkills;
+    const exists = current.includes(skill);
+    const next = exists ? current.filter((s) => s !== skill) : [...current, skill];
+    set((state) => ({
+      prioritizedSkills: next,
+      activeTrainingPreset: null,
+      sortBy:
+        next.length > 0
+          ? 'synergy'
+          : state.sortBy === 'synergy'
+          ? state.filterOrigin === 'local_songs'
+            ? 'sr'
+            : 'slot'
+          : state.sortBy,
+      sortDirection: next.length > 0 ? 'desc' : state.sortDirection,
+    }));
+  },
+  setPrioritizedSkills: (skills) => {
+    const unique = Array.from(new Set(skills));
+    set((state) => ({
+      prioritizedSkills: unique,
+      activeTrainingPreset: unique.length > 0 ? null : state.activeTrainingPreset,
+      sortBy:
+        unique.length > 0
+          ? 'synergy'
+          : state.sortBy === 'synergy'
+          ? state.filterOrigin === 'local_songs'
+            ? 'sr'
+            : 'slot'
+          : state.sortBy,
+      sortDirection: unique.length > 0 ? 'desc' : state.sortDirection,
+    }));
+  },
+  clearPrioritizedSkills: () =>
+    set((state) => ({
+      prioritizedSkills: [],
+      sortBy:
+        state.sortBy === 'synergy'
+          ? state.filterOrigin === 'local_songs'
+            ? 'sr'
+            : 'slot'
+          : state.sortBy,
+    })),
   resetTrainingFilters: () =>
-    set({
+    set((state) => ({
       trainingFilters: { ...DEFAULT_TRAINING_FILTERS },
       activeTrainingPreset: null,
-    }),
+      prioritizedSkills: [],
+      sortBy:
+        state.sortBy === 'synergy'
+          ? state.filterOrigin === 'local_songs'
+            ? 'sr'
+            : 'slot'
+          : state.sortBy,
+    })),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSortBy: (sortBy) => set({ sortBy }),
   setSortDirection: (sortDirection) => set({ sortDirection }),
@@ -819,7 +933,8 @@ function matchesGenericDensity(
 }
 
 /**
- * Filter and sort beatmaps according to current UI selections (Tournament + Personal Training).
+ * Filter and sort beatmaps according to current UI selections (Tournament + Personal Training + Multi-Skill Priority).
+ * Star Rating bounds (`srMin`..`srMax`) act as a strict AND filter across all presets, skills, and sort modes.
  */
 export function getFilteredAndSortedMaps(
   maps: BeatmapAnalysisResult[],
@@ -830,7 +945,8 @@ export function getFilteredAndSortedMaps(
   filterTournament: string = 'ALL',
   filterStage: string = 'ALL',
   filterOrigin: OriginFilter = 'ALL',
-  trainingFilters?: TrainingFilterState
+  trainingFilters?: TrainingFilterState,
+  prioritizedSkills: Array<keyof SkillAttributes> = []
 ): BeatmapAnalysisResult[] {
   let filtered = maps;
 
@@ -884,8 +1000,13 @@ export function getFilteredAndSortedMaps(
       : [];
 
     filtered = filtered.filter((m) => {
-      if (checkSr && (m.stats.starRating < tf.srMin || m.stats.starRating > tf.srMax)) {
-        return false;
+      if (checkSr) {
+        const srRounded = Math.round(m.stats.starRating * 100) / 100;
+        const minBound = Math.round(tf.srMin * 100) / 100;
+        const maxBound = Math.round(tf.srMax * 100) / 100;
+        if (srRounded < minBound || srRounded > maxBound) {
+          return false;
+        }
       }
       if (checkBpm && (m.stats.bpmMode < tf.bpmMin || m.stats.bpmMode > tf.bpmMax)) {
         return false;
@@ -920,6 +1041,11 @@ export function getFilteredAndSortedMaps(
       }
       return true;
     });
+  }
+
+  // 3b. Filter by Multi-Skill Priority (requires every prioritized skill to be meaningful)
+  if (prioritizedSkills.length > 0) {
+    filtered = filtered.filter((m) => matchesPrioritizedSkills(m.skills, prioritizedSkills));
   }
 
   // 4. Filter by Search Query (Title, Artist, Version, Mapper, Tags, Slot, Tournament)
@@ -963,7 +1089,11 @@ export function getFilteredAndSortedMaps(
       return sortDirection === 'desc' ? -diff : diff;
     }
 
-    if (sortBy === 'sr') {
+    if (sortBy === 'synergy' && prioritizedSkills.length > 0) {
+      diff =
+        computeMultiSkillSynergy(b.skills, prioritizedSkills) -
+        computeMultiSkillSynergy(a.skills, prioritizedSkills);
+    } else if (sortBy === 'sr') {
       diff = b.stats.starRating - a.stats.starRating;
     } else if (sortBy === 'bpm') {
       diff = b.stats.bpmMode - a.stats.bpmMode;
@@ -982,4 +1112,78 @@ export function getFilteredAndSortedMaps(
   });
 
   return sorted;
+}
+
+/**
+ * Computes a canonical grouping key for a song (beatmapset) so all difficulties
+ * of the same song collapse into a single expandable BeatmapSet card.
+ */
+export function getBeatmapSetGroupKey(map: BeatmapAnalysisResult): string {
+  if (map.metadata.beatmapSetId && map.metadata.beatmapSetId > 0) {
+    return `set:${map.metadata.beatmapSetId}`;
+  }
+  if (map.localOsuPath) {
+    const normalized = map.localOsuPath.replace(/\\/g, '/');
+    const parts = normalized.split('/').filter(Boolean);
+    if (parts.length >= 2) {
+      const parentFolder = parts[parts.length - 2].trim();
+      const folderIdMatch = parentFolder.match(/^(\d+)\s+/);
+      if (folderIdMatch) {
+        return `set:${folderIdMatch[1]}`;
+      }
+      if (parentFolder) {
+        return `folder:${parentFolder.toLowerCase()}`;
+      }
+    }
+  }
+  const artist = (map.metadata.artist || '').trim().toLowerCase();
+  const title = (map.metadata.title || '').trim().toLowerCase();
+  const creator = (map.metadata.creator || '').trim().toLowerCase();
+  return `meta:${artist}::${title}::${creator}`;
+}
+
+/**
+ * Groups an already-filtered and sorted list of beatmaps by song (beatmapset).
+ * - Group order preserves the position of each song's highest-ranked qualifying difficulty (`representative`).
+ * - Inside each group, `difficulties` are ordered ascending by Star Rating (`★`) like osu!lazer.
+ * - Any difficulty excluded by Star Rating / skill filters never enters `group.difficulties`,
+ *   and songs with zero qualifying difficulties are omitted completely.
+ */
+export function groupBeatmapsBySong(
+  filteredAndSortedMaps: BeatmapAnalysisResult[],
+  prioritizedSkills: Array<keyof SkillAttributes> = []
+): BeatmapSetGroup[] {
+  const groupMap = new Map<string, BeatmapSetGroup>();
+  const groups: BeatmapSetGroup[] = [];
+
+  for (let i = 0; i < filteredAndSortedMaps.length; i++) {
+    const map = filteredAndSortedMaps[i];
+    const key = getBeatmapSetGroupKey(map);
+    let group = groupMap.get(key);
+    if (!group) {
+      group = {
+        groupKey: key,
+        title: map.metadata.title,
+        artist: map.metadata.artist,
+        creator: map.metadata.creator,
+        beatmapSetId: map.metadata.beatmapSetId,
+        representative: map,
+        difficulties: [map],
+        synergyScore:
+          prioritizedSkills.length > 0
+            ? computeMultiSkillSynergy(map.skills, prioritizedSkills)
+            : 0,
+      };
+      groupMap.set(key, group);
+      groups.push(group);
+    } else {
+      group.difficulties.push(map);
+    }
+  }
+
+  for (let i = 0; i < groups.length; i++) {
+    groups[i].difficulties.sort((a, b) => a.stats.starRating - b.stats.starRating);
+  }
+
+  return groups;
 }

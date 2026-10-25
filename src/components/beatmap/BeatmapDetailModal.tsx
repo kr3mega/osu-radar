@@ -198,7 +198,7 @@ export const BeatmapDetailModal: React.FC<BeatmapDetailModalProps> = ({ onClose 
                 <div className="p-2.5 bg-osu-surface/60 rounded border border-osu-border flex flex-col gap-1">
                   <div className="flex justify-between font-bold">
                     <span className="text-osu-cyan">Canal 3: Deflexão Angular (θ)</span>
-                    <span className="text-osu-pink">Snap: {skills.snapAim.toFixed(1).replace('.', ',')}% | Flow: {skills.flowAim.toFixed(1).replace('.', ',')}%</span>
+                    <span className="text-osu-pink">Jump: {skills.snapAim.toFixed(1).replace('.', ',')}% | Flow: {skills.flowAim.toFixed(1).replace('.', ',')}%</span>
                   </div>
                   <p className="text-[11px] text-osu-text-muted">
                     Diferencia saltos agudos com parada brusca (&theta; &gt; 100°) de arcos circulares contínuos (&theta; &le; 65°).

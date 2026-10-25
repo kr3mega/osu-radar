@@ -6,11 +6,22 @@ export interface CachedBeatmapText {
   rawText: string;
 }
 
-// Dexie database for caching beatmaps and saved mappools offline
+export interface StoredCustomSkin {
+  id: string;
+  name: string;
+  author?: string;
+  iniText: string;
+  /** Maps normalized lowercase relative path (e.g. "hitcircle@2x.png") -> Blob */
+  files: Record<string, Blob>;
+  createdAt: number;
+}
+
+// Dexie database for caching beatmaps, saved mappools, and imported .osk skins offline
 export const db = new Dexie('osuRadarDB') as Dexie & {
   beatmaps: EntityTable<BeatmapAnalysisResult, 'id'>;
   mappools: EntityTable<Mappool, 'id'>;
   beatmapTexts: EntityTable<CachedBeatmapText, 'id'>;
+  skins: EntityTable<StoredCustomSkin, 'id'>;
 };
 
 // Schema definition
@@ -23,6 +34,13 @@ db.version(2).stores({
   beatmaps: 'id, fileName, modSlot, origin, localOsuPath, calculatedAt',
   mappools: 'id, name, stage, createdAt, updatedAt',
   beatmapTexts: 'id',
+});
+
+db.version(3).stores({
+  beatmaps: 'id, fileName, modSlot, origin, localOsuPath, calculatedAt',
+  mappools: 'id, name, stage, createdAt, updatedAt',
+  beatmapTexts: 'id',
+  skins: 'id, name, createdAt',
 });
 
 /**

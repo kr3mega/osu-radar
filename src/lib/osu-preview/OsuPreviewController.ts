@@ -139,7 +139,8 @@ export class OsuPreviewController {
     rawBeatmapText: string,
     initialTimeMs: number = 0,
     audioSource?: Blob | ArrayBuffer | string,
-    initialMods?: Set<OsuMod>
+    initialMods?: Set<OsuMod>,
+    initialSkin?: OsuSkin
   ): Promise<void> {
     if (initialMods) {
       this.activeMods = new Set(initialMods);
@@ -156,7 +157,12 @@ export class OsuPreviewController {
     this.hitsoundPlayer.init(this.audioCtx, this.masterGain);
 
     // 2. Load Beatmap & Skin
-    this.skin = await loadDefaultSkin('/skin/default');
+    this.skin = initialSkin || (await loadDefaultSkin('/skin/default'));
+    if (this.skin.hitsoundUrls) {
+      this.hitsoundPlayer
+        .setSkinSounds(this.skin.hitsoundUrls, this.skin.LayeredHitSounds)
+        .catch(() => {});
+    }
     this.beatmap = parseBeatmapText(rawBeatmapText, this.activeMods);
 
     // 3. Load Song Audio
@@ -172,6 +178,13 @@ export class OsuPreviewController {
     this.startLoop();
     this.drawCurrentFrame();
     this.notifyState();
+  }
+
+  public async setSkin(skin: OsuSkin): Promise<void> {
+    this.skin = skin;
+    this.drawCurrentFrame();
+    await this.hitsoundPlayer.setSkinSounds(skin.hitsoundUrls, skin.LayeredHitSounds);
+    this.drawCurrentFrame();
   }
 
   public async loadAudioTrack(audioSource: Blob | ArrayBuffer | string): Promise<boolean> {

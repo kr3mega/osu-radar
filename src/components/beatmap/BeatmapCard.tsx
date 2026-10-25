@@ -13,7 +13,7 @@ interface BeatmapCardProps {
 }
 
 const SKILL_LABELS: Record<string, string> = {
-  snapAim: 'Snap Aim',
+  snapAim: 'Jump',
   flowAim: 'Flow Aim',
   speed: 'Speed',
   stamina: 'Stamina',

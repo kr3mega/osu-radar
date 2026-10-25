@@ -1,6 +1,7 @@
 import React from 'react';
 import { BeatmapAnalysisResult } from '../../engine/types';
 import { getStarRatingColor, getStarRatingTextColor, TOURNAMENT_MOD_COLORS } from '../../utils/osuColors';
+import { formatSkillLabel } from '../../utils/skillLabels';
 import { ChevronRight, Trash2 } from 'lucide-react';
 
 export interface BeatmapSetGroup {
@@ -219,7 +220,7 @@ export const LazerCarouselSet: React.FC<LazerCarouselSetProps> = ({
                         key={skillKey}
                         className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#110618]/90 border border-white/10 text-osu-cyan font-mono"
                       >
-                        {skillKey}: {map.skills[skillKey].toFixed(1).replace('.', ',')}%
+                        {formatSkillLabel(skillKey)}: {map.skills[skillKey].toFixed(1).replace('.', ',')}%
                       </span>
                     ))}
                   </div>

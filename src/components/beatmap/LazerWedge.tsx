@@ -6,17 +6,22 @@ import { StatHexagon } from '../charts/StatHexagon';
 import { OsuPreviewPlayer } from '../visualizer/OsuPreviewPlayer';
 import { formatTimestamp } from '../../engine/strains';
 import { buildBeatmapCoverCss } from '../../lib/osu-preview';
+import { formatSkillLabel } from '../../utils/skillLabels';
 
 interface LazerWedgeProps {
   map: BeatmapAnalysisResult | null;
+  siblingDifficulties?: BeatmapAnalysisResult[];
   poolAverageSkills?: SkillAttributes;
   onSlotChange?: (id: string, newSlot: string) => void;
+  onSelectDifficulty?: (id: string) => void;
 }
 
 export const LazerWedge: React.FC<LazerWedgeProps> = ({
   map,
+  siblingDifficulties,
   poolAverageSkills,
   onSlotChange,
+  onSelectDifficulty,
 }) => {
   const [activeWedgeTab, setActiveWedgeTab] = useState<'radar' | 'visualizer'>('visualizer');
 
@@ -93,17 +98,36 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
         <div className="beatmapset-header__box beatmapset-header__box--main">
           <div className="beatmapset-header__beatmap-picker-box">
             <div className="beatmapset-beatmap-picker">
-              <span
-                className="beatmapset-beatmap-picker__beatmap beatmapset-beatmap-picker__beatmap--active"
-                title={`${metadata.version} (★ ${stats.starRating.toFixed(2).replace('.', ',')})`}
-              >
-                <div
-                  className="beatmap-icon beatmap-icon--beatmapset"
-                  style={{ '--diff': starColor } as React.CSSProperties}
-                >
-                  <i className="fal fa-extra-mode-osu" />
-                </div>
-              </span>
+              {(siblingDifficulties && siblingDifficulties.length > 0
+                ? siblingDifficulties
+                : [map]
+              ).map((diffMap) => {
+                const diffColor = getStarRatingColor(diffMap.stats.starRating);
+                const isDiffActive = diffMap.id === map.id;
+                return (
+                  <a
+                    key={diffMap.id}
+                    href={`#diff-${diffMap.id}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onSelectDifficulty?.(diffMap.id);
+                    }}
+                    className={`beatmapset-beatmap-picker__beatmap ${
+                      isDiffActive ? 'beatmapset-beatmap-picker__beatmap--active' : ''
+                    }`}
+                    title={`${diffMap.metadata.version} (★ ${diffMap.stats.starRating
+                      .toFixed(2)
+                      .replace('.', ',')})`}
+                  >
+                    <div
+                      className="beatmap-icon beatmap-icon--beatmapset"
+                      style={{ '--diff': diffColor } as React.CSSProperties}
+                    >
+                      <i className="fal fa-extra-mode-osu" />
+                    </div>
+                  </a>
+                );
+              })}
             </div>
 
             <span className="beatmapset-header__diff-name">
@@ -449,7 +473,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                 }}
               >
                 <i className="fas fa-bolt" style={{ color: 'hsl(var(--hsl-h1))' }} />
-                <span>{map.topSkills.slice(0, 2).join(' + ')}</span>
+                <span>{map.topSkills.slice(0, 2).map((k) => formatSkillLabel(k)).join(' + ')}</span>
               </span>
             </div>
           )}

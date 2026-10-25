@@ -55,12 +55,19 @@ export interface SkinIniColours {
 }
 
 export interface SkinIniGeneral {
+  Name?: string;
+  Author?: string;
+  Version?: string;
   AllowSliderBallTint?: string;
   SliderBallFlip?: string;
   CursorCenter?: string;
+  CursorCentre?: string;
   CursorRotate?: string;
   CursorTrailRotate?: string;
   LayeredHitSounds?: string;
+  HitCircleOverlayAboveNumber?: string;
+  HitCircleOverlayAboveNumer?: string;
+  [key: string]: string | undefined;
 }
 
 export interface SkinIniFonts {
@@ -76,10 +83,15 @@ export interface SkinIni {
 }
 
 export interface OsuSkin {
+  id?: string;
+  name?: string;
   ini: SkinIni;
   isOldSpinner: boolean;
   isLongerCursorTrail: boolean;
   LayeredHitSounds: number;
+  hitCircleOverlayAboveNumber?: boolean;
+  hasCustomDigits?: boolean;
+  hitsoundUrls?: Record<string, string>;
 
   // Sprites
   hitcircle: HTMLCanvasElement[];

@@ -9,7 +9,7 @@ const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
   { value: 'slot', label: 'Slot do Mod (NM1 → TB)' },
   { value: 'sr', label: 'Star Rating (★ Decrescente)' },
   { value: 'bpm', label: 'BPM' },
-  { value: 'snapAim', label: 'Snap Aim' },
+  { value: 'snapAim', label: 'Jump' },
   { value: 'flowAim', label: 'Flow Aim' },
   { value: 'speed', label: 'Speed' },
   { value: 'stamina', label: 'Stamina' },

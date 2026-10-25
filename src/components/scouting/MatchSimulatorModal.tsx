@@ -157,7 +157,7 @@ export const MatchSimulatorModal: React.FC<MatchSimulatorModalProps> = ({ onClos
               <div>
                 <span className="text-[10px] font-bold uppercase text-blue-400 tracking-wider">Equipe Azul</span>
                 <h3 className="text-lg font-black text-white">{teamBlue.name}</h3>
-                <span className="text-xs text-white/60">Especialidade: Speed & Snap Aim</span>
+                <span className="text-xs text-white/60">Especialidade: Speed & Jump</span>
               </div>
               <span className="text-3xl">{teamBlue.flag}</span>
             </div>

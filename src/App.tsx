@@ -2,9 +2,12 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   usePoolStore,
   getFilteredAndSortedMaps,
+  getBeatmapSetGroupKey,
+  groupBeatmapsBySong,
   SortOption,
   countActiveTrainingFilters,
 } from './store/usePoolStore';
+import { useSkinStore } from './store/useSkinStore';
 import { LazerToolbar } from './components/layout/LazerToolbar';
 import { LazerBottomBar } from './components/layout/LazerBottomBar';
 import { LazerFloatingAudioPlayer } from './components/layout/LazerFloatingAudioPlayer';
@@ -30,13 +33,19 @@ const MOD_FILTERS: Array<{ id: string; label: string }> = [
   { id: 'TB', label: 'Tiebreaker (TB)' },
 ];
 
-const SORT_OPTIONS: Array<{ value: SortOption; label: string; hideInLocal?: boolean }> = [
+const SORT_OPTIONS: Array<{
+  value: SortOption;
+  label: string;
+  hideInLocal?: boolean;
+  requiresSynergy?: boolean;
+}> = [
+  { value: 'synergy', label: 'Sinergia Multi-Skill', requiresSynergy: true },
   { value: 'slot', label: 'Slot', hideInLocal: true },
   { value: 'sr', label: 'Dificuldade (★)' },
   { value: 'bpm', label: 'BPM' },
   { value: 'od', label: 'Precisão (OD)' },
   { value: 'drain', label: 'Duração' },
-  { value: 'snapAim', label: 'Snap Aim' },
+  { value: 'snapAim', label: 'Jump' },
   { value: 'flowAim', label: 'Flow Aim' },
   { value: 'speed', label: 'Speed' },
   { value: 'stamina', label: 'Stamina' },
@@ -53,6 +62,8 @@ export const App: React.FC = () => {
     filterTournament,
     filterStage,
     trainingFilters,
+    prioritizedSkills,
+    expandedSetKeys,
     searchQuery,
     sortBy,
     sortDirection,
@@ -65,6 +76,8 @@ export const App: React.FC = () => {
     setFilterTournament,
     setFilterStage,
     resetTrainingFilters,
+    toggleExpandedSet,
+    collapseAllSets,
     setSearchQuery,
     initFromDb,
     addBeatmaps,
@@ -165,7 +178,8 @@ export const App: React.FC = () => {
         filterTournament,
         filterStage,
         filterOrigin,
-        trainingFilters
+        trainingFilters,
+        prioritizedSkills
       ),
     [
       maps,
@@ -177,16 +191,37 @@ export const App: React.FC = () => {
       filterStage,
       filterOrigin,
       trainingFilters,
+      prioritizedSkills,
     ]
+  );
+
+  const groupedSets = useMemo(
+    () => groupBeatmapsBySong(filteredMaps, prioritizedSkills),
+    [filteredMaps, prioritizedSkills]
   );
 
   const activeMap = useMemo(() => {
     if (selectedMapId) {
-      const found = maps.find((m) => m.id === selectedMapId);
-      if (found) return found;
+      const inFiltered = filteredMaps.find((m) => m.id === selectedMapId);
+      if (inFiltered) return inFiltered;
+      if (filteredMaps.length === 0) {
+        const foundAny = maps.find((m) => m.id === selectedMapId);
+        if (foundAny) return foundAny;
+      }
     }
     return filteredMaps[0] || maps[0] || null;
   }, [maps, filteredMaps, selectedMapId]);
+
+  const activeSiblingDifficulties = useMemo(() => {
+    if (!activeMap) return undefined;
+    const activeKey = getBeatmapSetGroupKey(activeMap);
+    const matchingGroup = groupedSets.find((g) => g.groupKey === activeKey);
+    if (matchingGroup) return matchingGroup.difficulties;
+    const allSiblings = maps
+      .filter((m) => getBeatmapSetGroupKey(m) === activeKey)
+      .sort((a, b) => a.stats.starRating - b.stats.starRating);
+    return allSiblings.length > 0 ? allSiblings : [activeMap];
+  }, [activeMap, groupedSets, maps]);
 
   const activeCoverCss = buildBeatmapCoverCss(activeMap, 'cover');
 
@@ -238,12 +273,22 @@ export const App: React.FC = () => {
     if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
 
     const files = Array.from(e.dataTransfer.files);
+    const oskFiles = files.filter((f) => f.name.toLowerCase().endsWith('.osk'));
+    const beatmapFiles = files.filter((f) => !f.name.toLowerCase().endsWith('.osk'));
+
+    if (oskFiles.length > 0) {
+      for (const osk of oskFiles) {
+        await useSkinStore.getState().importSkinOskOrZip(osk);
+      }
+    }
+
+    if (beatmapFiles.length === 0) return;
     setIsAnalyzing(true);
 
     try {
       const pendingOsuFiles: Array<{ fileName: string; text: string; bytes?: Uint8Array }> = [];
 
-      for (const file of files) {
+      for (const file of beatmapFiles) {
         const lower = file.name.toLowerCase();
         if (lower.endsWith('.osu')) {
           const text = await file.text();
@@ -305,7 +350,9 @@ export const App: React.FC = () => {
     }
   };
 
-  const hasActiveTrainingFilters = countActiveTrainingFilters(trainingFilters) > 0;
+  const hasActiveTrainingFilters =
+    countActiveTrainingFilters(trainingFilters) > 0 || prioritizedSkills.length > 0;
+  const hasAnyExpandedSets = Object.keys(expandedSetKeys).length > 0;
 
   return (
     <div
@@ -442,6 +489,21 @@ export const App: React.FC = () => {
                       >
                         <i className="fas fa-sync-alt" style={{ marginRight: '5px' }} />
                         Sincronizar Pasta Songs
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => openUploader('skins')}
+                        className="osu-radar-player__mod-btn"
+                        style={{
+                          padding: '3px 10px',
+                          fontSize: '11px',
+                          textTransform: 'none',
+                        }}
+                        title="Detectar ou importar Skins do osu! (.osk / pasta Skins) para usar no Preview"
+                      >
+                        <i className="fas fa-palette" style={{ marginRight: '5px', color: 'hsl(var(--hsl-h1))' }} />
+                        Skins do osu!
                       </button>
                     </div>
                   </div>
@@ -584,6 +646,8 @@ export const App: React.FC = () => {
                 <div ref={wedgeContainerRef} className="osu-radar-left-col">
                   <LazerWedge
                     map={activeMap}
+                    siblingDifficulties={activeSiblingDifficulties}
+                    onSelectDifficulty={(id) => selectMap(id)}
                     poolAverageSkills={avgSkills}
                     onSlotChange={(id, newSlot) => updateModSlot(id, newSlot)}
                   />
@@ -606,9 +670,17 @@ export const App: React.FC = () => {
                       <div className="sort sort--beatmapsets">
                         <div className="sort__items">
                           <span className="sort__item sort__item--title">ordenar por</span>
-                          {SORT_OPTIONS.filter(
-                            (opt) => !(filterOrigin === 'local_songs' && opt.hideInLocal)
-                          ).map((opt) => {
+                          {SORT_OPTIONS.filter((opt) => {
+                            if (filterOrigin === 'local_songs' && opt.hideInLocal) return false;
+                            if (
+                              opt.requiresSynergy &&
+                              prioritizedSkills.length < 2 &&
+                              sortBy !== 'synergy'
+                            ) {
+                              return false;
+                            }
+                            return true;
+                          }).map((opt) => {
                             const active = sortBy === opt.value;
                             return (
                               <a
@@ -640,22 +712,48 @@ export const App: React.FC = () => {
 
                     <div
                       style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
                         paddingRight: '12px',
                         fontSize: '11px',
                         fontWeight: 700,
                         color: 'hsl(var(--hsl-l2))',
                       }}
                     >
-                      <strong style={{ color: '#fff' }}>
-                        {filteredMaps.length.toLocaleString('pt-BR')}
-                      </strong>{' '}
-                      beatmap{filteredMaps.length === 1 ? '' : 's'}
+                      {hasAnyExpandedSets && (
+                        <button
+                          type="button"
+                          onClick={collapseAllSets}
+                          className="osu-radar-player__mod-btn"
+                          style={{ padding: '2px 7px', fontSize: '10px', textTransform: 'none' }}
+                          title="Recolher todas as músicas expandidas"
+                        >
+                          <i className="fas fa-compress-alt" style={{ marginRight: '4px' }} />
+                          Recolher
+                        </button>
+                      )}
+                      <span>
+                        <strong style={{ color: '#fff' }}>
+                          {groupedSets.length.toLocaleString('pt-BR')}
+                        </strong>{' '}
+                        {groupedSets.length === 1 ? 'música' : 'músicas'}
+                        {' · '}
+                        <strong style={{ color: 'hsl(var(--hsl-c1))' }}>
+                          {filteredMaps.length.toLocaleString('pt-BR')}
+                        </strong>{' '}
+                        {filteredMaps.length === 1 ? 'diff' : 'diffs'}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Virtualized Beatmapset Panels List */}
+                  {/* Virtualized Grouped Beatmapset Panels List */}
                   <VirtualBeatmapList
                     maps={filteredMaps}
+                    groups={groupedSets}
+                    expandedSetKeys={expandedSetKeys}
+                    onToggleExpandSet={toggleExpandedSet}
+                    prioritizedSkills={prioritizedSkills}
                     selectedMapId={activeMap?.id || selectedMapId}
                     maxHeightPx={wedgeHeight > 0 ? Math.max(460, wedgeHeight - 48) : undefined}
                     onSelectMap={(id) => selectMap(id)}
@@ -684,7 +782,7 @@ export const App: React.FC = () => {
                         </div>
                         <div style={{ fontSize: '12px', color: 'hsl(var(--hsl-l2))', maxWidth: '420px' }}>
                           {hasActiveTrainingFilters && maps.length > 0
-                            ? 'Experimente flexibilizar as faixas de estrelas/BPM/padrões ou clique abaixo para resetar os filtros.'
+                            ? 'Experimente flexibilizar a barra de Star Rating (★) ou as skills priorizadas, ou clique abaixo para resetar os filtros.'
                             : 'Sincronize todos os mapas instalados localmente na sua pasta Songs do osu! para treinar Streams, Jumps, Tech e Accuracy, ou importe uma planilha de torneio.'}
                         </div>
 
@@ -768,7 +866,7 @@ export const App: React.FC = () => {
             <div className="osu-radar-modal__header">
               <span style={{ fontWeight: 700, fontSize: '16px', color: 'hsl(var(--hsl-c1))' }}>
                 <i className="fas fa-hdd" style={{ marginRight: '8px', color: 'hsl(var(--hsl-h1))' }} />
-                Biblioteca osu! Songs & Importador de Mappools
+                Biblioteca osu! Songs, Skins & Importador de Mappools
               </span>
               <button
                 type="button"
@@ -800,10 +898,10 @@ export const App: React.FC = () => {
         >
           <i className="fas fa-cloud-upload-alt" style={{ fontSize: '54px', color: 'hsl(var(--hsl-h1))' }} />
           <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: '#fff' }}>
-            Solte seus beatmaps (.osz / .osu) aqui
+            Solte seus beatmaps (.osz / .osu) ou skins (.osk) aqui
           </h2>
           <p style={{ margin: 0, fontSize: '14px', color: 'hsl(var(--hsl-c1))' }}>
-            O osu!radar extrairá e analisará a física dos arquivos instantaneamente
+            O osu!radar importará mapas e skins automaticamente
           </p>
         </div>
       )}

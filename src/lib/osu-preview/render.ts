@@ -1,4 +1,4 @@
-import { clamp, distance, easingFunctions, lerp, mod, range } from './functions';
+import { clamp, distance, easingFunctions, lerp, mod, range, rgb } from './functions';
 import { strokeSlider, getFollowPosition, getSliderTicks, ViewportTransform } from './slider';
 import { PreviewBeatmap, PreviewHitObject, OsuSkin, OsuMod } from './types';
 import { getHiddenAlpha } from './mods';
@@ -279,11 +279,19 @@ export class OsuPreviewRenderer {
           ctx.globalAlpha = sliderAlpha;
           ctx.drawImage(this.bufferCanvas, 0, 0, this.canvasSize[0], this.canvasSize[1]);
 
-          // Slider Inner Track
+          // Slider Inner Track (supports competitive `SliderTrackOverride: R,G,B` e.g. `0,0,0`)
+          const trackOverrideRgb =
+            typeof skin.ini.Colours.SliderTrackOverride === 'string'
+              ? rgb(skin.ini.Colours.SliderTrackOverride)
+              : null;
           const comboColor =
             skin.ini.combos[(obj.comboIndex || 0) % skin.ini.combos.length] || [255, 102, 170];
-          const inner = comboColor.map((x) => clamp(61, range(0, 170, 61, 255, x), 255));
-          const outer = comboColor.map((x) => x * 0.91);
+          const inner = trackOverrideRgb
+            ? trackOverrideRgb.map((x) => Math.min(255, x + 10))
+            : comboColor.map((x) => clamp(61, range(0, 170, 61, 255, x), 255));
+          const outer = trackOverrideRgb
+            ? trackOverrideRgb.map((x) => x * 0.96)
+            : comboColor.map((x) => x * 0.91);
 
           bufferCtx.clearRect(0, 0, this.canvasSize[0], this.canvasSize[1]);
           bufferCtx.globalCompositeOperation = 'source-over';
@@ -294,7 +302,7 @@ export class OsuPreviewRenderer {
             bufferCtx.stroke();
           }
 
-          ctx.globalAlpha = sliderAlpha * 0.75;
+          ctx.globalAlpha = sliderAlpha * (trackOverrideRgb ? 0.88 : 0.75);
           ctx.drawImage(this.bufferCanvas, 0, 0, this.canvasSize[0], this.canvasSize[1]);
 
           const slideN = Math.max(
@@ -471,7 +479,10 @@ export class OsuPreviewRenderer {
           );
         }
 
-        if (overlaySprite) {
+        const circleBaseAlpha = ctx.globalAlpha;
+        const drawCircleOverlay = () => {
+          if (!overlaySprite) return;
+          ctx.globalAlpha = circleBaseAlpha;
           const size = [
             ((this.toPixelsX(beatmap.radius) * 2) / 128) * getSpriteLogicalWidth(overlaySprite) * circleScale,
             ((this.toPixelsX(beatmap.radius) * 2) / 128) * getSpriteLogicalHeight(overlaySprite) * circleScale,
@@ -483,6 +494,10 @@ export class OsuPreviewRenderer {
             size[0],
             size[1]
           );
+        };
+
+        if (!skin.hitCircleOverlayAboveNumber) {
+          drawCircleOverlay();
         }
 
         // Draw Combo Number
@@ -501,7 +516,7 @@ export class OsuPreviewRenderer {
 
           for (let c = 0; c < comboStr.length; c++) {
             const digitSprite = (skin as any)[`default-${comboStr[c]}`];
-            if (digitSprite && digitSprite.complete) {
+            if (digitSprite && digitSprite.complete && digitSprite.naturalWidth > 0) {
               const xPos =
                 this.toPixelsX(obj.x) +
                 this.margins[0] +
@@ -517,8 +532,8 @@ export class OsuPreviewRenderer {
               );
             }
           }
-        } else {
-          // Fallback crisp font
+        } else if (!skin.hasCustomDigits) {
+          // Fallback crisp font when no digit sprites were provided
           ctx.font = `bold ${Math.round(this.toPixelsX(beatmap.radius) * 0.8)}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -528,6 +543,10 @@ export class OsuPreviewRenderer {
             this.toPixelsX(obj.x) + this.margins[0],
             this.toPixelsY(obj.y, isHardRock) + this.margins[1]
           );
+        }
+
+        if (skin.hitCircleOverlayAboveNumber) {
+          drawCircleOverlay();
         }
       }
 
@@ -815,27 +834,45 @@ export class OsuPreviewRenderer {
       this.k2Pressed = false;
     }
 
-    // 1. Draw Cursor Trail (fading dots)
+    // 1. Draw Cursor Trail (custom cursortrail sprite when provided, fallback cyan trail on default skin)
     const trailDuration = 180;
+    const hasCustomTrailSprite =
+      skin.cursortrail && skin.cursortrail.complete && skin.cursortrail.naturalWidth > 1;
+    const trailSize = hasCustomTrailSprite
+      ? [
+          (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalWidth(skin.cursortrail),
+          (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalHeight(skin.cursortrail),
+        ]
+      : null;
+
     for (let t = time - trailDuration; t < time; t += this.trailIntervalMs) {
       const [tx, ty] = this.getCursorPositionAt(t, beatmap, isHardRock);
-      const trailAlpha = ((t - (time - trailDuration)) / trailDuration) * 0.45;
-      ctx.globalAlpha = trailAlpha;
-      ctx.fillStyle = '#00f0ff';
-      ctx.beginPath();
-      ctx.arc(
-        this.toPixelsX(tx) + this.margins[0],
-        this.toPixelsY(ty, isHardRock) + this.margins[1],
-        6,
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
+      const tpx = this.toPixelsX(tx) + this.margins[0];
+      const tpy = this.toPixelsY(ty, isHardRock) + this.margins[1];
+      const trailAlpha = ((t - (time - trailDuration)) / trailDuration) * 0.55;
+
+      if (hasCustomTrailSprite && trailSize) {
+        ctx.globalAlpha = trailAlpha;
+        ctx.drawImage(
+          skin.cursortrail,
+          tpx - trailSize[0] / 2,
+          tpy - trailSize[1] / 2,
+          trailSize[0],
+          trailSize[1]
+        );
+      } else if (!skin.id || skin.id === 'default') {
+        ctx.globalAlpha = trailAlpha * 0.8;
+        ctx.fillStyle = '#00f0ff';
+        ctx.beginPath();
+        ctx.arc(tpx, tpy, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
-    // 2. Draw Main Cursor
+    // 2. Draw Main Cursor & CursorMiddle
     const px = this.toPixelsX(cursorX) + this.margins[0];
     const py = this.toPixelsY(cursorY, isHardRock) + this.margins[1];
+    const isCursorCentered = skin.ini.General.CursorCenter !== '0';
 
     ctx.globalAlpha = 1;
     if (skin.cursor && skin.cursor.complete && skin.cursor.naturalWidth > 0) {
@@ -843,7 +880,27 @@ export class OsuPreviewRenderer {
         (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalWidth(skin.cursor),
         (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalHeight(skin.cursor),
       ];
-      ctx.drawImage(skin.cursor, px - size[0] / 2, py - size[1] / 2, size[0], size[1]);
+      ctx.drawImage(
+        skin.cursor,
+        isCursorCentered ? px - size[0] / 2 : px,
+        isCursorCentered ? py - size[1] / 2 : py,
+        size[0],
+        size[1]
+      );
+
+      if (skin.cursormiddle && skin.cursormiddle.complete && skin.cursormiddle.naturalWidth > 1) {
+        const midSize = [
+          (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalWidth(skin.cursormiddle),
+          (this.toPixelsX(beatmap.radius) / 64) * getSpriteLogicalHeight(skin.cursormiddle),
+        ];
+        ctx.drawImage(
+          skin.cursormiddle,
+          px - midSize[0] / 2,
+          py - midSize[1] / 2,
+          midSize[0],
+          midSize[1]
+        );
+      }
     } else {
       // Sleek osu! Lazer neon cursor
       ctx.beginPath();

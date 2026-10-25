@@ -6,6 +6,12 @@ import {
   TRAINING_PRESETS,
   usePoolStore,
 } from '../../store/usePoolStore';
+import {
+  ALL_SKILL_KEYS,
+  SKILL_ICONS,
+  SKILL_LABELS,
+} from '../../utils/skillLabels';
+import { StarRatingDualSlider } from './StarRatingDualSlider';
 
 const DENSITY_OPTIONS: Array<{ value: PatternDensityFilter; label: string; hint: string }> = [
   { value: 'any', label: 'Qualquer', hint: 'Sem restrição' },
@@ -19,13 +25,18 @@ export const TrainingFiltersPanel: React.FC = () => {
   const {
     trainingFilters,
     activeTrainingPreset,
+    prioritizedSkills,
+    setStarRatingRange,
     setTrainingFilters,
     applyTrainingPreset,
+    togglePrioritizedSkill,
+    clearPrioritizedSkills,
     resetTrainingFilters,
   } = usePoolStore();
 
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(false);
   const activeCount = countActiveTrainingFilters(trainingFilters);
+  const totalActiveFilters = activeCount + prioritizedSkills.length;
 
   const durationProgressPct = Math.round(
     ((trainingFilters.durationMinSec - 0) / Math.max(1, 300 - 0)) * 100
@@ -33,7 +44,78 @@ export const TrainingFiltersPanel: React.FC = () => {
 
   return (
     <>
-      {/* 1-Click Training Focus Row inside .beatmapsets-search__filter-grid */}
+      {/* 1. Always-visible Dual-Thumb Star Rating Filter Bar (★ min — max) */}
+      <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
+        <span className="beatmapsets-search-filter__header">Dificuldade ★</span>
+        <div className="beatmapsets-search-filter__items" style={{ width: '100%' }}>
+          <StarRatingDualSlider />
+        </div>
+      </div>
+
+      {/* 2. Multi-Skill Priority Filter Row (Combine 1, 2+ skills e.g. Jump + Finger Control) */}
+      <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
+        <span
+          className="beatmapsets-search-filter__header"
+          title="Selecione 1 ou mais skills simultaneamente para buscar mapas híbridos com a maior porcentagem combinada"
+        >
+          Priorizar
+        </span>
+        <div
+          className="beatmapsets-search-filter__items"
+          style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '5px 8px' }}
+        >
+          {ALL_SKILL_KEYS.map((skillKey) => {
+            const selectedIdx = prioritizedSkills.indexOf(skillKey);
+            const isPrioritized = selectedIdx !== -1;
+            return (
+              <button
+                key={skillKey}
+                type="button"
+                aria-pressed={isPrioritized}
+                onClick={() => togglePrioritizedSkill(skillKey)}
+                className={`osu-radar-skill-priority-pill ${
+                  isPrioritized ? 'osu-radar-skill-priority-pill--active' : ''
+                }`}
+                title={
+                  isPrioritized
+                    ? `Remover ${SKILL_LABELS[skillKey]} da busca combinada`
+                    : `Adicionar ${SKILL_LABELS[skillKey]} à busca prioritária (pode marcar múltiplas skills ao mesmo tempo)`
+                }
+              >
+                <i className={SKILL_ICONS[skillKey]} style={{ fontSize: '10px' }} />
+                <span>{SKILL_LABELS[skillKey]}</span>
+                {isPrioritized && prioritizedSkills.length > 1 && (
+                  <span className="osu-radar-skill-priority-pill__order">
+                    {selectedIdx + 1}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          {prioritizedSkills.length >= 2 && (
+            <span className="osu-radar-synergy-active-tag">
+              <i className="fas fa-link" style={{ marginRight: '5px', fontSize: '10px' }} />
+              Sinergia: {prioritizedSkills.map((k) => SKILL_LABELS[k]).join(' + ')}
+            </span>
+          )}
+
+          {prioritizedSkills.length > 0 && (
+            <button
+              type="button"
+              onClick={clearPrioritizedSkills}
+              className="osu-radar-player__mod-btn"
+              style={{ padding: '2px 8px', fontSize: '10px', textTransform: 'none' }}
+              title="Desmarcar skills priorizadas"
+            >
+              <i className="fas fa-times" style={{ marginRight: '4px' }} />
+              Limpar Skills
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 3. 1-Click Training Focus Row inside .beatmapsets-search__filter-grid */}
       <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
         <span className="beatmapsets-search-filter__header">Treino</span>
         <div
@@ -47,7 +129,7 @@ export const TrainingFiltersPanel: React.FC = () => {
               resetTrainingFilters();
             }}
             className={`beatmapsets-search-filter__item ${
-              !activeTrainingPreset && activeCount === 0
+              !activeTrainingPreset && totalActiveFilters === 0
                 ? 'beatmapsets-search-filter__item--active'
                 : ''
             }`}
@@ -88,7 +170,7 @@ export const TrainingFiltersPanel: React.FC = () => {
             style={{ marginLeft: '4px', padding: '3px 10px', fontSize: '11px', textTransform: 'none' }}
           >
             <i className="fas fa-sliders-h" style={{ marginRight: '5px' }} />
-            Mais/Menos Padrões & ★/BPM
+            Mais/Menos Padrões & BPM/OD
             {activeCount > 0 ? ` (${activeCount})` : ''}
             <i
               className={`fas fa-chevron-${isAdvancedOpen ? 'up' : 'down'}`}
@@ -96,16 +178,16 @@ export const TrainingFiltersPanel: React.FC = () => {
             />
           </button>
 
-          {activeCount > 0 && (
+          {totalActiveFilters > 0 && (
             <button
               type="button"
               onClick={resetTrainingFilters}
               className="osu-radar-player__mod-btn"
               style={{ padding: '3px 9px', fontSize: '11px', textTransform: 'none' }}
-              title="Resetar todos os filtros de treino"
+              title="Resetar todos os filtros de treino, estrelas e skills"
             >
               <i className="fas fa-undo" style={{ marginRight: '4px' }} />
-              Limpar
+              Limpar Tudo
             </button>
           )}
         </div>
@@ -131,7 +213,7 @@ export const TrainingFiltersPanel: React.FC = () => {
                   },
                   {
                     key: 'jumpsDensity' as const,
-                    label: 'Jumps (Snap / Aim)',
+                    label: 'Jumps',
                     icon: 'fas fa-crosshairs',
                   },
                   {
@@ -179,11 +261,11 @@ export const TrainingFiltersPanel: React.FC = () => {
           <div className="osu-radar-training-panel__section">
             <div className="osu-radar-training-panel__title">
               <i className="fas fa-tachometer-alt" style={{ color: 'hsl(var(--hsl-h1))' }} />
-              <span>Faixas de Estrelas (★), BPM, Precisão (OD) & Atributos Físicos</span>
+              <span>Faixas Exatas de Estrelas (★), BPM, Precisão (OD) & Atributos Físicos</span>
             </div>
 
             <div className="osu-radar-training-panel__ranges-grid">
-              {/* Star Rating */}
+              {/* Star Rating numeric fine-tune synced with dual slider */}
               <div className="osu-radar-range-field">
                 <label className="osu-radar-range-field__label">Dificuldade (★)</label>
                 <div className="osu-radar-range-field__inputs">
@@ -195,9 +277,10 @@ export const TrainingFiltersPanel: React.FC = () => {
                     aria-label="Estrelas mínimas"
                     value={trainingFilters.srMin}
                     onChange={(e) =>
-                      setTrainingFilters({
-                        srMin: Math.max(0, Math.min(trainingFilters.srMax, Number(e.target.value) || 0)),
-                      })
+                      setStarRatingRange(
+                        Math.max(0, Math.min(trainingFilters.srMax, Number(e.target.value) || 0)),
+                        trainingFilters.srMax
+                      )
                     }
                   />
                   <span>até</span>
@@ -209,9 +292,10 @@ export const TrainingFiltersPanel: React.FC = () => {
                     aria-label="Estrelas máximas"
                     value={trainingFilters.srMax}
                     onChange={(e) =>
-                      setTrainingFilters({
-                        srMax: Math.max(trainingFilters.srMin, Number(e.target.value) || 12),
-                      })
+                      setStarRatingRange(
+                        trainingFilters.srMin,
+                        Math.max(trainingFilters.srMin, Number(e.target.value) || 12)
+                      )
                     }
                   />
                 </div>

@@ -21,6 +21,7 @@ import { parseOsuBeatmap } from '../../engine/parser';
 import { BeatmapAnalysisResult } from '../../engine/types';
 import { db } from '../../db';
 import { useAudioStore, registerVisualizerPauseCallback } from '../../store/useAudioStore';
+import { useSkinStore } from '../../store/useSkinStore';
 
 const SEVERITY_BADGES: Record<
   PatternSeverity,
@@ -82,12 +83,22 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const patternsListRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<OsuPreviewController | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
+  const skinInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTimeMs, setCurrentTimeMs] = useState<number>(initialTimeMs);
   const [durationMs, setDurationMs] = useState<number>(map.stats.durationMs || 1000);
   const [playbackRate, setPlaybackRate] = useState<number>(1.0);
   const { volume, isMuted, getEffectiveVolume } = useAudioStore();
+  const {
+    availableSkins,
+    selectedSkinId,
+    isLoadingSkin,
+    initSkins,
+    selectSkin,
+    resolveSkinById,
+    importSkinOskOrZip,
+  } = useSkinStore();
   const bgDim = 0.85;
   const [activeMods, setActiveMods] = useState<Set<OsuMod>>(new Set());
   const [copiedTime, setCopiedTime] = useState<boolean>(false);
@@ -219,11 +230,20 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     setHydratedRawText(map.rawText && map.rawText.length > 50 ? map.rawText : null);
 
     (async () => {
-      const resolvedRawText = await hydrateBeatmapRawText(map);
+      const [resolvedRawText, activeSkin] = await Promise.all([
+        hydrateBeatmapRawText(map),
+        resolveSkinById(useSkinStore.getState().selectedSkinId),
+      ]);
       if (isCancelled) return;
       setHydratedRawText(resolvedRawText);
 
-      await controller.init(resolvedRawText, initialTimeMs, map.audioBlob || map.audioUrl, initialMods);
+      await controller.init(
+        resolvedRawText,
+        initialTimeMs,
+        map.audioBlob || map.audioUrl,
+        initialMods,
+        activeSkin
+      );
       if (isCancelled) return;
 
       controller.setVolume(getEffectiveVolume());
@@ -261,6 +281,26 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       controllerRef.current = null;
     };
   }, [map.id]);
+
+  // Discover local & imported skins on mount
+  useEffect(() => {
+    initSkins();
+  }, [initSkins]);
+
+  // Live-swap skin in OsuPreviewController whenever user changes skin selection
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!controllerRef.current) return;
+      const loaded = await resolveSkinById(selectedSkinId);
+      if (!cancelled && controllerRef.current) {
+        await controllerRef.current.setSkin(loaded);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSkinId, resolveSkinById]);
 
   // Ref tracking which pattern currently holds the top scroll position
   const lastScrolledPatternIdRef = useRef<string | null>(null);
@@ -474,13 +514,37 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     setAudioStatus({ state: 'ready', message: 'Música carregada manualmente' });
   };
 
+  const handleSkinFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await importSkinOskOrZip(file);
+    } catch (err) {
+      console.warn('Falha ao importar skin .osk:', err);
+    } finally {
+      if (skinInputRef.current) skinInputRef.current.value = '';
+    }
+  };
+
   const handleAudioDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
     const file = e.dataTransfer.files?.[0];
-    if (
-      file &&
-      (file.name.endsWith('.mp3') || file.name.endsWith('.ogg') || file.name.endsWith('.wav'))
-    ) {
+    if (!file) return;
+    const lower = file.name.toLowerCase();
+
+    if (lower.endsWith('.osk')) {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        await importSkinOskOrZip(file);
+      } catch (err) {
+        console.warn('Falha ao importar skin .osk via drag-and-drop:', err);
+      }
+      return;
+    }
+
+    if (lower.endsWith('.mp3') || lower.endsWith('.ogg') || lower.endsWith('.wav')) {
+      e.preventDefault();
+      e.stopPropagation();
       map.audioBlob = file;
       map.audioUrl = URL.createObjectURL(file);
       try {
@@ -503,7 +567,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       {/* Top Toolbar */}
       <div className="osu-radar-player__toolbar">
         <div className="osu-radar-player__toolbar-left">
-          <strong className="u-ellipsis-overflow" style={{ color: '#fff', maxWidth: '220px' }}>
+          <strong className="u-ellipsis-overflow" style={{ color: '#fff', maxWidth: '185px' }}>
             {map.metadata.title}
           </strong>
           <span style={{ color: 'hsl(var(--hsl-l2))', fontSize: '11px' }}>
@@ -542,9 +606,49 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             style={{ display: 'none' }}
             onChange={handleAudioFileSelect}
           />
+          <input
+            ref={skinInputRef}
+            type="file"
+            accept=".osk,.zip"
+            style={{ display: 'none' }}
+            onChange={handleSkinFileSelect}
+          />
         </div>
 
         <div className="osu-radar-player__toolbar-right">
+          {/* Skin Switcher + Quick .osk Import */}
+          <div className="osu-radar-skin-switcher" title="Alternar entre a Skin Padrão e suas Skins do osu!">
+            <i
+              className={isLoadingSkin ? 'fas fa-circle-notch fa-spin' : 'fas fa-palette'}
+              style={{ color: 'hsl(var(--hsl-h1))', fontSize: '11px' }}
+            />
+            <select
+              aria-label="Selecionar skin do preview"
+              value={selectedSkinId}
+              onChange={(e) => selectSkin(e.target.value)}
+              className="osu-radar-skin-switcher__select"
+            >
+              {availableSkins.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.source === 'default'
+                    ? '★ osu!radar (Padrão)'
+                    : s.source === 'local_osu'
+                    ? `osu!: ${s.name}`
+                    : `Importada: ${s.name}`}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => skinInputRef.current?.click()}
+              className="osu-radar-skin-switcher__import-btn"
+              title="Importar arquivo de skin .osk / .zip"
+            >
+              <i className="fas fa-plus" />
+              <span>.osk</span>
+            </button>
+          </div>
+
           {/* Mod Buttons (EZ, HR, DT, HD) */}
           <div className="osu-radar-player__mods-group">
             {(['ez', 'hr', 'dt', 'hd'] as OsuMod[]).map((modKey) => {

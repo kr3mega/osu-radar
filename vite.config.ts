@@ -2,10 +2,11 @@ import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { localSongsPlugin } from './src/server/localSongsPlugin';
+import { localSkinsPlugin } from './src/server/localSkinsPlugin';
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), localSongsPlugin()],
+  plugins: [react(), localSongsPlugin(), localSkinsPlugin()],
   resolve: {
     alias: [
       { find: /^~@fonts/, replacement: path.resolve(__dirname, 'src/osu-web/fonts') },

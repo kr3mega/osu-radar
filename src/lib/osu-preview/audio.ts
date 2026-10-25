@@ -203,10 +203,13 @@ export class MusicPlayer {
 
 export class HitsoundPlayer {
   private ctx: AudioContext | null = null;
+  private defaultBuffers: Map<string, AudioBuffer> = new Map();
   private soundBuffers: Map<string, AudioBuffer> = new Map();
   private effectsGain: GainNode | null = null;
   private volume: number = 0.8;
   private isMuted: boolean = false;
+  private layeredHitSounds: number = 1;
+  private skinLoadGen: number = 0;
   private scheduledNodes: Set<AudioScheduledSourceNode> = new Set();
 
   constructor() {}
@@ -243,11 +246,59 @@ export class HitsoundPlayer {
         }
         if (rawBuf && this.ctx) {
           const audioBuffer = await this.ctx.decodeAudioData(rawBuf.slice(0));
-          this.soundBuffers.set(name, audioBuffer);
+          this.defaultBuffers.set(name, audioBuffer);
+          if (!this.soundBuffers.has(name)) {
+            this.soundBuffers.set(name, audioBuffer);
+          }
         }
       } catch {
         // Fallback to synthesizer
       }
+    }
+  }
+
+  public async setSkinSounds(
+    hitsoundUrls?: Record<string, string>,
+    layeredHitSounds: number = 1
+  ): Promise<void> {
+    this.layeredHitSounds = layeredHitSounds;
+    const gen = ++this.skinLoadGen;
+    if (!this.ctx) return;
+
+    if (this.defaultBuffers.size === 0) {
+      await this.loadSoundBuffers();
+    }
+    if (gen !== this.skinLoadGen || !this.ctx) return;
+
+    const nextMap = new Map<string, AudioBuffer>(this.defaultBuffers);
+
+    if (hitsoundUrls && Object.keys(hitsoundUrls).length > 0) {
+      await Promise.all(
+        Object.entries(hitsoundUrls).map(async ([soundKey, url]) => {
+          try {
+            let rawBuf = rawWavCache.get(`url:${url}`);
+            if (!rawBuf) {
+              const res = await fetch(url);
+              if (res.ok) {
+                rawBuf = await res.arrayBuffer();
+                if (rawBuf.byteLength > 44) {
+                  rawWavCache.set(`url:${url}`, rawBuf);
+                }
+              }
+            }
+            if (rawBuf && rawBuf.byteLength > 44 && this.ctx) {
+              const decoded = await this.ctx.decodeAudioData(rawBuf.slice(0));
+              nextMap.set(soundKey, decoded);
+            }
+          } catch {
+            // Silently ignore empty 44-byte silent wavs or unsupported sample encodings
+          }
+        })
+      );
+    }
+
+    if (gen === this.skinLoadGen) {
+      this.soundBuffers = nextMap;
     }
   }
 
@@ -273,34 +324,69 @@ export class HitsoundPlayer {
     this.scheduledNodes.clear();
   }
 
+  private playBufferAt(buffer: AudioBuffer, startTime: number, trackScheduled: boolean): void {
+    if (!this.ctx || !this.effectsGain) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(this.effectsGain);
+    if (trackScheduled) {
+      this.scheduledNodes.add(src);
+      src.onended = () => this.scheduledNodes.delete(src);
+    }
+    src.start(startTime);
+  }
+
   public playHit(hitSounds: number = 0, sampleSet: number = 2, delaySec: number = 0): void {
     if (!this.ctx || this.isMuted || this.volume <= 0) return;
     if (this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
 
-    const setPrefix = sampleSet === 1 ? 'normal' : 'soft';
-    const normalSound = `${setPrefix}-hitnormal`;
-    const clapSound = `${setPrefix}-hitclap`;
+    const setPrefix = sampleSet === 1 ? 'normal' : sampleSet === 3 ? 'drum' : 'soft';
+    const normalSound =
+      this.soundBuffers.get(`${setPrefix}-hitnormal`) ||
+      this.soundBuffers.get('soft-hitnormal') ||
+      this.soundBuffers.get('normal-hitnormal');
 
-    let buffer = this.soundBuffers.get(normalSound);
-    if ((hitSounds & 8) !== 0 && this.soundBuffers.has(clapSound)) {
-      buffer = this.soundBuffers.get(clapSound);
+    const additions: AudioBuffer[] = [];
+    if ((hitSounds & 2) !== 0) {
+      const w =
+        this.soundBuffers.get(`${setPrefix}-hitwhistle`) ||
+        this.soundBuffers.get('soft-hitwhistle') ||
+        this.soundBuffers.get('normal-hitwhistle');
+      if (w) additions.push(w);
+    }
+    if ((hitSounds & 4) !== 0) {
+      const f =
+        this.soundBuffers.get(`${setPrefix}-hitfinish`) ||
+        this.soundBuffers.get('soft-hitfinish') ||
+        this.soundBuffers.get('normal-hitfinish');
+      if (f) additions.push(f);
+    }
+    if ((hitSounds & 8) !== 0) {
+      const c =
+        this.soundBuffers.get(`${setPrefix}-hitclap`) ||
+        this.soundBuffers.get('soft-hitclap') ||
+        this.soundBuffers.get('normal-hitclap');
+      if (c) additions.push(c);
     }
 
     const startTime = this.ctx.currentTime + Math.max(0, delaySec);
+    const track = delaySec > 0.01;
+    let playedAny = false;
 
-    if (buffer && this.effectsGain) {
-      const src = this.ctx.createBufferSource();
-      src.buffer = buffer;
-      src.connect(this.effectsGain);
-      if (delaySec > 0.01) {
-        this.scheduledNodes.add(src);
-        src.onended = () => this.scheduledNodes.delete(src);
-      }
-      src.start(startTime);
-    } else {
-      this.synthesizeHitClick(startTime, delaySec > 0.01);
+    if (normalSound && (this.layeredHitSounds !== 0 || additions.length === 0)) {
+      this.playBufferAt(normalSound, startTime, track);
+      playedAny = true;
+    }
+
+    for (const addBuf of additions) {
+      this.playBufferAt(addBuf, startTime, track);
+      playedAny = true;
+    }
+
+    if (!playedAny) {
+      this.synthesizeHitClick(startTime, track);
     }
   }
 

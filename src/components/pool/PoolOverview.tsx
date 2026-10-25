@@ -56,7 +56,7 @@ export const PoolOverview: React.FC = () => {
 
   const anomalies: Anomaly[] = [];
   const skillNames: Record<keyof SkillAttributes, string> = {
-    snapAim: 'Snap Aim',
+    snapAim: 'Jump',
     flowAim: 'Flow Aim',
     speed: 'Speed',
     stamina: 'Stamina',

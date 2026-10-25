@@ -1,13 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { PoolSheetSync } from './PoolSheetSync';
 import { LocalSongsSyncPanel } from './LocalSongsSyncPanel';
+import { LocalSkinsPanel } from './LocalSkinsPanel';
 import { extractOsuFilesFromZip } from '../../utils/unzip';
 import { analyzeBeatmap } from '../../engine/analyzer';
 import { usePoolStore } from '../../store/usePoolStore';
 import { BeatmapAnalysisResult } from '../../engine/types';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 
-export type UploaderTab = 'osu_songs' | 'sheet' | 'files' | 'json';
+export type UploaderTab = 'osu_songs' | 'skins' | 'sheet' | 'files' | 'json';
 
 interface PoolUploaderProps {
   initialTab?: UploaderTab;
@@ -175,6 +176,16 @@ export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_so
 
           <button
             type="button"
+            onClick={() => setActiveTab('skins')}
+            className={`osu-radar-player__mod-btn ${activeTab === 'skins' ? 'osu-radar-player__mod-btn--active' : ''}`}
+            style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
+          >
+            <i className="fas fa-palette" style={{ marginRight: '6px' }} />
+            Skins do osu! (.osk)
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('sheet')}
             className={`osu-radar-player__mod-btn ${activeTab === 'sheet' ? 'osu-radar-player__mod-btn--active' : ''}`}
             style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
@@ -206,6 +217,9 @@ export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_so
 
         {/* Tab 0: Local osu!stable Songs Library Sync */}
         {activeTab === 'osu_songs' && <LocalSongsSyncPanel />}
+
+        {/* Tab 0.5: osu! Skins Importer & Switcher */}
+        {activeTab === 'skins' && <LocalSkinsPanel />}
 
         {/* Tab 1: Google Sheets Sync */}
         {activeTab === 'sheet' && <PoolSheetSync />}

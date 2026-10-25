@@ -146,7 +146,7 @@ export function simulateMapConfrontation(
   else if (blueWinProbability >= 54) favoredTeam = 'blue';
 
   const skillNameMap: Record<keyof SkillAttributes, string> = {
-    snapAim: 'Snap Aim / Jumps',
+    snapAim: 'Jump',
     flowAim: 'Flow Aim',
     speed: 'Speed',
     stamina: 'Stamina',
