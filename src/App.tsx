@@ -25,13 +25,13 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { buildBeatmapCoverCss } from './lib/osu-preview';
 
 const MOD_FILTERS: Array<{ id: string; label: string }> = [
-  { id: 'ALL', label: 'Qualquer' },
-  { id: 'NM', label: 'NoMod (NM)' },
-  { id: 'HD', label: 'Hidden (HD)' },
-  { id: 'HR', label: 'HardRock (HR)' },
-  { id: 'DT', label: 'DoubleTime (DT)' },
-  { id: 'FM', label: 'FreeMod (FM)' },
-  { id: 'TB', label: 'Tiebreaker (TB)' },
+  { id: 'ALL', label: 'Todos' },
+  { id: 'NM', label: 'NM' },
+  { id: 'HD', label: 'HD' },
+  { id: 'HR', label: 'HR' },
+  { id: 'DT', label: 'DT' },
+  { id: 'FM', label: 'FM' },
+  { id: 'TB', label: 'TB' },
 ];
 
 const SORT_OPTIONS: Array<{
@@ -448,7 +448,7 @@ export const App: React.FC = () => {
                           filterOrigin === 'ALL' ? 'beatmapsets-search-filter__item--active' : ''
                         }`}
                       >
-                        Qualquer ({maps.length})
+                        Todos ({maps.length})
                       </a>
 
                       <a
@@ -467,7 +467,7 @@ export const App: React.FC = () => {
                           className="fas fa-hdd"
                           style={{ marginRight: '5px', fontSize: '10px', color: 'hsl(var(--hsl-h1))' }}
                         />
-                        Meus Beatmaps / Songs ({localMapsCount})
+                        Beatmaps Locais ({localMapsCount})
                       </a>
 
                       <a
@@ -488,37 +488,6 @@ export const App: React.FC = () => {
                         />
                         Torneios ({tournamentMapsCount})
                       </a>
-
-                      <button
-                        type="button"
-                        onClick={() => openUploader('osu_songs')}
-                        className="osu-radar-player__mod-btn osu-radar-player__mod-btn--active"
-                        style={{
-                          marginLeft: '4px',
-                          padding: '3px 10px',
-                          fontSize: '11px',
-                          textTransform: 'none',
-                        }}
-                        title="Indexar ou atualizar automaticamente sua pasta Songs instalada no osu!"
-                      >
-                        <i className="fas fa-sync-alt" style={{ marginRight: '5px' }} />
-                        Sincronizar Pasta Songs
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => openUploader('skins')}
-                        className="osu-radar-player__mod-btn"
-                        style={{
-                          padding: '3px 10px',
-                          fontSize: '11px',
-                          textTransform: 'none',
-                        }}
-                        title="Detectar ou importar Skins do osu! (.osk / pasta Skins) para usar no Preview"
-                      >
-                        <i className="fas fa-palette" style={{ marginRight: '5px', color: 'hsl(var(--hsl-h1))' }} />
-                        Skins do osu!
-                      </button>
                     </div>
                   </div>
 
@@ -529,7 +498,7 @@ export const App: React.FC = () => {
                   {filterOrigin !== 'local_songs' && (
                     <>
                       <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
-                        <span className="beatmapsets-search-filter__header">Slot / Mod</span>
+                        <span className="beatmapsets-search-filter__header">Mod</span>
                         <div className="beatmapsets-search-filter__items">
                           {MOD_FILTERS.map((mod) => {
                             const basePool = filterOrigin === 'tournament' ? tournamentMaps : maps;
@@ -573,7 +542,7 @@ export const App: React.FC = () => {
                                 filterTournament === 'ALL' ? 'beatmapsets-search-filter__item--active' : ''
                               }`}
                             >
-                              Todos os Torneios ({tournamentMaps.length})
+                              Todos ({tournamentMaps.length})
                             </a>
                             {availableTournaments.map((tourney: string) => {
                               const cnt = tournamentMaps.filter((m) => m.tournamentName === tourney).length;
@@ -614,7 +583,7 @@ export const App: React.FC = () => {
                                 filterStage === 'ALL' ? 'beatmapsets-search-filter__item--active' : ''
                               }`}
                             >
-                              Todas as Etapas (
+                              Todos (
                               {filterTournament === 'ALL'
                                 ? tournamentMaps.length
                                 : tournamentMaps.filter((m) => m.tournamentName === filterTournament).length}

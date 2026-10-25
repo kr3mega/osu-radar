@@ -21,6 +21,7 @@ class BeatmapPreviewAudioManager {
   private listeners: Set<Listener> = new Set();
   private requestToken: number = 0;
   private onPlayStart: (() => void) | null = null;
+  private previewTimer: any = null;
 
   public setOnPlayStart(callback: (() => void) | null): void {
     this.onPlayStart = callback;
@@ -62,6 +63,10 @@ class BeatmapPreviewAudioManager {
 
   public stop(): void {
     this.requestToken++;
+    if (this.previewTimer) {
+      clearTimeout(this.previewTimer);
+      this.previewTimer = null;
+    }
     if (this.audio) {
       try {
         this.audio.pause();
@@ -147,6 +152,7 @@ class BeatmapPreviewAudioManager {
   }
 
   private tryPlayUrl(url: string, token: number, seekPreviewMs?: number): Promise<boolean> {
+    const MAX_PREVIEW_SECONDS = 10;
     return new Promise<boolean>((resolve) => {
       if (typeof Audio === 'undefined') {
         resolve(false);
@@ -158,6 +164,7 @@ class BeatmapPreviewAudioManager {
       audio.preload = 'auto';
 
       let settled = false;
+      let playStartPos: number | null = null;
       const finish = (ok: boolean) => {
         if (settled) return;
         settled = true;
@@ -188,6 +195,18 @@ class BeatmapPreviewAudioManager {
           finish(false);
           return;
         }
+        if (playStartPos === null) {
+          playStartPos = audio.currentTime;
+        }
+        if (this.previewTimer) {
+          clearTimeout(this.previewTimer);
+        }
+        this.previewTimer = setTimeout(() => {
+          if (token === this.requestToken && this.audio === audio) {
+            this.stop();
+          }
+        }, MAX_PREVIEW_SECONDS * 1000);
+
         this.audio = audio;
         this.state = 'playing';
         this.notify();
@@ -196,11 +215,19 @@ class BeatmapPreviewAudioManager {
 
       audio.addEventListener('timeupdate', () => {
         if (token !== this.requestToken || this.audio !== audio) return;
-        const dur = audio.duration;
-        if (dur && isFinite(dur) && dur > 0) {
-          this.progress = Math.min(1, Math.max(0, audio.currentTime / dur));
-          this.notify();
+        if (playStartPos === null) {
+          playStartPos = audio.currentTime;
         }
+        const elapsed = Math.max(0, audio.currentTime - playStartPos);
+        if (elapsed >= MAX_PREVIEW_SECONDS) {
+          this.stop();
+          return;
+        }
+        const dur = audio.duration;
+        const effectiveDuration =
+          dur && isFinite(dur) && dur > 0 && dur <= 10.5 ? dur : MAX_PREVIEW_SECONDS;
+        this.progress = Math.min(1, Math.max(0, elapsed / effectiveDuration));
+        this.notify();
       });
 
       audio.addEventListener('ended', () => {

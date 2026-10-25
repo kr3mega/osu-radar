@@ -425,6 +425,10 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   },
 
   removeBeatmap: (id) => {
+    try {
+      db.beatmaps.delete(id).catch(() => {});
+      db.beatmapTexts.delete(id).catch(() => {});
+    } catch {}
     set((state) => {
       const updated = state.currentPool.maps.filter((m) => m.id !== id);
       return {

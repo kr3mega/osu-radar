@@ -186,7 +186,6 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
   };
 
   const containerStyle: React.CSSProperties = {
-    height: maxHeightPx && maxHeightPx > 0 ? `${Math.max(460, maxHeightPx)}px` : undefined,
     maxHeight: maxHeightPx && maxHeightPx > 0 ? `${Math.max(460, maxHeightPx)}px` : undefined,
   };
 

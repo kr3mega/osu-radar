@@ -217,17 +217,19 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
               )}
             </button>
 
-            <div className="beatmapset-panel__play-icons">
-              <span
-                className="osu-radar-mod-pill"
-                style={{
-                  backgroundColor: modColorConfig.bg,
-                  color: modColorConfig.text,
-                }}
-              >
-                {badgeLabel}
-              </span>
-            </div>
+            {!isLocalSong && (
+              <div className="beatmapset-panel__play-icons">
+                <span
+                  className="osu-radar-mod-pill"
+                  style={{
+                    backgroundColor: modColorConfig.bg,
+                    color: modColorConfig.text,
+                  }}
+                >
+                  {badgeLabel}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Center Info Area */}
@@ -516,15 +518,23 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                 </a>
               )}
 
-              {onRemove && difficulties.length === 1 && (
+              {onRemove && (
                 <button
                   type="button"
                   className="beatmapset-panel__menu-item"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onRemove();
+                    if (group && difficulties.length > 1 && onRemoveDifficulty) {
+                      difficulties.forEach((d) => onRemoveDifficulty(d.id));
+                    } else {
+                      onRemove();
+                    }
                   }}
-                  title="Remover mapa da pool"
+                  title={
+                    group && difficulties.length > 1
+                      ? 'Remover todas as dificuldades deste mapa'
+                      : 'Remover mapa'
+                  }
                 >
                   <span className="fas fa-trash" />
                 </button>

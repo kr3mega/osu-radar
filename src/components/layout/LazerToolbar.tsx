@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePoolStore } from '../../store/usePoolStore';
 import { useAudioStore } from '../../store/useAudioStore';
-import { formatTimestamp } from '../../engine/strains';
 
 interface LazerToolbarProps {
   activeTab: 'select' | 'overview';
@@ -38,8 +37,6 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
   const totalMaps = maps.length;
   const cachedBytes = maps.reduce((acc, m) => acc + (m.audioBlob?.size || 0), 0);
   const cachedMb = (cachedBytes / (1024 * 1024)).toFixed(1);
-  const avgSr = totalMaps > 0 ? maps.reduce((acc, m) => acc + m.stats.starRating, 0) / totalMaps : 0;
-  const totalDuration = maps.reduce((acc, m) => acc + m.stats.drainTimeMs, 0);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -182,7 +179,7 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                       }}
                       className="nav2__menu-link-main"
                     >
-                      <span className="u-relative">importar / planilha</span>
+                      <span className="u-relative">Importação</span>
                     </a>
                   </div>
                 )}
@@ -440,7 +437,7 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                       <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
                         <i className="fas fa-plus-circle" />
                       </span>
-                      <span>importar beatmaps / planilha</span>
+                      <span>Importação</span>
                     </div>
                   </button>
                 )}
@@ -522,29 +519,6 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                   </li>
                 )}
               </ul>
-
-              {/* Pool Summary Telemetry */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '14px',
-                  fontSize: '12px',
-                  color: 'hsl(var(--hsl-l1))',
-                  padding: '6px 0',
-                }}
-              >
-                <span>
-                  <strong style={{ color: '#fff' }}>{currentPool.name}</strong>
-                  {currentPool.stage ? ` · ${currentPool.stage}` : ''}
-                </span>
-                <span>
-                  média: <strong style={{ color: '#ffcc22' }}>★ {avgSr.toFixed(2).replace('.', ',')}</strong>
-                </span>
-                <span>
-                  duração: <strong style={{ color: '#fff' }}>{formatTimestamp(totalDuration)}</strong>
-                </span>
-              </div>
             </div>
           </div>
         </div>
