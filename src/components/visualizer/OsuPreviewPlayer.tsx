@@ -931,6 +931,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
           backgroundColor: 'hsl(var(--hsl-b4))',
           textAlign: 'left',
           flexShrink: 0,
+          fontSize: '13px',
+          fontFamily: 'Inter, Torus, "Helvetica Neue", sans-serif',
         }}
       >
         <li className="page-mode__item">
@@ -943,9 +945,15 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             className={`page-mode-link ${
               activeBottomTab === 'patterns' ? 'page-mode-link--is-active' : ''
             }`}
+            style={{
+              fontSize: '13px',
+              fontFamily: 'Inter, Torus, "Helvetica Neue", sans-serif',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
           >
-            <i className="fas fa-list-ul" style={{ marginRight: '6px', alignSelf: 'center' }} />
-            <span>Ver Padrões</span>
+            <i className="fas fa-list-ul fa-fw" style={{ fontSize: '13px', marginRight: '6px', alignSelf: 'center' }} />
+            <span style={{ fontSize: '13px', lineHeight: 1.2 }}>Ver Padrões</span>
             <span className="page-mode-link__stripe" />
           </a>
         </li>
@@ -960,9 +968,15 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             className={`page-mode-link ${
               activeBottomTab === 'skills' ? 'page-mode-link--is-active' : ''
             }`}
+            style={{
+              fontSize: '13px',
+              fontFamily: 'Inter, Torus, "Helvetica Neue", sans-serif',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
           >
-            <i className="fas fa-chart-bar" style={{ marginRight: '6px', alignSelf: 'center' }} />
-            <span>Ver Skills</span>
+            <i className="fas fa-chart-bar fa-fw" style={{ fontSize: '13px', marginRight: '6px', alignSelf: 'center' }} />
+            <span style={{ fontSize: '13px', lineHeight: 1.2 }}>Ver Skills</span>
             <span className="page-mode-link__stripe" />
           </a>
         </li>
