@@ -530,17 +530,8 @@ export const App: React.FC = () => {
                 {/* Right Column: Official .beatmapsets Toolbar + Virtualized .beatmapset-panel List */}
                 <div className="osu-radar-right-col">
                   {/* Official ppy/osu-web .beatmapsets__toolbar & .sort (resources/js/beatmaps/search-sort.tsx) */}
-                  <div
-                    className="beatmapsets__toolbar"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: '8px',
-                    }}
-                  >
-                    <div className="beatmapsets__toolbar-item">
+                  <div className="beatmapsets__toolbar">
+                    <div className="beatmapsets__toolbar-item" style={{ flex: '1 1 auto', minWidth: 0, width: '100%' }}>
                       <div className="sort sort--beatmapsets">
                         <div className="sort__items">
                           <span className="sort__item sort__item--title">ordenar por</span>
@@ -580,32 +571,22 @@ export const App: React.FC = () => {
                               </a>
                             );
                           })}
+
+                          <div className="osu-radar-toolbar-count">
+                            <span>
+                              <strong style={{ color: '#fff' }}>
+                                {groupedSets.length.toLocaleString('pt-BR')}
+                              </strong>{' '}
+                              {groupedSets.length === 1 ? 'música' : 'músicas'}
+                              {' · '}
+                              <strong style={{ color: 'hsl(var(--hsl-c1))' }}>
+                                {filteredMaps.length.toLocaleString('pt-BR')}
+                              </strong>{' '}
+                              {filteredMaps.length === 1 ? 'diff' : 'diffs'}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        paddingRight: '12px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        color: 'hsl(var(--hsl-l2))',
-                      }}
-                    >
-                      <span>
-                        <strong style={{ color: '#fff' }}>
-                          {groupedSets.length.toLocaleString('pt-BR')}
-                        </strong>{' '}
-                        {groupedSets.length === 1 ? 'música' : 'músicas'}
-                        {' · '}
-                        <strong style={{ color: 'hsl(var(--hsl-c1))' }}>
-                          {filteredMaps.length.toLocaleString('pt-BR')}
-                        </strong>{' '}
-                        {filteredMaps.length === 1 ? 'diff' : 'diffs'}
-                      </span>
                     </div>
                   </div>
 

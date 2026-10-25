@@ -77,6 +77,38 @@
   background-color: @osu-colour-b5;
   border-radius: @border-radius--large;
   overflow: hidden;
+
+  .beatmapsets__toolbar {
+    padding: 8px 16px;
+    background-color: @osu-colour-b4;
+    border-bottom: 1px solid @osu-colour-b3;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+
+  .sort--beatmapsets {
+    padding: 2px 0;
+    width: 100%;
+  }
+
+  .osu-radar-toolbar-count {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding-left: 14px;
+    padding-right: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: hsl(var(--hsl-l2));
+    white-space: nowrap;
+    align-self: center;
+  }
 }
 
 // Override beatmapset-header inside the left column so it fits cleanly
