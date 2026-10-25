@@ -935,14 +935,14 @@
 
       &:hover {
         transform: scale(1.04);
-        box-shadow: 0 0 0 2px hsla(var(--hsl-h1), 0.4), 0 1px 4px rgba(0, 0, 0, 0.35);
+        border-color: @osu-colour-h1;
+        color: #ffffff;
       }
     }
 
     &--input {
       outline: none;
-      border: 1px solid #ffffff;
-      box-shadow: 0 0 0 2px hsla(var(--hsl-h1), 0.6), 0 1px 4px rgba(0, 0, 0, 0.35);
+      border: 1px solid @osu-colour-h1;
       cursor: text;
       font-family: inherit;
       width: 58px;
@@ -981,15 +981,7 @@
     position: absolute;
     inset-block: 0;
     border-radius: 999px;
-    background: linear-gradient(
-      90deg,
-      #4290fb 0%,
-      #7cff4f 28%,
-      #f6f05c 52%,
-      hsl(var(--hsl-h1)) 78%,
-      #aa88ff 100%
-    );
-    box-shadow: 0 0 8px hsla(var(--hsl-h1), 0.45);
+    background-color: @osu-colour-h1;
   }
 }
 
@@ -1057,7 +1049,7 @@
 
 .osu-radar-dual-slider__input::-webkit-slider-thumb:hover {
   transform: scale(1.14);
-  box-shadow: 0 0 0 4px hsla(var(--hsl-h1), 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
 }
 
 .osu-radar-dual-slider__input::-webkit-slider-thumb:active {
@@ -1094,7 +1086,7 @@
 
 .osu-radar-dual-slider__input::-moz-range-thumb:hover {
   transform: scale(1.14);
-  box-shadow: 0 0 0 4px hsla(var(--hsl-h1), 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
 }
 
 .osu-radar-dual-slider__input::-moz-range-thumb:active {
@@ -1119,43 +1111,43 @@
   border-radius: 999px;
   border: 1px solid @osu-colour-b3;
   background-color: @osu-colour-b5;
-  color: @osu-colour-l1;
+  color: @osu-colour-l2;
   font-family: inherit;
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 
   &:hover {
-    background-color: @osu-colour-b4;
-    border-color: hsl(var(--hsl-h1));
+    background-color: @osu-colour-b3;
+    border-color: @osu-colour-b2;
     color: #ffffff;
   }
 
   &:focus-visible {
-    outline: 2px solid hsl(var(--hsl-h1));
-    outline-offset: 2px;
+    outline: none;
+    border-color: @osu-colour-h1;
   }
 
   &--active {
-    background-color: hsla(var(--hsl-h1), 0.18);
-    border-color: hsl(var(--hsl-h1));
-    color: #ffffff;
-    box-shadow: 0 0 10px hsla(var(--hsl-h1), 0.25);
+    background-color: @osu-colour-h1;
+    border-color: @osu-colour-h1;
+    color: @osu-colour-b6;
+    font-weight: 800;
+
+    i {
+      color: @osu-colour-b6;
+    }
+
+    &:hover {
+      background-color: @osu-colour-h1;
+      border-color: @osu-colour-h1;
+      color: @osu-colour-b6;
+    }
   }
 
   &__order {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-inline-size: 15px;
-    block-size: 15px;
-    padding: 0 3px;
-    border-radius: 999px;
-    background-color: hsl(var(--hsl-h1));
-    color: @osu-colour-b6;
-    font-size: 9px;
-    font-weight: 800;
+    display: none;
   }
 }
 
@@ -1210,7 +1202,6 @@
   &--open {
     border-color: hsl(var(--hsl-h1));
     background-color: @osu-colour-b4;
-    box-shadow: 0 0 0 2px hsla(var(--hsl-h1), 0.25);
   }
 
   &__name {
@@ -1477,7 +1468,6 @@
     color: #fff;
     background-color: @osu-colour-b4;
     border-color: hsl(var(--hsl-h1));
-    box-shadow: 0 0 0 2px hsla(var(--hsl-h1), 0.25);
   }
 
   &__label {

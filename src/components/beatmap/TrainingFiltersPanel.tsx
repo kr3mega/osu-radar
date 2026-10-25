@@ -52,11 +52,6 @@ export const TrainingFiltersPanel: React.FC = () => {
               >
                 <i className={SKILL_ICONS[skillKey]} style={{ fontSize: '10px' }} />
                 <span>{SKILL_LABELS[skillKey]}</span>
-                {isPrioritized && prioritizedSkills.length > 1 && (
-                  <span className="osu-radar-skill-priority-pill__order">
-                    {selectedIdx + 1}
-                  </span>
-                )}
               </button>
             );
           })}
