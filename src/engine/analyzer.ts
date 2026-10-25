@@ -18,6 +18,7 @@ export interface AnalyzeBeatmapOptions {
   folderName?: string;
   lightweight?: boolean;
   origin?: BeatmapOrigin;
+  localClient?: 'stable' | 'lazer';
   localOsuPath?: string;
   localAudioPath?: string;
   localBgPath?: string;
@@ -169,15 +170,16 @@ export async function analyzeBeatmap(
     return match ? match[1].toUpperCase() : undefined;
   };
 
-  if (options?.origin !== 'local_songs') {
+  const isLocal = options?.origin === 'local_songs' || options?.origin === 'lazer';
+  if (!isLocal) {
     modSlot = matchSlot(fileName) || matchSlot(metadata.version) || matchSlot(metadata.title);
   }
 
   const baseId = metadata.beatmapId ? metadata.beatmapId.toString() : simpleHash(rawText);
-  const id =
-    options?.origin === 'local_songs'
-      ? `local_${baseId}_${simpleHash(options.localOsuPath || `${options.folderName || ''}/${fileName}`)}`
-      : baseId;
+  const localClientFlavour = options?.localClient || (options?.origin === 'lazer' ? 'lazer' : 'stable');
+  const id = isLocal
+    ? `local_${localClientFlavour}_${baseId}_${simpleHash(options?.localOsuPath || `${options?.folderName || ''}/${fileName}`)}`
+    : baseId;
   const audioUrl = audioBlob ? URL.createObjectURL(audioBlob) : undefined;
   const isLightweight = Boolean(options?.lightweight);
 
@@ -198,6 +200,7 @@ export async function analyzeBeatmap(
     topSkills,
     modSlot,
     origin: options?.origin || 'tournament',
+    localClient: isLocal ? localClientFlavour : undefined,
     localOsuPath: options?.localOsuPath,
     localAudioPath: options?.localAudioPath,
     localBgPath: options?.localBgPath,

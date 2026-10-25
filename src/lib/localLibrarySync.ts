@@ -15,6 +15,20 @@ export interface LocalBridgeDetection {
   folderCount: number;
 }
 
+export interface LocalLazerDetection {
+  available: boolean;
+  detectedPath: string;
+  exists: boolean;
+  beatmapCount: number;
+  filesCount: number;
+  hasRealm: boolean;
+}
+
+export interface DualLocalBridgeDetection extends LocalBridgeDetection {
+  stable: LocalBridgeDetection;
+  lazer: LocalLazerDetection;
+}
+
 export interface LocalLibrarySyncProgress {
   phase: 'scanning' | 'indexing' | 'completed' | 'cancelled';
   processed: number;
@@ -33,26 +47,72 @@ interface ScannedEntry {
   fileName: string;
   mtimeMs: number;
   size: number;
+  localAudioPath?: string;
+  localBgPath?: string;
 }
 
 /**
- * Checks if the local Vite osu! Songs disk bridge is reachable and returns auto-detected path info.
+ * Checks if the local Vite osu!lazer disk bridge is reachable and returns auto-detected path info.
  */
-export async function detectLocalOsuSongsFolder(): Promise<LocalBridgeDetection> {
+export async function detectLocalOsuLazerFolder(): Promise<LocalLazerDetection> {
   try {
-    const res = await fetch('/api/local-songs/detect');
+    const res = await fetch('/api/lazer/detect');
     if (!res.ok) {
-      return { available: false, detectedPath: '', exists: false, folderCount: 0 };
+      return { available: false, detectedPath: '', exists: false, beatmapCount: 0, filesCount: 0, hasRealm: false };
     }
     const data = await res.json();
     return {
       available: Boolean(data.available),
       detectedPath: data.detectedPath || '',
       exists: Boolean(data.exists),
-      folderCount: Number(data.folderCount) || 0,
+      beatmapCount: Number(data.beatmapCount) || 0,
+      filesCount: Number(data.filesCount) || 0,
+      hasRealm: Boolean(data.hasRealm),
     };
   } catch {
-    return { available: false, detectedPath: '', exists: false, folderCount: 0 };
+    return { available: false, detectedPath: '', exists: false, beatmapCount: 0, filesCount: 0, hasRealm: false };
+  }
+}
+
+/**
+ * Checks if the local Vite osu! Songs disk bridge is reachable and returns auto-detected path info
+ * for both osu!stable and osu!lazer.
+ */
+export async function detectLocalOsuSongsFolder(): Promise<DualLocalBridgeDetection> {
+  try {
+    const res = await fetch('/api/local-songs/detect');
+    if (!res.ok) {
+      const emptyBase = { available: false, detectedPath: '', exists: false, folderCount: 0 };
+      const emptyLazer = { available: false, detectedPath: '', exists: false, beatmapCount: 0, filesCount: 0, hasRealm: false };
+      return { ...emptyBase, stable: emptyBase, lazer: emptyLazer };
+    }
+    const data = await res.json();
+    const stableInfo: LocalBridgeDetection = {
+      available: Boolean(data.available),
+      detectedPath: data.stable?.detectedPath || data.detectedPath || '',
+      exists: Boolean(data.stable?.exists ?? data.exists),
+      folderCount: Number(data.stable?.folderCount ?? data.folderCount) || 0,
+    };
+    const lazerInfo: LocalLazerDetection = {
+      available: Boolean(data.lazer?.available ?? data.available),
+      detectedPath: data.lazer?.detectedPath || '',
+      exists: Boolean(data.lazer?.exists),
+      beatmapCount: Number(data.lazer?.beatmapCount) || 0,
+      filesCount: Number(data.lazer?.filesCount) || 0,
+      hasRealm: Boolean(data.lazer?.hasRealm),
+    };
+    return {
+      available: Boolean(data.available),
+      detectedPath: stableInfo.detectedPath || lazerInfo.detectedPath,
+      exists: stableInfo.exists || lazerInfo.exists,
+      folderCount: stableInfo.folderCount,
+      stable: stableInfo,
+      lazer: lazerInfo,
+    };
+  } catch {
+    const emptyBase = { available: false, detectedPath: '', exists: false, folderCount: 0 };
+    const emptyLazer = { available: false, detectedPath: '', exists: false, beatmapCount: 0, filesCount: 0, hasRealm: false };
+    return { ...emptyBase, stable: emptyBase, lazer: emptyLazer };
   }
 }
 
@@ -159,6 +219,7 @@ function createWorkerPool(): Worker[] {
  */
 export async function syncFromLocalServerBridge(options: {
   songsDir?: string;
+  client?: 'stable' | 'lazer';
   existingMaps: BeatmapAnalysisResult[];
   forceReindex?: boolean;
   signal?: AbortSignal;
@@ -166,13 +227,18 @@ export async function syncFromLocalServerBridge(options: {
   onCommitBatch: (maps: BeatmapAnalysisResult[], removedIds?: string[]) => Promise<void>;
 }): Promise<{
   songsDir: string;
+  client: 'stable' | 'lazer';
   indexedStandard: number;
   skippedCached: number;
   skippedNonStandard: number;
   totalDiscovered: number;
   cancelled: boolean;
 }> {
-  const { songsDir, existingMaps, forceReindex = false, signal, onProgress, onCommitBatch } = options;
+  const { songsDir, client = 'stable', existingMaps, forceReindex = false, signal, onProgress, onCommitBatch } = options;
+
+  const isLazer = client === 'lazer';
+  const scanEndpoint = isLazer ? '/api/lazer/scan' : '/api/local-songs/scan';
+  const readBatchEndpoint = isLazer ? '/api/lazer/read-batch' : '/api/local-songs/read-batch';
 
   onProgress?.({
     phase: 'scanning',
@@ -182,27 +248,30 @@ export async function syncFromLocalServerBridge(options: {
     indexedStandard: 0,
     skippedCached: 0,
     skippedNonStandard: 0,
-    currentFileName: 'Escaneando pasta Songs do osu!...',
+    currentFileName: isLazer ? 'Escaneando armazenamento do osu!lazer...' : 'Escaneando pasta Songs do osu!...',
   });
 
-  const scanRes = await fetch('/api/local-songs/scan', {
+  const scanRes = await fetch(scanEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ songsDir }),
+    body: JSON.stringify(isLazer ? { lazerDir: songsDir } : { songsDir }),
     signal,
   });
 
   const scanJson = await scanRes.json();
   if (!scanRes.ok) {
-    throw new Error(scanJson?.error || 'Falha ao escanear a pasta Songs.');
+    throw new Error(scanJson?.error || (isLazer ? 'Falha ao escanear a pasta do osu!lazer.' : 'Falha ao escanear a pasta Songs.'));
   }
 
   const entries: ScannedEntry[] = Array.isArray(scanJson.entries) ? scanJson.entries : [];
-  const resolvedSongsDir: string = scanJson.songsDir || songsDir || '';
+  const resolvedSongsDir: string = scanJson.lazerDir || scanJson.songsDir || songsDir || '';
 
   const existingLocalMapByPath = new Map<string, BeatmapAnalysisResult>();
   for (const m of existingMaps) {
-    if (m.origin === 'local_songs' && m.localOsuPath) {
+    const isThisClient = isLazer
+      ? m.origin === 'lazer' || m.localClient === 'lazer'
+      : (m.origin === 'local_songs' && m.localClient !== 'lazer');
+    if (isThisClient && m.localOsuPath) {
       existingLocalMapByPath.set(m.localOsuPath.toLowerCase(), m);
     }
   }
@@ -242,10 +311,11 @@ export async function syncFromLocalServerBridge(options: {
       indexedStandard: 0,
       skippedCached,
       skippedNonStandard: 0,
-      currentFileName: 'Biblioteca local já está 100% sincronizada!',
+      currentFileName: isLazer ? 'Biblioteca do osu!lazer já está 100% sincronizada!' : 'Biblioteca local já está 100% sincronizada!',
     });
     return {
       songsDir: resolvedSongsDir,
+      client,
       indexedStandard: 0,
       skippedCached,
       skippedNonStandard: 0,
@@ -283,11 +353,12 @@ export async function syncFromLocalServerBridge(options: {
         currentFileName: chunk[0]?.folderName || chunk[0]?.fileName || 'Processando...',
       });
 
-      const readRes = await fetch('/api/local-songs/read-batch', {
+      const readRes = await fetch(readBatchEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: chunk.map((c) => ({ osuPath: c.osuPath, folderPath: c.folderPath })),
+          lazerDir: isLazer ? resolvedSongsDir : undefined,
         }),
         signal,
       });
@@ -313,7 +384,8 @@ export async function syncFromLocalServerBridge(options: {
           text: lf.text,
           folderName: meta?.folderName,
           lightweight: true,
-          origin: 'local_songs',
+          origin: isLazer ? 'lazer' : 'local_songs',
+          localClient: isLazer ? 'lazer' : 'stable',
           localOsuPath: lf.osuPath,
           localAudioPath: lf.localAudioPath,
           localBgPath: lf.localBgPath,
@@ -383,6 +455,7 @@ export async function syncFromLocalServerBridge(options: {
 
     return {
       songsDir: resolvedSongsDir,
+      client,
       indexedStandard,
       skippedCached,
       skippedNonStandard,

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   detectLocalOsuSongsFolder,
-  LocalBridgeDetection,
+  DualLocalBridgeDetection,
   LocalLibrarySyncProgress,
   syncFromBrowserDirectoryFiles,
   syncFromLocalServerBridge,
@@ -16,7 +16,8 @@ export const LocalSongsSyncPanel: React.FC = () => {
     setFilterOrigin,
   } = usePoolStore();
 
-  const [detection, setDetection] = useState<LocalBridgeDetection | null>(null);
+  const [detection, setDetection] = useState<DualLocalBridgeDetection | null>(null);
+  const [selectedClient, setSelectedClient] = useState<'stable' | 'lazer'>('stable');
   const [songsPath, setSongsPath] = useState<string>('');
   const [forceReindex, setForceReindex] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -28,15 +29,23 @@ export const LocalSongsSyncPanel: React.FC = () => {
   const abortCtrlRef = useRef<AbortController | null>(null);
   const browserFolderRef = useRef<HTMLInputElement | null>(null);
 
-  const localMapsCount = currentPool.maps.filter((m) => m.origin === 'local_songs').length;
+  const stableMapsCount = currentPool.maps.filter(
+    (m) => (m.origin === 'local_songs' || !m.origin) && m.localClient !== 'lazer' && Boolean(m.localOsuPath)
+  ).length;
+  const lazerMapsCount = currentPool.maps.filter(
+    (m) => m.origin === 'lazer' || m.localClient === 'lazer'
+  ).length;
+  const totalLocalMapsCount = stableMapsCount + lazerMapsCount;
 
   useEffect(() => {
     let mounted = true;
     detectLocalOsuSongsFolder().then((info) => {
       if (!mounted) return;
       setDetection(info);
-      if (info.detectedPath) {
-        setSongsPath(info.detectedPath);
+      if (selectedClient === 'lazer' && info.lazer?.detectedPath) {
+        setSongsPath(info.lazer.detectedPath);
+      } else if (info.stable?.detectedPath || info.detectedPath) {
+        setSongsPath(info.stable?.detectedPath || info.detectedPath);
       }
     });
     return () => {
@@ -44,15 +53,29 @@ export const LocalSongsSyncPanel: React.FC = () => {
     };
   }, []);
 
+  const handleSelectClient = (client: 'stable' | 'lazer') => {
+    setSelectedClient(client);
+    if (detection) {
+      if (client === 'lazer' && detection.lazer?.detectedPath) {
+        setSongsPath(detection.lazer.detectedPath);
+      } else if (client === 'stable' && (detection.stable?.detectedPath || detection.detectedPath)) {
+        setSongsPath(detection.stable?.detectedPath || detection.detectedPath);
+      }
+    }
+  };
+
   const handleStartServerSync = async () => {
     setStatusMsg(null);
     setIsSyncing(true);
     const ctrl = new AbortController();
     abortCtrlRef.current = ctrl;
 
+    const isLazer = selectedClient === 'lazer';
+
     try {
       const res = await syncFromLocalServerBridge({
         songsDir: songsPath.trim() || undefined,
+        client: selectedClient,
         existingMaps: usePoolStore.getState().currentPool.maps,
         forceReindex,
         signal: ctrl.signal,
@@ -62,20 +85,21 @@ export const LocalSongsSyncPanel: React.FC = () => {
         },
       });
 
-      setFilterOrigin('local_songs');
+      setFilterOrigin(isLazer ? 'lazer' : 'local_songs');
 
       if (res.cancelled) {
         setStatusMsg({
           type: 'success',
-          text: `Sincronização pausada. ${res.indexedStandard} mapas osu!standard já analisados foram salvos na sua biblioteca!`,
+          text: `Sincronização pausada. ${res.indexedStandard} mapas osu!standard analisados foram salvos na biblioteca!`,
         });
       } else {
+        const clientLabel = isLazer ? 'osu!lazer' : 'osu! (Stable)';
         setStatusMsg({
           type: 'success',
           text:
             res.indexedStandard === 0 && res.skippedCached > 0
-              ? `Sua pasta Songs já está 100% atualizada (${res.skippedCached} mapas em cache)!`
-              : `Sincronização concluída! ${res.indexedStandard} novos mapas osu!standard indexados (${res.skippedCached} em cache, ${res.skippedNonStandard} outros modos ignorados).`,
+              ? `Sua biblioteca do ${clientLabel} já está 100% atualizada (${res.skippedCached} mapas em cache)!`
+              : `Sincronização concluída! ${res.indexedStandard} novos mapas do ${clientLabel} indexados (${res.skippedCached} em cache, ${res.skippedNonStandard} outros modos ignorados).`,
         });
       }
     } catch (err) {
@@ -188,7 +212,7 @@ export const LocalSongsSyncPanel: React.FC = () => {
             </div>
             <div>
               <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff', display: 'block' }}>
-                Sincronizar Pasta Songs do osu!stable
+                Sincronizar Biblioteca Local de Músicas (osu!stable & osu!lazer)
               </span>
               <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-l2))' }}>
                 Indexa automaticamente todos os seus mapas instalados para treino de Stream, Jump, Speed, Tech e Accuracy
@@ -196,19 +220,69 @@ export const LocalSongsSyncPanel: React.FC = () => {
             </div>
           </div>
 
-          {localMapsCount > 0 && (
-            <span
-              className="osu-skills-mod-pill"
-              style={{
-                backgroundColor: 'hsl(var(--hsl-b3))',
-                color: 'hsl(var(--hsl-lime-1))',
-                padding: '4px 10px',
-              }}
-            >
-              <i className="fas fa-check" style={{ marginRight: '5px', fontSize: '9px' }} />
-              {localMapsCount} mapas indexados
-            </span>
-          )}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {stableMapsCount > 0 && (
+              <span
+                className="osu-skills-mod-pill"
+                style={{
+                  backgroundColor: 'hsl(var(--hsl-b3))',
+                  color: 'hsl(var(--hsl-lime-1))',
+                  padding: '4px 10px',
+                }}
+              >
+                <i className="fas fa-check" style={{ marginRight: '5px', fontSize: '9px' }} />
+                {stableMapsCount} Stable
+              </span>
+            )}
+            {lazerMapsCount > 0 && (
+              <span
+                className="osu-skills-mod-pill"
+                style={{
+                  backgroundColor: 'hsl(var(--hsl-b3))',
+                  color: 'hsl(var(--hsl-h1))',
+                  padding: '4px 10px',
+                }}
+              >
+                <i className="fas fa-check" style={{ marginRight: '5px', fontSize: '9px' }} />
+                {lazerMapsCount} Lazer
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Client Selection: Stable vs Lazer */}
+        <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid hsl(var(--hsl-b2))', paddingBottom: '8px' }}>
+          <button
+            type="button"
+            disabled={isSyncing}
+            onClick={() => handleSelectClient('stable')}
+            className={`osu-skills-player__mod-btn ${selectedClient === 'stable' ? 'osu-skills-player__mod-btn--active' : ''}`}
+            style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
+          >
+            <i className="fas fa-desktop" style={{ marginRight: '6px' }} />
+            osu! (Stable)
+            {detection?.stable?.exists && (
+              <span style={{ marginLeft: '6px', fontSize: '10px', opacity: 0.8 }}>
+                ({detection.stable.folderCount} pastas)
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            disabled={isSyncing}
+            onClick={() => handleSelectClient('lazer')}
+            className={`osu-skills-player__mod-btn ${selectedClient === 'lazer' ? 'osu-skills-player__mod-btn--active' : ''}`}
+            style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
+          >
+            <i className="fas fa-rocket" style={{ marginRight: '6px', color: 'hsl(var(--hsl-h1))' }} />
+            osu!lazer
+            {detection?.lazer?.exists && (
+              <span style={{ marginLeft: '6px', fontSize: '10px', opacity: 0.8 }}>
+                ({detection.lazer.hasRealm ? 'Realm DB' : 'Files'})
+              </span>
+            )}
+          </button>
         </div>
 
         {detection?.available ? (
@@ -219,12 +293,20 @@ export const LocalSongsSyncPanel: React.FC = () => {
                   htmlFor="osu-songs-path-input"
                   style={{ fontSize: '11px', fontWeight: 700, color: 'hsl(var(--hsl-l1))' }}
                 >
-                  Caminho da pasta Songs do seu osu!:
+                  {selectedClient === 'lazer'
+                    ? 'Pasta de dados do osu!lazer (AppData/Roaming/osu):'
+                    : 'Caminho da pasta Songs do seu osu!stable:'}
                 </label>
-                {detection.exists && (
+                {selectedClient === 'lazer' && detection.lazer?.exists && (
                   <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-lime-1))', fontWeight: 600 }}>
                     <i className="fas fa-check-circle" style={{ marginRight: '4px' }} />
-                    Detectada automaticamente ({detection.folderCount} pastas de mapas)
+                    osu!lazer detectado automaticamente
+                  </span>
+                )}
+                {selectedClient === 'stable' && detection.stable?.exists && (
+                  <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-lime-1))', fontWeight: 600 }}>
+                    <i className="fas fa-check-circle" style={{ marginRight: '4px' }} />
+                    osu!stable detectado ({detection.stable.folderCount} pastas de mapas)
                   </span>
                 )}
               </div>
@@ -235,7 +317,11 @@ export const LocalSongsSyncPanel: React.FC = () => {
                   value={songsPath}
                   disabled={isSyncing}
                   onChange={(e) => setSongsPath(e.target.value)}
-                  placeholder="Ex: C:\Users\Usuário\AppData\Local\osu!\Songs"
+                  placeholder={
+                    selectedClient === 'lazer'
+                      ? 'Ex: C:\\Users\\Usuário\\AppData\\Roaming\\osu'
+                      : 'Ex: C:\\Users\\Usuário\\AppData\\Local\\osu!\\Songs'
+                  }
                   style={{
                     flex: 1,
                     minWidth: '240px',
@@ -257,7 +343,10 @@ export const LocalSongsSyncPanel: React.FC = () => {
                     onClick={async () => {
                       const bridge = window.osuSkillsDesktop || window.osuRadarDesktop;
                       const picked = await bridge?.selectDirectory({
-                        title: 'Selecionar pasta Songs do osu!',
+                        title:
+                          selectedClient === 'lazer'
+                            ? 'Selecionar pasta de armazenamento do osu!lazer'
+                            : 'Selecionar pasta Songs do osu! (Stable)',
                         defaultPath: songsPath.trim() || undefined,
                       });
                       if (picked) {
@@ -302,8 +391,16 @@ export const LocalSongsSyncPanel: React.FC = () => {
                   >
                     <span className="btn-osu-big__content">
                       <span className="btn-osu-big__left">
-                        <span className="btn-osu-big__text-top">Sincronizar Meu osu! (Songs)</span>
-                        <span className="btn-osu-big__text-bottom">Leitura direta em alta velocidade</span>
+                        <span className="btn-osu-big__text-top">
+                          {selectedClient === 'lazer'
+                            ? 'Sincronizar Meu osu!lazer'
+                            : 'Sincronizar Meu osu! (Songs)'}
+                        </span>
+                        <span className="btn-osu-big__text-bottom">
+                          {selectedClient === 'lazer'
+                            ? 'Indexação nativa de beatmaps do Lazer'
+                            : 'Leitura direta em alta velocidade'}
+                        </span>
                       </span>
                       <span className="btn-osu-big__icon">
                         <i className="fas fa-sync-alt" />
@@ -332,17 +429,43 @@ export const LocalSongsSyncPanel: React.FC = () => {
                   </button>
                 )}
 
-                {localMapsCount > 0 && !isSyncing && (
-                  <button
-                    type="button"
-                    onClick={() => clearLocalSongs()}
-                    className="osu-skills-player__mod-btn"
-                    style={{ padding: '8px 12px', fontSize: '11px' }}
-                    title="Remove apenas os mapas indexados da pasta Songs, mantendo suas pools de torneios intactas"
-                  >
-                    <i className="fas fa-trash-alt" style={{ marginRight: '5px' }} />
-                    Limpar Índice Local
-                  </button>
+                {totalLocalMapsCount > 0 && !isSyncing && (
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {lazerMapsCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => clearLocalSongs('lazer')}
+                        className="osu-skills-player__mod-btn"
+                        style={{ padding: '8px 10px', fontSize: '11px' }}
+                        title="Remove apenas os mapas do osu!lazer"
+                      >
+                        <i className="fas fa-trash-alt" style={{ marginRight: '4px' }} />
+                        Limpar Lazer ({lazerMapsCount})
+                      </button>
+                    )}
+                    {stableMapsCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => clearLocalSongs('stable')}
+                        className="osu-skills-player__mod-btn"
+                        style={{ padding: '8px 10px', fontSize: '11px' }}
+                        title="Remove apenas os mapas do osu!stable"
+                      >
+                        <i className="fas fa-trash-alt" style={{ marginRight: '4px' }} />
+                        Limpar Stable ({stableMapsCount})
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => clearLocalSongs('all')}
+                      className="osu-skills-player__mod-btn"
+                      style={{ padding: '8px 10px', fontSize: '11px' }}
+                      title="Remove todos os mapas locais indexados (mantém pools de torneios)"
+                    >
+                      <i className="fas fa-trash-alt" style={{ marginRight: '4px' }} />
+                      Limpar Todos ({totalLocalMapsCount})
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

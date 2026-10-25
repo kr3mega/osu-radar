@@ -1,4 +1,4 @@
-export type OsuMod = 'ez' | 'hr' | 'ht' | 'dt' | 'hd' | 'fl';
+export type OsuMod = 'ez' | 'hr' | 'ht' | 'dt' | 'hd' | 'fl' | 'cl' | 'da' | 'mr';
 
 export interface HitSampleData {
   0: number; // normalSet

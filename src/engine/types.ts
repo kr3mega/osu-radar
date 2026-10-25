@@ -92,7 +92,7 @@ export interface PatternCounts {
   tech: number;         // sv_spike + rhythm_switch + choke_point sections
 }
 
-export type BeatmapOrigin = 'tournament' | 'local_songs';
+export type BeatmapOrigin = 'tournament' | 'local_songs' | 'lazer';
 
 export interface BeatmapAnalysisResult {
   id: string; // Hash or unique id
@@ -112,10 +112,11 @@ export interface BeatmapAnalysisResult {
   modSlot?: string; // "NM1", "HD2", "HR1", "DT1", "FM1", "TB"
   tournamentName?: string; // e.g. "6WC 2026", "OWC 2025"
   stageName?: string;      // e.g. "Grand Finals", "Finals", "Qualifiers"
-  origin?: BeatmapOrigin;  // 'tournament' | 'local_songs'
-  localOsuPath?: string;   // Local osu!stable Songs .osu file path
-  localAudioPath?: string; // Local osu!stable Songs audio file path
-  localBgPath?: string;    // Local osu!stable Songs background image path
+  origin?: BeatmapOrigin;  // 'tournament' | 'local_songs' | 'lazer'
+  localClient?: 'stable' | 'lazer'; // osu! client flavour for local beatmaps
+  localOsuPath?: string;   // Local osu! Songs / Lazer CAS .osu file path
+  localAudioPath?: string; // Local audio file path
+  localBgPath?: string;    // Local background image path
   fileMtimeMs?: number;    // File last modified timestamp for incremental sync
   calculatedAt: number;
 }

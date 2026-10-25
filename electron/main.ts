@@ -33,7 +33,7 @@ const DEFAULT_WINDOW_STATE: PersistedWindowState = {
   isMaximized: false,
 };
 
-const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'osu:']);
+const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'osu:', 'osulazer:']);
 
 app.setName('osu!skills');
 if (process.platform === 'win32') {

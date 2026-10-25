@@ -9,6 +9,7 @@ export interface WorkerAnalyzeFileInput {
   folderName?: string;
   lightweight?: boolean;
   origin?: BeatmapOrigin;
+  localClient?: 'stable' | 'lazer';
   localOsuPath?: string;
   localAudioPath?: string;
   localBgPath?: string;
@@ -60,6 +61,7 @@ self.onmessage = async (event: MessageEvent<WorkerAnalyzePayload>) => {
             folderName: file.folderName,
             lightweight: file.lightweight,
             origin: file.origin,
+            localClient: file.localClient,
             localOsuPath: file.localOsuPath,
             localAudioPath: file.localAudioPath,
             localBgPath: file.localBgPath,

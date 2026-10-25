@@ -369,14 +369,25 @@ function sendJson(res: ServerResponse, statusCode: number, data: unknown) {
   res.end(JSON.stringify(data));
 }
 
+import { detectDefaultOsuLazerDir } from './localLazerPlugin';
+
 export function createLocalSongsMiddleware() {
   const authorizedRoots = new Set<string>();
 
-  // Pre-authorize default osu! Songs directory on startup if it exists
+  // Pre-authorize default osu! Songs & Lazer directories on startup if they exist
   detectDefaultOsuSongsDir()
     .then((res) => {
       if (res.exists && res.detectedPath) {
         authorizedRoots.add(path.resolve(res.detectedPath));
+      }
+    })
+    .catch(() => {});
+
+  detectDefaultOsuLazerDir()
+    .then((res) => {
+      if (res.exists && res.detectedPath) {
+        authorizedRoots.add(path.resolve(res.detectedPath));
+        authorizedRoots.add(path.resolve(path.join(res.detectedPath, 'files')));
       }
     })
     .catch(() => {});
@@ -395,9 +406,16 @@ export function createLocalSongsMiddleware() {
         if (info.exists && info.detectedPath) {
           authorizedRoots.add(path.resolve(info.detectedPath));
         }
+        const lazerInfo = await detectDefaultOsuLazerDir();
+        if (lazerInfo.exists && lazerInfo.detectedPath) {
+          authorizedRoots.add(path.resolve(lazerInfo.detectedPath));
+          authorizedRoots.add(path.resolve(path.join(lazerInfo.detectedPath, 'files')));
+        }
         return sendJson(res, 200, {
           available: true,
           ...info,
+          stable: info,
+          lazer: lazerInfo,
         });
       }
 

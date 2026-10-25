@@ -62,7 +62,8 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   const displayMap = activeDiffInGroup || (group ? group.representative : map);
 
   const { metadata, stats, difficulty, modSlot, topSkills, skills } = displayMap;
-  const isLocalSong = displayMap.origin === 'local_songs';
+  const isLazerSong = displayMap.origin === 'lazer' || displayMap.localClient === 'lazer';
+  const isLocalSong = displayMap.origin === 'local_songs' || isLazerSong;
   const patternCounts = getEffectivePatternCounts(displayMap);
 
   const [audioState, setAudioState] = useState<PreviewAudioState>('stopped');
@@ -92,10 +93,12 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   const starTextColor = getStarRatingTextColor(stats.starRating);
 
   const modPrefix = (modSlot || 'NM').slice(0, 2).toUpperCase();
-  const modColorConfig = isLocalSong
+  const modColorConfig = isLazerSong
+    ? { bg: '#e56499', text: '#fff' }
+    : isLocalSong
     ? { bg: 'hsl(var(--hsl-h1))', text: 'hsl(var(--hsl-b6))' }
     : TOURNAMENT_MOD_COLORS[modPrefix] || TOURNAMENT_MOD_COLORS.NM;
-  const badgeLabel = isLocalSong ? 'OSU!' : modSlot || 'NM1';
+  const badgeLabel = isLazerSong ? 'LAZER' : isLocalSong ? 'OSU!' : modSlot || 'NM1';
 
   const minSr = difficulties[0]?.stats.starRating ?? stats.starRating;
   const maxSr = difficulties[difficulties.length - 1]?.stats.starRating ?? stats.starRating;

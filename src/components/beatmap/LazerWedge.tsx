@@ -244,15 +244,37 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                 <a
                   href={
                     metadata.beatmapId
+                      ? `osulazer://b/${metadata.beatmapId}`
+                      : `osulazer://s/${metadata.beatmapSetId}`
+                  }
+                  className="btn-osu-big btn-osu-big--beatmapset-header"
+                  title="Selecionar este mapa diretamente dentro do cliente osu!lazer"
+                >
+                  <div className="btn-osu-big__content">
+                    <div className="btn-osu-big__left">
+                      <span className="btn-osu-big__text-top">Abrir no Lazer</span>
+                      <span className="btn-osu-big__text-bottom">osu!lazer</span>
+                    </div>
+                    <div className="btn-osu-big__icon">
+                      <span className="fas fa-play" />
+                    </div>
+                  </div>
+                </a>
+              )}
+
+              {(metadata.beatmapId || metadata.beatmapSetId) && (
+                <a
+                  href={
+                    metadata.beatmapId
                       ? `osu://b/${metadata.beatmapId}`
                       : `osu://s/${metadata.beatmapSetId}`
                   }
                   className="btn-osu-big btn-osu-big--beatmapset-header"
-                  title="Selecionar este mapa diretamente dentro do cliente osu!"
+                  title="Selecionar este mapa diretamente dentro do cliente osu! (Stable)"
                 >
                   <div className="btn-osu-big__content">
                     <div className="btn-osu-big__left">
-                      <span className="btn-osu-big__text-top">Abrir no osu!</span>
+                      <span className="btn-osu-big__text-top">Abrir no Stable</span>
                       <span className="btn-osu-big__text-bottom">osu!direct</span>
                     </div>
                     <div className="btn-osu-big__icon">

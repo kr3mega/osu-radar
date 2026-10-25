@@ -110,18 +110,30 @@ export const App: React.FC = () => {
 
   const maps = currentPool.maps;
 
-  const { localMapsCount, tournamentMapsCount } = useMemo(() => {
+  const { localMapsCount, stableMapsCount, lazerMapsCount, tournamentMapsCount } = useMemo(() => {
     let local = 0;
+    let stable = 0;
+    let lazer = 0;
     let tourney = 0;
     for (let i = 0; i < maps.length; i++) {
-      if (maps[i].origin === 'local_songs') local++;
-      else tourney++;
+      const m = maps[i];
+      const isLzr = m.origin === 'lazer' || m.localClient === 'lazer';
+      const isStb = (m.origin === 'local_songs' || !m.origin) && m.localClient !== 'lazer' && Boolean(m.localOsuPath);
+      if (isLzr) {
+        lazer++;
+        local++;
+      } else if (isStb || m.origin === 'local_songs') {
+        stable++;
+        local++;
+      } else {
+        tourney++;
+      }
     }
-    return { localMapsCount: local, tournamentMapsCount: tourney };
+    return { localMapsCount: local, stableMapsCount: stable, lazerMapsCount: lazer, tournamentMapsCount: tourney };
   }, [maps]);
 
   const tournamentMaps = useMemo(
-    () => maps.filter((m) => m.origin !== 'local_songs'),
+    () => maps.filter((m) => m.origin !== 'local_songs' && m.origin !== 'lazer' && !m.localClient),
     [maps]
   );
 
@@ -358,8 +370,50 @@ export const App: React.FC = () => {
                           className="fas fa-hdd"
                           style={{ marginRight: '5px', fontSize: '10px', color: 'hsl(var(--hsl-h1))' }}
                         />
-                        Beatmaps Locais ({localMapsCount})
+                        Todas Locais ({localMapsCount})
                       </a>
+
+                      {lazerMapsCount > 0 && (
+                        <a
+                          href="#origin-lazer"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setFilterOrigin('lazer');
+                          }}
+                          className={`beatmapsets-search-filter__item ${
+                            filterOrigin === 'lazer'
+                              ? 'beatmapsets-search-filter__item--active'
+                              : ''
+                          }`}
+                        >
+                          <i
+                            className="fas fa-rocket"
+                            style={{ marginRight: '5px', fontSize: '10px', color: 'hsl(var(--hsl-h1))' }}
+                          />
+                          osu!lazer ({lazerMapsCount})
+                        </a>
+                      )}
+
+                      {stableMapsCount > 0 && (
+                        <a
+                          href="#origin-stable"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setFilterOrigin('stable');
+                          }}
+                          className={`beatmapsets-search-filter__item ${
+                            filterOrigin === 'stable'
+                              ? 'beatmapsets-search-filter__item--active'
+                              : ''
+                          }`}
+                        >
+                          <i
+                            className="fas fa-desktop"
+                            style={{ marginRight: '5px', fontSize: '10px' }}
+                          />
+                          osu! (Stable) ({stableMapsCount})
+                        </a>
+                      )}
 
                       <a
                         href="#origin-tournament"
@@ -619,8 +673,8 @@ export const App: React.FC = () => {
                         <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff' }}>
                           {hasActiveTrainingFilters && maps.length > 0
                             ? 'Nenhum beatmap atende aos filtros de treino atuais'
-                            : filterOrigin === 'local_songs' && localMapsCount === 0
-                            ? 'Sua pasta Songs do osu! ainda não foi sincronizada'
+                            : (filterOrigin === 'local_songs' || filterOrigin === 'lazer' || filterOrigin === 'stable') && localMapsCount === 0
+                            ? 'Sua biblioteca local do osu! / osu!lazer ainda não foi sincronizada'
                             : 'Nenhum beatmap encontrado nesta visualização'}
                         </div>
                         <div style={{ fontSize: '12px', color: 'hsl(var(--hsl-l2))', maxWidth: '420px' }}>

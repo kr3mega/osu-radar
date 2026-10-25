@@ -152,6 +152,9 @@ export function getModFromSlot(modSlot?: string): OsuMod | null {
   if (upper.startsWith('EZ')) return 'ez';
   if (upper.startsWith('HT')) return 'ht';
   if (upper.startsWith('FL')) return 'fl';
+  if (upper.startsWith('CL')) return 'cl';
+  if (upper.startsWith('DA')) return 'da';
+  if (upper.startsWith('MR')) return 'mr';
   return null;
 }
 
@@ -160,4 +163,22 @@ export function getModFromSlot(modSlot?: string): OsuMod | null {
  */
 export function transformOsuCoordY(y: number, isHardRock: boolean): number {
   return isHardRock ? 384 - y : y;
+}
+
+/**
+ * Generates an official osu!lazer deep link for a beatmap or beatmapset.
+ */
+export function buildOsuLazerUrl(beatmapId?: number | string, beatmapSetId?: number | string): string {
+  if (beatmapId) return `osulazer://b/${beatmapId}`;
+  if (beatmapSetId) return `osulazer://s/${beatmapSetId}`;
+  return 'osulazer://';
+}
+
+/**
+ * Generates an official osu!stable deep link for a beatmap or beatmapset.
+ */
+export function buildOsuStableUrl(beatmapId?: number | string, beatmapSetId?: number | string): string {
+  if (beatmapId) return `osu://b/${beatmapId}`;
+  if (beatmapSetId) return `osu://s/${beatmapSetId}`;
+  return 'osu://';
 }

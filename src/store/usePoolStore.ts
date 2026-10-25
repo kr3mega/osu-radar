@@ -21,7 +21,7 @@ export interface ActiveTournamentFilter {
   entries: SheetBeatmapEntry[];
 }
 
-export type OriginFilter = 'ALL' | 'local_songs' | 'tournament';
+export type OriginFilter = 'ALL' | 'local_songs' | 'stable' | 'lazer' | 'tournament';
 
 export type PatternDensityFilter = 'any' | 'none' | 'low' | 'medium' | 'high';
 
@@ -223,7 +223,7 @@ interface PoolState {
   // Actions
   addBeatmaps: (results: BeatmapAnalysisResult[]) => Promise<void>;
   upsertLocalBeatmaps: (results: BeatmapAnalysisResult[], removedIds?: string[]) => Promise<void>;
-  clearLocalSongs: () => Promise<void>;
+  clearLocalSongs: (client?: 'all' | 'stable' | 'lazer') => Promise<void>;
   removeBeatmap: (id: string) => void;
   updateModSlot: (id: string, newSlot: string) => void;
   selectMap: (id: string | null) => void;
@@ -401,21 +401,34 @@ export const usePoolStore = create<PoolState>((set, get) => ({
     });
   },
 
-  clearLocalSongs: async () => {
+  clearLocalSongs: async (client: 'all' | 'stable' | 'lazer' = 'all') => {
     try {
-      await clearLocalSongsFromDb();
+      if (client === 'all') {
+        await clearLocalSongsFromDb();
+      }
     } catch (e) {
       console.warn('Could not clear local songs from IndexedDB:', e);
     }
     set((state) => {
-      const remaining = state.currentPool.maps.filter((m) => m.origin !== 'local_songs');
+      const remaining = state.currentPool.maps.filter((m) => {
+        const isLazer = m.origin === 'lazer' || m.localClient === 'lazer';
+        const isStable = m.origin === 'local_songs' && m.localClient !== 'lazer';
+        if (client === 'all') return m.origin !== 'local_songs' && m.origin !== 'lazer';
+        if (client === 'stable') return !isStable;
+        if (client === 'lazer') return !isLazer;
+        return true;
+      });
+      const wasActiveLocal =
+        state.filterOrigin === 'local_songs' ||
+        state.filterOrigin === 'stable' ||
+        state.filterOrigin === 'lazer';
       return {
         currentPool: {
           ...state.currentPool,
           maps: remaining,
           updatedAt: Date.now(),
         },
-        filterOrigin: state.filterOrigin === 'local_songs' ? 'ALL' : state.filterOrigin,
+        filterOrigin: wasActiveLocal && remaining.length === 0 ? 'ALL' : state.filterOrigin,
         selectedMapId:
           state.selectedMapId && remaining.some((m) => m.id === state.selectedMapId)
             ? state.selectedMapId
@@ -992,15 +1005,28 @@ export function getFilteredAndSortedMaps(
 ): BeatmapAnalysisResult[] {
   let filtered = maps;
 
-  // 1. Filter by Origin (All vs Local osu! Songs vs Tournaments)
+  // 1. Filter by Origin (All vs Local osu! Songs / Lazer vs Tournaments)
+  const isLocalMap = (m: BeatmapAnalysisResult) =>
+    m.origin === 'local_songs' || m.origin === 'lazer' || Boolean(m.localClient);
+  const isLazerMap = (m: BeatmapAnalysisResult) =>
+    m.origin === 'lazer' || m.localClient === 'lazer';
+  const isStableMap = (m: BeatmapAnalysisResult) =>
+    isLocalMap(m) && !isLazerMap(m);
+
   if (filterOrigin === 'local_songs') {
-    filtered = filtered.filter((m) => m.origin === 'local_songs');
+    filtered = filtered.filter(isLocalMap);
+  } else if (filterOrigin === 'stable') {
+    filtered = filtered.filter(isStableMap);
+  } else if (filterOrigin === 'lazer') {
+    filtered = filtered.filter(isLazerMap);
   } else if (filterOrigin === 'tournament') {
-    filtered = filtered.filter((m) => m.origin !== 'local_songs');
+    filtered = filtered.filter((m) => !isLocalMap(m));
   }
 
   // 2. Tournament-specific filters (skipped when strictly viewing Personal Local Library)
-  if (filterOrigin !== 'local_songs') {
+  const isViewingLocalOnly =
+    filterOrigin === 'local_songs' || filterOrigin === 'stable' || filterOrigin === 'lazer';
+  if (!isViewingLocalOnly) {
     if (filterMod !== 'ALL') {
       filtered = filtered.filter((m) => m.modSlot?.startsWith(filterMod));
     }

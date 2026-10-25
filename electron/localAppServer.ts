@@ -5,6 +5,7 @@ import type { AddressInfo } from 'net';
 import type { DesktopLogger } from './logger';
 import { createLocalSongsMiddleware } from '../src/server/localSongsPlugin';
 import { createLocalSkinsMiddleware } from '../src/server/localSkinsPlugin';
+import { createLocalLazerMiddleware } from '../src/server/localLazerPlugin';
 
 export const DEFAULT_DESKTOP_PORT = 45721;
 
@@ -128,6 +129,7 @@ export async function startLocalAppServer(options: {
   const resolvedDist = path.resolve(options.distDir);
   const songsMiddleware = createLocalSongsMiddleware();
   const skinsMiddleware = createLocalSkinsMiddleware();
+  const lazerMiddleware = createLocalLazerMiddleware();
 
   const server = http.createServer((req, res) => {
     const startMs = Date.now();
@@ -159,7 +161,8 @@ export async function startLocalAppServer(options: {
     });
 
     songsMiddleware(req, res, () => {
-      skinsMiddleware(req, res, async () => {
+      lazerMiddleware(req, res, () => {
+        skinsMiddleware(req, res, async () => {
         try {
           const parsed = new URL(req.url || '/', 'http://127.0.0.1');
           let relPathname = '/';
@@ -218,6 +221,7 @@ export async function startLocalAppServer(options: {
       });
     });
   });
+});
 
   const preferred = options.preferredPort ?? DEFAULT_DESKTOP_PORT;
 
