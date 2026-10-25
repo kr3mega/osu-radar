@@ -973,8 +973,8 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
         <div className="osu-skills-player__patterns">
           <div className="osu-skills-player__patterns-header">
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'hsl(var(--hsl-c1))' }}>
-            <i className="fas fa-bolt" style={{ color: 'hsl(var(--hsl-h1))', marginRight: '6px' }} />
-            <span>padrões detectados pelo algoritmo ({detectedPatterns.length})</span>
+            <i className="fas fa-list-ul" style={{ color: 'hsl(var(--hsl-h1))', marginRight: '6px' }} />
+            <span>Padrões detectados ({detectedPatterns.length})</span>
           </div>
 
           {/* Category Filter using osu-web .sort */}
