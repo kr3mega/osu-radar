@@ -42,7 +42,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
           Nenhum beatmap selecionado
         </h3>
         <p style={{ margin: 0, fontSize: '12px', color: 'hsl(var(--hsl-l2))' }}>
-          Selecione um beatmap na listagem à direita para carregar as estatísticas oficiais e o visualizador ao vivo.
+          Selecione um beatmap na listagem à direita para carregar as estatísticas oficiais e assistir ao preview.
         </p>
       </div>
     );
@@ -420,7 +420,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
             }`}
           >
             <i className="fas fa-play-circle" style={{ marginRight: '6px', alignSelf: 'center' }} />
-            <span>visualizador ao vivo</span>
+            <span>Assistir Preview</span>
             <span className="page-mode-link__stripe" />
           </a>
         </li>
@@ -436,8 +436,8 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
               activeWedgeTab === 'radar' ? 'page-mode-link--is-active' : ''
             }`}
           >
-            <i className="fas fa-chart-pie" style={{ marginRight: '6px', alignSelf: 'center' }} />
-            <span>radar de skills</span>
+            <i className="fas fa-chart-bar" style={{ marginRight: '6px', alignSelf: 'center' }} />
+            <span>Ver Skills</span>
             <span className="page-mode-link__stripe" />
           </a>
         </li>

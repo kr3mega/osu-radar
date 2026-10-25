@@ -104,9 +104,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const [activeMods, setActiveMods] = useState<Set<OsuMod>>(new Set());
   const [copiedTime, setCopiedTime] = useState<boolean>(false);
   const [copiedPatternId, setCopiedPatternId] = useState<string | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [selectedPatternId, setSelectedPatternId] = useState<string | undefined>(initialPatternId);
-  const [isLoopEnabled, setIsLoopEnabled] = useState<boolean>(false);
   const [_hasAudioTrack, setHasAudioTrack] = useState<boolean>(false);
   const [patternCategory, setPatternCategory] = useState<PatternCategory>('TODOS');
   const [audioStatus, setAudioStatus] = useState<AudioResolveStatus>({
@@ -119,6 +117,9 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
 
   const [isSkinDropdownOpen, setIsSkinDropdownOpen] = useState<boolean>(false);
   const skinDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  const [isSpeedOpen, setIsSpeedOpen] = useState<boolean>(false);
+  const speedDropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isSkinDropdownOpen) return;
@@ -139,6 +140,26 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isSkinDropdownOpen]);
+
+  useEffect(() => {
+    if (!isSpeedOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (speedDropdownRef.current && !speedDropdownRef.current.contains(e.target as Node)) {
+        setIsSpeedOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsSpeedOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isSpeedOpen]);
 
   const currentSkin = useMemo(() => {
     return availableSkins.find((s) => s.id === selectedSkinId) || availableSkins[0];
@@ -388,34 +409,11 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       if (controllerRef.current) {
         controllerRef.current.seek(p.startTimeMs);
         controllerRef.current.play();
-        if (isLoopEnabled) {
-          controllerRef.current.setLoopRange(p.startTimeMs, p.endTimeMs);
-        } else {
-          controllerRef.current.clearLoopRange();
-        }
-      }
-    },
-    [isLoopEnabled]
-  );
-
-  const handleToggleLoop = () => {
-    const next = !isLoopEnabled;
-    setIsLoopEnabled(next);
-    if (controllerRef.current) {
-      if (next) {
-        const target =
-          livePattern ||
-          currentOrRecentPattern ||
-          detectedPatterns.find((p) => p.id === selectedPatternId) ||
-          detectedPatterns[0];
-        if (target) {
-          controllerRef.current.setLoopRange(target.startTimeMs, target.endTimeMs);
-        }
-      } else {
         controllerRef.current.clearLoopRange();
       }
-    }
-  };
+    },
+    []
+  );
 
   const handleTogglePlay = useCallback(() => {
     previewAudioManager.stop();
@@ -513,21 +511,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleTogglePlay, currentTimeMs]);
 
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-    if (!isFullscreen) {
-      if (containerRef.current.requestFullscreen) {
-        containerRef.current.requestFullscreen().catch(() => {});
-      }
-      setIsFullscreen(true);
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      }
-      setIsFullscreen(false);
-    }
-  };
-
   const handleAudioFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -590,28 +573,136 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       ref={containerRef}
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleAudioDrop}
-      className={`osu-radar-player ${isFullscreen ? 'osu-radar-player--fullscreen' : ''}`}
+      className="osu-radar-player"
     >
-      {/* Top Toolbar */}
-      <div className="osu-radar-player__toolbar">
-        <div className="osu-radar-player__toolbar-left">
+      <input
+        ref={audioInputRef}
+        type="file"
+        accept="audio/mp3,audio/ogg,audio/wav,audio/*"
+        style={{ display: 'none' }}
+        onChange={handleAudioFileSelect}
+      />
+      <input
+        ref={skinInputRef}
+        type="file"
+        accept=".osk,.zip"
+        style={{ display: 'none' }}
+        onChange={handleSkinFileSelect}
+      />
+
+      {/* Playfield Stage */}
+      <div className="osu-radar-player__stage">
+        <div className="osu-radar-player__canvas-box" onClick={handleTogglePlay}>
+          <canvas ref={canvasRef} />
+
+          {!isPlaying && (
+            <div className="osu-radar-player__play-overlay">
+              <div className="osu-radar-player__play-circle">
+                <i className="fas fa-play" style={{ marginLeft: '2px' }} />
+              </div>
+              <span
+                className="osu-radar-mod-pill"
+                style={{
+                  backgroundColor: 'rgba(0,0,0,0.75)',
+                  color: '#fff',
+                  padding: '3px 10px',
+                }}
+              >
+                Clique para Jogar
+              </span>
+            </div>
+          )}
+
+          {activeTopLivePattern && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '8px',
+                left: '8px',
+                backgroundColor: 'rgba(0,0,0,0.75)',
+                padding: '3px 8px',
+                borderRadius: '1000px',
+                fontSize: '10px',
+                fontWeight: 700,
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <i className="fas fa-circle" style={{ color: 'hsl(var(--hsl-h1))', fontSize: '7px' }} />
+              <span>
+                {activeTopLivePattern.label}
+                {livePatterns.length > 1 ? ` (+${livePatterns.length - 1})` : ''}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Scrubber & Playback Controls */}
+      <div className="osu-radar-player__controls">
+        <div className="osu-radar-player__scrubber-row">
+          <span className="osu-radar-player__time">
+            {formatOsuEditorTimestamp(currentTimeMs)}
+          </span>
+
           <input
-            ref={audioInputRef}
-            type="file"
-            accept="audio/mp3,audio/ogg,audio/wav,audio/*"
-            style={{ display: 'none' }}
-            onChange={handleAudioFileSelect}
-          />
-          <input
-            ref={skinInputRef}
-            type="file"
-            accept=".osk,.zip"
-            style={{ display: 'none' }}
-            onChange={handleSkinFileSelect}
+            type="range"
+            min={0}
+            max={Math.max(1, durationMs)}
+            value={currentTimeMs}
+            onChange={(e) => handleSeek(parseFloat(e.target.value))}
+            className="osu-radar-player__range"
           />
 
-          {/* Custom Skin Selector Dropdown - Expanded and Left-Aligned */}
-          <div className="osu-radar-skin-switcher" ref={skinDropdownRef}>
+          <span className="osu-radar-player__time osu-radar-player__time--muted">
+            {formatOsuEditorTimestamp(durationMs)}
+          </span>
+
+          <button
+            type="button"
+            onClick={copyEditorTimestamp}
+            title="Copiar Timestamp para o editor do osu!"
+            className="btn-osu-big btn-osu-big--rounded-small"
+          >
+            <i className={`fas fa-${copiedTime ? 'check' : 'copy'}`} />
+          </button>
+        </div>
+
+        <div className="osu-radar-player__buttons-row">
+          {/* Transport Buttons: [-1s], [Play/Pause], [+1s] */}
+          <div className="osu-radar-player__transport-group">
+            <button
+              type="button"
+              onClick={() => handleStep(-1000)}
+              title="-1s"
+              className="btn-osu-big btn-osu-big--rounded-small osu-radar-player__transport-btn"
+            >
+              <i className="fas fa-step-backward" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleTogglePlay}
+              title={isPlaying ? 'Pausar' : 'Reproduzir'}
+              className="btn-osu-big btn-osu-big--pink btn-osu-big--rounded-small osu-radar-player__play-btn"
+            >
+              <i className={`fas fa-${isPlaying ? 'pause' : 'play'}`} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleStep(1000)}
+              title="+1s"
+              className="btn-osu-big btn-osu-big--rounded-small osu-radar-player__transport-btn"
+            >
+              <i className="fas fa-step-forward" />
+            </button>
+          </div>
+
+          {/* Skin Selector Dropdown - Flexible horizontal width positioned to the right of playback transport */}
+          <div className="osu-radar-skin-switcher osu-radar-skin-switcher--bottom" ref={skinDropdownRef}>
             <button
               type="button"
               className={`osu-radar-skin-trigger ${isSkinDropdownOpen ? 'osu-radar-skin-trigger--open' : ''}`}
@@ -635,7 +726,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                   <span className="osu-radar-skin-tag osu-radar-skin-tag--imported">.osk</span>
                 )}
                 <i
-                  className={`fas fa-chevron-down osu-radar-skin-trigger__chevron ${
+                  className={`fas fa-chevron-up osu-radar-skin-trigger__chevron ${
                     isSkinDropdownOpen ? 'osu-radar-skin-trigger__chevron--open' : ''
                   }`}
                 />
@@ -643,7 +734,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
             </button>
 
             {isSkinDropdownOpen && (
-              <div className="osu-radar-skin-dropdown" role="listbox">
+              <div className="osu-radar-skin-dropdown osu-radar-skin-dropdown--upward" role="listbox">
                 <div className="osu-radar-skin-dropdown__header">
                   <span>Skins Disponíveis ({availableSkins.length})</span>
                   <button
@@ -772,208 +863,85 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               </div>
             )}
           </div>
-        </div>
 
-        <div className="osu-radar-player__toolbar-right">
-          {audioStatus.state === 'loading' ? (
-            <span
-              className="osu-radar-mod-pill"
-              style={{
-                backgroundColor: 'hsl(var(--hsl-orange-3))',
-                color: '#fff',
-                fontSize: '9px',
-                gap: '4px',
-                flexShrink: 0,
-              }}
-            >
-              <i className="fas fa-circle-notch fa-spin" />
-              <span>{audioStatus.message || 'Baixando áudio...'}</span>
-            </span>
-          ) : null}
-
-          {/* Mod Buttons (EZ, HR, DT, HD) */}
-          <div className="osu-radar-player__mods-group">
-            {(['ez', 'hr', 'dt', 'hd'] as OsuMod[]).map((modKey) => {
-              const active = activeMods.has(modKey);
-              return (
-                <button
-                  key={modKey}
-                  type="button"
-                  onClick={() => handleToggleMod(modKey)}
-                  className={`osu-radar-player__mod-btn ${
-                    active ? 'osu-radar-player__mod-btn--active' : ''
-                  }`}
-                >
-                  {modKey}
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            title={isFullscreen ? 'Sair do Modo Cinema' : 'Modo Cinema'}
-            className="btn-osu-big btn-osu-big--rounded-small"
-          >
-            <i className={`fas fa-${isFullscreen ? 'compress' : 'expand'}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* Playfield Stage */}
-      <div className="osu-radar-player__stage">
-        <div className="osu-radar-player__canvas-box" onClick={handleTogglePlay}>
-          <canvas ref={canvasRef} />
-
-          {!isPlaying && (
-            <div className="osu-radar-player__play-overlay">
-              <div className="osu-radar-player__play-circle">
-                <i className="fas fa-play" style={{ marginLeft: '2px' }} />
-              </div>
+          {/* Right utility group: audio status, mods, unified speed */}
+          <div className="osu-radar-player__utility-group">
+            {audioStatus.state === 'loading' && (
               <span
                 className="osu-radar-mod-pill"
                 style={{
-                  backgroundColor: 'rgba(0,0,0,0.75)',
+                  backgroundColor: 'hsl(var(--hsl-orange-3))',
                   color: '#fff',
-                  padding: '3px 10px',
+                  fontSize: '9px',
+                  gap: '4px',
+                  flexShrink: 0,
                 }}
               >
-                Clique para Jogar
+                <i className="fas fa-circle-notch fa-spin" />
+                <span>{audioStatus.message || 'Baixando áudio...'}</span>
               </span>
+            )}
+
+            {/* Mod Buttons (EZ, HR, DT, HD) */}
+            <div className="osu-radar-player__mods-group">
+              {(['ez', 'hr', 'dt', 'hd'] as OsuMod[]).map((modKey) => {
+                const active = activeMods.has(modKey);
+                return (
+                  <button
+                    key={modKey}
+                    type="button"
+                    onClick={() => handleToggleMod(modKey)}
+                    className={`osu-radar-player__mod-btn ${
+                      active ? 'osu-radar-player__mod-btn--active' : ''
+                    }`}
+                  >
+                    {modKey}
+                  </button>
+                );
+              })}
             </div>
-          )}
 
-          {activeTopLivePattern && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '8px',
-                left: '8px',
-                backgroundColor: 'rgba(0,0,0,0.75)',
-                padding: '3px 8px',
-                borderRadius: '1000px',
-                fontSize: '10px',
-                fontWeight: 700,
-                color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              <i className="fas fa-circle" style={{ color: 'hsl(var(--hsl-h1))', fontSize: '7px' }} />
-              <span>
-                {activeTopLivePattern.label}
-                {livePatterns.length > 1 ? ` (+${livePatterns.length - 1})` : ''}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Scrubber & Playback Controls */}
-      <div className="osu-radar-player__controls">
-        <div className="osu-radar-player__scrubber-row">
-          <span className="osu-radar-player__time">
-            {formatOsuEditorTimestamp(currentTimeMs)}
-          </span>
-
-          <input
-            type="range"
-            min={0}
-            max={Math.max(1, durationMs)}
-            value={currentTimeMs}
-            onChange={(e) => handleSeek(parseFloat(e.target.value))}
-            className="osu-radar-player__range"
-          />
-
-          <span className="osu-radar-player__time osu-radar-player__time--muted">
-            {formatOsuEditorTimestamp(durationMs)}
-          </span>
-
-          <button
-            type="button"
-            onClick={copyEditorTimestamp}
-            title="Copiar Timestamp para o editor do osu!"
-            className="btn-osu-big btn-osu-big--rounded-small"
-          >
-            <i className={`fas fa-${copiedTime ? 'check' : 'copy'}`} />
-          </button>
-        </div>
-
-        <div className="osu-radar-player__buttons-row">
-          {/* Transport Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={() => handleSeek(0)}
-              title="Reiniciar"
-              className="btn-osu-big btn-osu-big--rounded-small"
-            >
-              <i className="fas fa-undo" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleStep(-1000)}
-              title="-1s"
-              className="btn-osu-big btn-osu-big--rounded-small"
-            >
-              <i className="fas fa-step-backward" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleTogglePlay}
-              className="btn-osu-big btn-osu-big--pink btn-osu-big--rounded-small"
-            >
-              <div className="btn-osu-big__content">
-                <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
-                  <i className={`fas fa-${isPlaying ? 'pause' : 'play'}`} />
-                </span>
-                <span>{isPlaying ? 'pausar' : 'jogar'}</span>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleStep(1000)}
-              title="+1s"
-              className="btn-osu-big btn-osu-big--rounded-small"
-            >
-              <i className="fas fa-step-forward" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleToggleLoop}
-              title={
-                isLoopEnabled
-                  ? 'Loop de Padrão Ativo (Clique para desativar)'
-                  : 'Repetir padrão selecionado em Loop'
-              }
-              className={`btn-osu-big btn-osu-big--rounded-small ${
-                isLoopEnabled ? 'btn-osu-big--pink' : ''
-              }`}
-            >
-              <i className="fas fa-sync-alt" />
-            </button>
-          </div>
-
-          {/* Speed Selector */}
-          <div className="osu-radar-player__mods-group">
-            {[0.5, 0.75, 1.0, 1.5].map((speed) => (
+            {/* Unified Speed Dropdown */}
+            <div className="osu-radar-speed-switcher" ref={speedDropdownRef}>
               <button
-                key={speed}
                 type="button"
-                onClick={() => handleSpeedChange(speed)}
-                className={`osu-radar-player__mod-btn ${
-                  playbackRate === speed ? 'osu-radar-player__mod-btn--active' : ''
-                }`}
+                className={`osu-radar-speed-trigger ${isSpeedOpen ? 'osu-radar-speed-trigger--open' : ''}`}
+                onClick={() => setIsSpeedOpen(!isSpeedOpen)}
+                title="Alterar velocidade de reprodução"
+                aria-expanded={isSpeedOpen}
               >
-                {speed}x
+                <span className="osu-radar-speed-trigger__label">{playbackRate}x</span>
+                <i
+                  className={`fas fa-chevron-up osu-radar-speed-trigger__icon ${
+                    isSpeedOpen ? 'osu-radar-speed-trigger__icon--open' : ''
+                  }`}
+                />
               </button>
-            ))}
+
+              {isSpeedOpen && (
+                <div className="osu-radar-speed-dropdown" role="listbox">
+                  <div className="osu-radar-speed-dropdown__title">Velocidade</div>
+                  {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((speed) => (
+                    <button
+                      key={speed}
+                      type="button"
+                      role="option"
+                      aria-selected={playbackRate === speed}
+                      className={`osu-radar-speed-item ${
+                        playbackRate === speed ? 'osu-radar-speed-item--active' : ''
+                      }`}
+                      onClick={() => {
+                        handleSpeedChange(speed);
+                        setIsSpeedOpen(false);
+                      }}
+                    >
+                      <span>{speed}x</span>
+                      {playbackRate === speed && <i className="fas fa-check osu-radar-speed-item__check" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

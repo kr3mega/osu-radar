@@ -24,17 +24,23 @@ export const BeatmapDetailModal: React.FC<BeatmapDetailModalProps> = ({ onClose 
     stamina: 0,
     fingerControl: 0,
     readingTech: 0,
+    stream: 0,
+    burst: 0,
+    accuracy: 0,
   };
 
   const poolCount = currentPool.maps.length;
   if (poolCount > 0) {
     for (const m of currentPool.maps) {
-      avgSkills.snapAim += m.skills.snapAim;
-      avgSkills.flowAim += m.skills.flowAim;
-      avgSkills.speed += m.skills.speed;
-      avgSkills.stamina += m.skills.stamina;
-      avgSkills.fingerControl += m.skills.fingerControl;
-      avgSkills.readingTech += m.skills.readingTech;
+      avgSkills.snapAim += m.skills.snapAim || 0;
+      avgSkills.flowAim += m.skills.flowAim || 0;
+      avgSkills.speed += m.skills.speed || 0;
+      avgSkills.stamina += m.skills.stamina || 0;
+      avgSkills.fingerControl += m.skills.fingerControl || 0;
+      avgSkills.readingTech += m.skills.readingTech || 0;
+      avgSkills.stream! += m.skills.stream ?? ((m.skills.stamina || 0) * 0.7 + (m.skills.speed || 0) * 0.3);
+      avgSkills.burst! += m.skills.burst ?? ((m.skills.speed || 0) * 0.7 + (m.skills.fingerControl || 0) * 0.3);
+      avgSkills.accuracy! += m.skills.accuracy ?? ((m.skills.fingerControl || 0) * 0.45 + (m.skills.readingTech || 20) * 0.35 + 15);
     }
     (Object.keys(avgSkills) as Array<keyof SkillAttributes>).forEach((k) => {
       avgSkills[k] = Math.round((avgSkills[k] / poolCount) * 10) / 10;

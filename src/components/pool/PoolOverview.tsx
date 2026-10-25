@@ -18,15 +18,21 @@ export const PoolOverview: React.FC = () => {
     stamina: 0,
     fingerControl: 0,
     readingTech: 0,
+    stream: 0,
+    burst: 0,
+    accuracy: 0,
   };
 
   for (const m of maps) {
-    avgSkills.snapAim += m.skills.snapAim;
-    avgSkills.flowAim += m.skills.flowAim;
-    avgSkills.speed += m.skills.speed;
-    avgSkills.stamina += m.skills.stamina;
-    avgSkills.fingerControl += m.skills.fingerControl;
-    avgSkills.readingTech += m.skills.readingTech;
+    avgSkills.snapAim += m.skills.snapAim || 0;
+    avgSkills.flowAim += m.skills.flowAim || 0;
+    avgSkills.speed += m.skills.speed || 0;
+    avgSkills.stamina += m.skills.stamina || 0;
+    avgSkills.fingerControl += m.skills.fingerControl || 0;
+    avgSkills.readingTech += m.skills.readingTech || 0;
+    avgSkills.stream! += m.skills.stream ?? ((m.skills.stamina || 0) * 0.7 + (m.skills.speed || 0) * 0.3);
+    avgSkills.burst! += m.skills.burst ?? ((m.skills.speed || 0) * 0.7 + (m.skills.fingerControl || 0) * 0.3);
+    avgSkills.accuracy! += m.skills.accuracy ?? ((m.skills.fingerControl || 0) * 0.45 + (m.skills.readingTech || 20) * 0.35 + 15);
   }
 
   const count = maps.length;
@@ -60,7 +66,10 @@ export const PoolOverview: React.FC = () => {
     flowAim: 'Flow Aim',
     speed: 'Speed',
     stamina: 'Stamina',
+    stream: 'Stream',
+    burst: 'Burst',
     fingerControl: 'Finger Control',
+    accuracy: 'Accuracy',
     readingTech: 'Tech / Reading',
   };
 

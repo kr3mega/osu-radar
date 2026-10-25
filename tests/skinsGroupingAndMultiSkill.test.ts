@@ -43,7 +43,10 @@ function createMockBeatmap(overrides: {
     flowAim: 10,
     speed: 10,
     stamina: 10,
+    stream: 10,
+    burst: 10,
     fingerControl: 10,
+    accuracy: 10,
     readingTech: 10,
     ...overrides.skills,
   };

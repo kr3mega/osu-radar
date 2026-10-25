@@ -54,7 +54,17 @@ export interface MatchSimulationReport {
  */
 export function calculateTeamSkills(roster: PlayerRoster[]): SkillAttributes {
   if (roster.length === 0) {
-    return { snapAim: 50, flowAim: 50, speed: 50, stamina: 50, fingerControl: 50, readingTech: 50 };
+    return {
+      snapAim: 50,
+      flowAim: 50,
+      speed: 50,
+      stamina: 50,
+      stream: 50,
+      burst: 50,
+      fingerControl: 50,
+      accuracy: 50,
+      readingTech: 50,
+    };
   }
 
   const result: SkillAttributes = {
@@ -62,7 +72,10 @@ export function calculateTeamSkills(roster: PlayerRoster[]): SkillAttributes {
     flowAim: 0,
     speed: 0,
     stamina: 0,
+    stream: 0,
+    burst: 0,
     fingerControl: 0,
+    accuracy: 0,
     readingTech: 0,
   };
 
@@ -71,7 +84,10 @@ export function calculateTeamSkills(roster: PlayerRoster[]): SkillAttributes {
     result.flowAim += player.skills.flowAim;
     result.speed += player.skills.speed;
     result.stamina += player.skills.stamina;
+    result.stream += player.skills.stream;
+    result.burst += player.skills.burst;
     result.fingerControl += player.skills.fingerControl;
+    result.accuracy += player.skills.accuracy;
     result.readingTech += player.skills.readingTech;
   }
 
@@ -106,7 +122,10 @@ export function simulateMapConfrontation(
     'flowAim',
     'speed',
     'stamina',
+    'stream',
+    'burst',
     'fingerControl',
+    'accuracy',
     'readingTech',
   ];
 
@@ -150,7 +169,10 @@ export function simulateMapConfrontation(
     flowAim: 'Flow Aim',
     speed: 'Speed',
     stamina: 'Stamina',
+    stream: 'Stream',
+    burst: 'Burst',
     fingerControl: 'Finger Control',
+    accuracy: 'Accuracy',
     readingTech: 'Tech / Reading',
   };
 

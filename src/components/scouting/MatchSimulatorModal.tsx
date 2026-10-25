@@ -22,7 +22,7 @@ const DEFAULT_TEAM_RED: TeamProfile = {
       rank: 1200,
       badges: 4,
       country: 'BR',
-      skills: { snapAim: 82, flowAim: 88, speed: 76, stamina: 78, fingerControl: 90, readingTech: 86 },
+      skills: { snapAim: 82, flowAim: 88, speed: 76, stamina: 78, stream: 80, burst: 78, fingerControl: 90, accuracy: 88, readingTech: 86 },
       consistencyScore: 85,
     },
     {
@@ -31,7 +31,7 @@ const DEFAULT_TEAM_RED: TeamProfile = {
       rank: 2100,
       badges: 2,
       country: 'BR',
-      skills: { snapAim: 86, flowAim: 82, speed: 80, stamina: 75, fingerControl: 84, readingTech: 80 },
+      skills: { snapAim: 86, flowAim: 82, speed: 80, stamina: 75, stream: 76, burst: 82, fingerControl: 84, accuracy: 80, readingTech: 80 },
       consistencyScore: 82,
     },
     {
@@ -40,11 +40,11 @@ const DEFAULT_TEAM_RED: TeamProfile = {
       rank: 3500,
       badges: 1,
       country: 'BR',
-      skills: { snapAim: 80, flowAim: 84, speed: 72, stamina: 70, fingerControl: 92, readingTech: 88 },
+      skills: { snapAim: 80, flowAim: 84, speed: 72, stamina: 70, stream: 72, burst: 75, fingerControl: 92, accuracy: 85, readingTech: 88 },
       consistencyScore: 88,
     },
   ],
-  aggregatedSkills: { snapAim: 83, flowAim: 85, speed: 76, stamina: 74, fingerControl: 89, readingTech: 85 },
+  aggregatedSkills: { snapAim: 83, flowAim: 85, speed: 76, stamina: 74, stream: 76, burst: 78, fingerControl: 89, accuracy: 84, readingTech: 85 },
 };
 
 const DEFAULT_TEAM_BLUE: TeamProfile = {
@@ -60,7 +60,7 @@ const DEFAULT_TEAM_BLUE: TeamProfile = {
       rank: 800,
       badges: 5,
       country: 'US',
-      skills: { snapAim: 92, flowAim: 78, speed: 94, stamina: 88, fingerControl: 75, readingTech: 72 },
+      skills: { snapAim: 92, flowAim: 78, speed: 94, stamina: 88, stream: 90, burst: 92, fingerControl: 75, accuracy: 85, readingTech: 72 },
       consistencyScore: 90,
     },
     {
@@ -69,7 +69,7 @@ const DEFAULT_TEAM_BLUE: TeamProfile = {
       rank: 1500,
       badges: 3,
       country: 'US',
-      skills: { snapAim: 90, flowAim: 76, speed: 90, stamina: 84, fingerControl: 78, readingTech: 70 },
+      skills: { snapAim: 90, flowAim: 76, speed: 90, stamina: 84, stream: 86, burst: 88, fingerControl: 78, accuracy: 82, readingTech: 70 },
       consistencyScore: 86,
     },
     {
@@ -78,11 +78,11 @@ const DEFAULT_TEAM_BLUE: TeamProfile = {
       rank: 1900,
       badges: 2,
       country: 'US',
-      skills: { snapAim: 88, flowAim: 80, speed: 86, stamina: 82, fingerControl: 74, readingTech: 75 },
+      skills: { snapAim: 88, flowAim: 80, speed: 86, stamina: 82, stream: 84, burst: 85, fingerControl: 74, accuracy: 80, readingTech: 75 },
       consistencyScore: 84,
     },
   ],
-  aggregatedSkills: { snapAim: 90, flowAim: 78, speed: 90, stamina: 85, fingerControl: 76, readingTech: 72 },
+  aggregatedSkills: { snapAim: 90, flowAim: 78, speed: 90, stamina: 85, stream: 87, burst: 88, fingerControl: 76, accuracy: 82, readingTech: 72 },
 };
 
 export const MatchSimulatorModal: React.FC<MatchSimulatorModalProps> = ({ onClose }) => {

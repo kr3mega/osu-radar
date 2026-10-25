@@ -238,16 +238,22 @@ export const App: React.FC = () => {
       stamina: 0,
       fingerControl: 0,
       readingTech: 0,
+      stream: 0,
+      burst: 0,
+      accuracy: 0,
     };
 
     for (let i = 0; i < refPool.length; i++) {
       const s = refPool[i].skills;
-      sum.snapAim += s.snapAim;
-      sum.flowAim += s.flowAim;
-      sum.speed += s.speed;
-      sum.stamina += s.stamina;
-      sum.fingerControl += s.fingerControl;
-      sum.readingTech += s.readingTech;
+      sum.snapAim += s.snapAim || 0;
+      sum.flowAim += s.flowAim || 0;
+      sum.speed += s.speed || 0;
+      sum.stamina += s.stamina || 0;
+      sum.fingerControl += s.fingerControl || 0;
+      sum.readingTech += s.readingTech || 0;
+      sum.stream! += s.stream ?? ((s.stamina || 0) * 0.7 + (s.speed || 0) * 0.3);
+      sum.burst! += s.burst ?? ((s.speed || 0) * 0.7 + (s.fingerControl || 0) * 0.3);
+      sum.accuracy! += s.accuracy ?? ((s.fingerControl || 0) * 0.45 + (s.readingTech || 20) * 0.35 + 15);
     }
 
     (Object.keys(sum) as Array<keyof SkillAttributes>).forEach((k) => {

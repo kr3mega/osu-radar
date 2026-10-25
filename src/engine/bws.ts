@@ -6,14 +6,7 @@ export interface TierConfig {
   id: TournamentTier;
   label: string;
   rankRange: string;
-  referenceMax: {
-    snapAim: number;
-    flowAim: number;
-    speed: number;
-    stamina: number;
-    fingerControl: number;
-    readingTech: number;
-  };
+  referenceMax: SkillAttributes;
   expectedBpmRange: [number, number];
   expectedStarRatingRange: [number, number];
 }
@@ -28,7 +21,10 @@ export const TOURNAMENT_TIERS: Record<TournamentTier, TierConfig> = {
       flowAim: 130,
       speed: 120,
       stamina: 140,
+      stream: 130,
+      burst: 120,
       fingerControl: 90,
+      accuracy: 100,
       readingTech: 100,
     },
     expectedBpmRange: [160, 200],
@@ -43,7 +39,10 @@ export const TOURNAMENT_TIERS: Record<TournamentTier, TierConfig> = {
       flowAim: 180,
       speed: 170,
       stamina: 200,
+      stream: 190,
+      burst: 170,
       fingerControl: 130,
+      accuracy: 140,
       readingTech: 150,
     },
     expectedBpmRange: [180, 230],
@@ -58,7 +57,10 @@ export const TOURNAMENT_TIERS: Record<TournamentTier, TierConfig> = {
       flowAim: 230,
       speed: 220,
       stamina: 250,
+      stream: 240,
+      burst: 220,
       fingerControl: 170,
+      accuracy: 180,
       readingTech: 190,
     },
     expectedBpmRange: [200, 260],
@@ -73,7 +75,10 @@ export const TOURNAMENT_TIERS: Record<TournamentTier, TierConfig> = {
       flowAim: 290,
       speed: 280,
       stamina: 320,
+      stream: 310,
+      burst: 280,
       fingerControl: 220,
+      accuracy: 230,
       readingTech: 240,
     },
     expectedBpmRange: [220, 300],
@@ -113,7 +118,10 @@ export function calibrateSkillsForTier(
     'flowAim',
     'speed',
     'stamina',
+    'stream',
+    'burst',
     'fingerControl',
+    'accuracy',
     'readingTech',
   ];
 

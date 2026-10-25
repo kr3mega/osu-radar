@@ -354,8 +354,45 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 8px;
+    width: 100%;
+  }
+
+  &__transport-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  &__transport-btn {
+    width: 34px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  &__play-btn {
+    width: 38px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  &__utility-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-left: auto;
   }
 
   &__patterns {
@@ -1226,6 +1263,279 @@
     background-color: hsla(var(--hsl-h1), 0.18);
     color: #ffffff;
     font-weight: 700;
+  }
+}
+
+.osu-radar-skin-switcher--bottom {
+  flex: 1 1 200px;
+  min-width: 140px;
+  max-width: 100%;
+
+  .osu-radar-skin-trigger {
+    height: 32px;
+    padding: 0 10px;
+    background-color: @osu-colour-b5;
+    border: 1px solid @osu-colour-b3;
+    border-radius: 6px;
+  }
+}
+
+.osu-radar-skin-dropdown--upward {
+  top: auto;
+  bottom: calc(100% + 6px);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.75), 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+/* ==========================================================================
+   Speed Switcher Dropdown (Single expandable button)
+   ========================================================================== */
+.osu-radar-speed-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.osu-radar-speed-trigger {
+  .reset-input();
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 10000px;
+  background-color: @osu-colour-b6;
+  border: 1px solid @osu-colour-b3;
+  color: @osu-colour-l2;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 120ms ease;
+
+  &:hover {
+    color: #fff;
+    background-color: @osu-colour-b4;
+    border-color: @osu-colour-b2;
+  }
+
+  &--open {
+    color: #fff;
+    background-color: @osu-colour-b4;
+    border-color: hsl(var(--hsl-h1));
+    box-shadow: 0 0 0 2px hsla(var(--hsl-h1), 0.25);
+  }
+
+  &__label {
+    letter-spacing: 0.3px;
+  }
+
+  &__icon {
+    font-size: 9px;
+    transition: transform 150ms ease;
+
+    &--open {
+      transform: rotate(180deg);
+      color: hsl(var(--hsl-h1));
+    }
+  }
+}
+
+.osu-radar-speed-dropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  z-index: 1050;
+  min-width: 110px;
+  background-color: @osu-colour-b6;
+  border: 1px solid @osu-colour-b3;
+  border-radius: 8px;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.75), 0 0 1px rgba(255, 255, 255, 0.12);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  &__title {
+    padding: 4px 8px 3px;
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: @osu-colour-l3;
+    letter-spacing: 0.5px;
+  }
+}
+
+.osu-radar-speed-item {
+  .reset-input();
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: transparent;
+  color: @osu-colour-c1;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 100ms ease;
+
+  &:hover {
+    background-color: @osu-colour-b4;
+    color: #fff;
+  }
+
+  &--active {
+    background-color: hsla(var(--hsl-h1), 0.2);
+    color: hsl(var(--hsl-h1));
+  }
+
+  &__check {
+    font-size: 10px;
+    color: hsl(var(--hsl-h1));
+  }
+}
+
+/* ==========================================================================
+   Skills Bar Chart (Ver Skills)
+   ========================================================================== */
+.osu-radar-skills-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.osu-radar-skills-bars-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.osu-radar-skill-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background-color: @osu-colour-b5;
+  border: 1px solid @osu-colour-b3;
+  border-radius: 8px;
+  transition: all 120ms ease;
+
+  &:hover {
+    background-color: @osu-colour-b4;
+    border-color: @osu-colour-b2;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+
+    i {
+      font-size: 11px;
+      color: hsl(var(--hsl-h1));
+      width: 14px;
+      text-align: center;
+    }
+  }
+
+  &__values {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  &__score {
+    font-family: "AzeretMono", monospace;
+    font-size: 12px;
+    font-weight: 800;
+    color: hsl(var(--hsl-h1));
+  }
+
+  &__comp-score {
+    font-family: "AzeretMono", monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: @osu-colour-l2;
+  }
+}
+
+.osu-radar-skill-bar {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background-color: @osu-colour-b6;
+  border-radius: 9999px;
+  overflow: visible;
+
+  &__fill {
+    height: 100%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, hsl(var(--hsl-h1)), hsl(var(--hsl-h2)));
+    box-shadow: 0 0 8px hsla(var(--hsl-h1), 0.4);
+    transition: width 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  &__marker {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 3px;
+    background-color: #ffd700;
+    border-radius: 2px;
+    transform: translateX(-50%);
+    box-shadow: 0 0 6px rgba(255, 215, 0, 0.8);
+    z-index: 2;
+  }
+}
+
+.osu-radar-skills-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 8px 12px;
+  background-color: @osu-colour-b5;
+  border: 1px solid @osu-colour-b4;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: @osu-colour-l1;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__badge {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+
+    &--current {
+      background: linear-gradient(90deg, hsl(var(--hsl-h1)), hsl(var(--hsl-h2)));
+    }
+
+    &--comparison {
+      background-color: #ffd700;
+      box-shadow: 0 0 4px rgba(255, 215, 0, 0.6);
+    }
   }
 }
 

@@ -54,7 +54,10 @@ export function calculateRollingStrains(
         flowAim: 0,
         speed: 0,
         stamina: 0,
+        stream: 0,
+        burst: 0,
         fingerControl: 0,
+        accuracy: 0,
         readingTech: 0,
       },
     };
@@ -69,6 +72,9 @@ export function calculateRollingStrains(
   const staminaSeries: number[] = [];
   const fingerSeries: number[] = [];
   const techSeries: number[] = [];
+  const streamSeries: number[] = [];
+  const burstSeries: number[] = [];
+  const accuracySeries: number[] = [];
   const timeline: StrainPoint[] = [];
 
   const preempt = calculatePreempt(ar);
@@ -95,6 +101,9 @@ export function calculateRollingStrains(
     let staminaLocal = 0;
     let fingerLocal = 0;
     let techLocal = 0;
+    let streamLocal = 0;
+    let burstLocal = 0;
+    let accuracyLocal = 0;
 
     if (windowObjects.length >= 2) {
       const deltasT: number[] = [];
@@ -137,11 +146,21 @@ export function calculateRollingStrains(
           snapLocal += vel * (dist / 140) * 0.9;
         }
 
-        // 2. Speed & Stamina: true stream tapping (dt <= 95ms is >= 158 BPM 1/4)
+        // 2. Speed, Stamina, Stream & Burst (dt <= 95ms is >= 158 BPM 1/4)
         if (dt <= 95) {
           consecutiveFastNotes++;
           const sf = Math.pow(95 / Math.max(30, dt), 1.6);
           speedLocal += sf * 1.5;
+
+          // Stream: sustained stream volume (>= 8 consecutive notes)
+          if (consecutiveFastNotes >= 8) {
+            streamLocal += (consecutiveFastNotes - 6) * sf * 1.25;
+          }
+
+          // Burst: explosive short bursts (3 to 7 consecutive notes)
+          if (consecutiveFastNotes >= 3 && consecutiveFastNotes <= 7) {
+            burstLocal += sf * 1.7;
+          }
 
           // Stamina: exponential scaling for sustained high-frequency tapping
           if (consecutiveFastNotes > 6) {
@@ -149,6 +168,11 @@ export function calculateRollingStrains(
           }
         } else {
           consecutiveFastNotes = 0;
+        }
+
+        // Accuracy: timing precision scaling with tight temporal intervals
+        if (dt <= 125) {
+          accuracyLocal += Math.pow(125 / Math.max(30, dt), 1.3);
         }
 
         // 3. Tech: complex multi-point sliders or visual overlapping stacks
@@ -192,6 +216,9 @@ export function calculateRollingStrains(
     staminaSeries.push(staminaLocal);
     fingerSeries.push(fingerLocal);
     techSeries.push(techLocal);
+    streamSeries.push(streamLocal);
+    burstSeries.push(burstLocal);
+    accuracySeries.push(accuracyLocal);
 
     const totalStrain = snapLocal + flowLocal + speedLocal + staminaLocal + fingerLocal + techLocal;
 
@@ -217,6 +244,9 @@ export function calculateRollingStrains(
   const rawStamina = integrateTopStrains(staminaSeries);
   const rawFinger = integrateTopStrains(fingerSeries);
   const rawTech = integrateTopStrains(techSeries);
+  const rawStream = integrateTopStrains(streamSeries);
+  const rawBurst = integrateTopStrains(burstSeries);
+  const rawAccuracy = integrateTopStrains(accuracySeries);
 
   // Normalization to 0-100 scale using sincere power-law scaling against peak 10★ benchmarks
   const normalize = (val: number, refMax: number): number => {
@@ -233,6 +263,9 @@ export function calculateRollingStrains(
     stamina: normalize(rawStamina, 950),
     fingerControl: normalize(rawFinger, 600),
     readingTech: normalize(rawTech, 650),
+    stream: normalize(rawStream, 850),
+    burst: normalize(rawBurst, 700),
+    accuracy: normalize(rawAccuracy, 650),
   };
 
   return {

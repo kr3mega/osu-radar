@@ -50,7 +50,10 @@ export interface SkillAttributes {
   flowAim: number;       // 0 to 100: Smooth obtuse angles (θ > 120°), circular flow, spaced streams
   speed: number;         // 0 to 100: High raw tapping frequency (200-260+ BPM 1/4 streams, short bursts)
   stamina: number;       // 0 to 100: Long continuous stream density without breaks (> 32+ objects)
+  stream: number;        // 0 to 100: Continuous stream density and volume
+  burst: number;         // 0 to 100: Rapid short burst tapping (3-7 notes)
   fingerControl: number; // 0 to 100: Rhythmic complexity, 1/3, 1/4, 1/6 mixes, temporal Shannon entropy
+  accuracy: number;      // 0 to 100: Rhythm precision, timing tightness and OD scale
   readingTech: number;   // 0 to 100: SV shifts, complex sliders, spatial overlap (low spacing + high time delta)
 }
 

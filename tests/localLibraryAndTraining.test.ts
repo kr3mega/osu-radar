@@ -67,7 +67,10 @@ function makeMockMap(overrides: Partial<BeatmapAnalysisResult> & { id: string })
       flowAim: 30,
       speed: 35,
       stamina: 25,
+      stream: 30,
+      burst: 32,
       fingerControl: 20,
+      accuracy: 35,
       readingTech: 15,
       ...overrides.skills,
     },
@@ -278,7 +281,7 @@ describe('Training Filters, Origin Separation & 10k-Map Performance', () => {
     origin: 'local_songs',
     stats: { starRating: 6.4, bpmMode: 200 } as any,
     difficulty: { hp: 6, cs: 4, od: 9, ar: 9.5, sliderMultiplier: 1.4, sliderTickRate: 1 },
-    skills: { snapAim: 30, flowAim: 72, speed: 68, stamina: 82, fingerControl: 40, readingTech: 20 },
+    skills: { snapAim: 30, flowAim: 72, speed: 68, stamina: 82, stream: 80, burst: 70, fingerControl: 40, accuracy: 75, readingTech: 20 },
     patternCounts: { streams: 9, streamNotes: 260, deathstreams: 3, jumps: 1, bursts: 3, tech: 0 },
   });
 
@@ -286,7 +289,7 @@ describe('Training Filters, Origin Separation & 10k-Map Performance', () => {
     id: 'local_long_stream_practice',
     origin: 'local_songs',
     stats: { starRating: 5.9, bpmMode: 180 } as any,
-    skills: { snapAim: 15, flowAim: 65, speed: 55, stamina: 90, fingerControl: 15, readingTech: 10 },
+    skills: { snapAim: 15, flowAim: 65, speed: 55, stamina: 90, stream: 88, burst: 50, fingerControl: 15, accuracy: 70, readingTech: 10 },
     patternCounts: { streams: 1, streamNotes: 400, deathstreams: 1, jumps: 0, bursts: 0, tech: 0 },
   });
 
@@ -295,7 +298,7 @@ describe('Training Filters, Origin Separation & 10k-Map Performance', () => {
     origin: 'local_songs',
     stats: { starRating: 6.2, bpmMode: 190 } as any,
     difficulty: { hp: 5, cs: 4, od: 8.5, ar: 9.6, sliderMultiplier: 1.4, sliderTickRate: 1 },
-    skills: { snapAim: 84, flowAim: 22, speed: 45, stamina: 12, fingerControl: 18, readingTech: 14 },
+    skills: { snapAim: 84, flowAim: 22, speed: 45, stamina: 12, stream: 10, burst: 20, fingerControl: 18, accuracy: 50, readingTech: 14 },
     patternCounts: { streams: 0, streamNotes: 0, deathstreams: 0, jumps: 11, bursts: 1, tech: 0 },
   });
 
@@ -307,7 +310,7 @@ describe('Training Filters, Origin Separation & 10k-Map Performance', () => {
     stageName: 'Finals',
     stats: { starRating: 6.8, bpmMode: 175 } as any,
     difficulty: { hp: 5, cs: 4, od: 9.2, ar: 9.3, sliderMultiplier: 1.4, sliderTickRate: 1 },
-    skills: { snapAim: 50, flowAim: 55, speed: 40, stamina: 35, fingerControl: 48, readingTech: 74 },
+    skills: { snapAim: 50, flowAim: 55, speed: 40, stamina: 35, stream: 38, burst: 42, fingerControl: 48, accuracy: 65, readingTech: 74 },
     patternCounts: { streams: 2, streamNotes: 28, deathstreams: 0, jumps: 4, bursts: 4, tech: 6 },
   });
 

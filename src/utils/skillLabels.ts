@@ -5,7 +5,10 @@ export const ALL_SKILL_KEYS: Array<keyof SkillAttributes> = [
   'flowAim',
   'speed',
   'stamina',
+  'stream',
+  'burst',
   'fingerControl',
+  'accuracy',
   'readingTech',
 ];
 
@@ -18,7 +21,10 @@ export const SKILL_LABELS: Record<keyof SkillAttributes, string> = {
   flowAim: 'Flow Aim',
   speed: 'Speed',
   stamina: 'Stamina',
+  stream: 'Stream',
+  burst: 'Burst',
   fingerControl: 'Finger Control',
+  accuracy: 'Accuracy',
   readingTech: 'Tech / Reading',
 };
 
@@ -27,7 +33,10 @@ export const SKILL_SHORT_LABELS: Record<keyof SkillAttributes, string> = {
   flowAim: 'Flow Aim',
   speed: 'Speed',
   stamina: 'Stamina',
+  stream: 'Stream',
+  burst: 'Burst',
   fingerControl: 'Finger Control',
+  accuracy: 'Acc',
   readingTech: 'Tech',
 };
 
@@ -36,9 +45,28 @@ export const SKILL_ICONS: Record<keyof SkillAttributes, string> = {
   flowAim: 'fas fa-bezier-curve',
   speed: 'fas fa-bolt',
   stamina: 'fas fa-water',
+  stream: 'fas fa-wave-square',
+  burst: 'fas fa-fire',
   fingerControl: 'fas fa-drum',
+  accuracy: 'fas fa-bullseye',
   readingTech: 'fas fa-random',
 };
+
+export function getSkillValue(skills: SkillAttributes, key: keyof SkillAttributes): number {
+  if (typeof skills[key] === 'number' && !isNaN(skills[key]!)) {
+    return skills[key]!;
+  }
+  if (key === 'stream') {
+    return Math.min(100, Math.round(((skills.stamina || 0) * 0.7 + (skills.speed || 0) * 0.3) * 10) / 10);
+  }
+  if (key === 'burst') {
+    return Math.min(100, Math.round(((skills.speed || 0) * 0.7 + (skills.fingerControl || 0) * 0.3) * 10) / 10);
+  }
+  if (key === 'accuracy') {
+    return Math.min(100, Math.round(((skills.fingerControl || 0) * 0.45 + (skills.readingTech || 20) * 0.35 + 15) * 10) / 10);
+  }
+  return 0;
+}
 
 export function formatSkillLabel(key: keyof SkillAttributes | string): string {
   if (key in SKILL_LABELS) {
