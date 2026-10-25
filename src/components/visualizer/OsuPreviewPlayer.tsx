@@ -1035,31 +1035,17 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                       {p.startTimestamp}
                     </span>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <strong
-                          className="u-ellipsis-overflow"
-                          style={{ fontSize: '12px', color: '#fff' }}
-                        >
-                          {p.label}
-                        </strong>
-                        {isLive && (
-                          <span
-                            className="osu-radar-mod-pill"
-                            style={{
-                              backgroundColor: 'hsl(var(--hsl-h1))',
-                              color: 'hsl(var(--hsl-b6))',
-                              fontSize: '9px',
-                            }}
-                          >
-                            AO VIVO
-                          </span>
-                        )}
-                      </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, justifyContent: 'center' }}>
+                      <strong
+                        className="u-ellipsis-overflow"
+                        style={{ fontSize: '12px', color: '#fff', lineHeight: 1.25 }}
+                      >
+                        {p.label}
+                      </strong>
                       {p.description && (
                         <span
                           className="u-ellipsis-overflow"
-                          style={{ fontSize: '11px', color: 'hsl(var(--hsl-l2))' }}
+                          style={{ fontSize: '11px', color: 'hsl(var(--hsl-l2))', lineHeight: 1.25 }}
                         >
                           {p.description}
                         </span>
