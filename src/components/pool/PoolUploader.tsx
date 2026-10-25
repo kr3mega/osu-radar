@@ -193,26 +193,6 @@ export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_so
             <i className="fas fa-table" style={{ marginRight: '6px' }} />
             Planilha Google Sheets
           </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('files')}
-            className={`osu-radar-player__mod-btn ${activeTab === 'files' ? 'osu-radar-player__mod-btn--active' : ''}`}
-            style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
-          >
-            <i className="fas fa-folder-open" style={{ marginRight: '6px' }} />
-            Arquivos Locais (.osz / .osu)
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('json')}
-            className={`osu-radar-player__mod-btn ${activeTab === 'json' ? 'osu-radar-player__mod-btn--active' : ''}`}
-            style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
-          >
-            <i className="fas fa-file-code" style={{ marginRight: '6px' }} />
-            Backup JSON (Exportar / Importar)
-          </button>
         </div>
 
         {/* Tab 0: Local osu!stable Songs Library Sync */}

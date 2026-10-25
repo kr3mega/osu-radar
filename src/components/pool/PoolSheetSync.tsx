@@ -351,27 +351,6 @@ export const PoolSheetSync: React.FC = () => {
             <i className="fas fa-trophy" style={{ color: '#e5b32e' }} />
             Importação de Planilhas e Etapas de Torneio (Google Sheets)
           </span>
-          <button
-            type="button"
-            onClick={() => {
-              setSheetUrl(DEFAULT_SHEET_URL);
-              setTournamentName('6 Digit World Cup 2026');
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'hsl(var(--hsl-h1))',
-              fontSize: '11px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            <i className="fas fa-magic" />
-            Preencher 6WC 2026
-          </button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
