@@ -1,5 +1,6 @@
 import { execFileSync } from 'child_process';
 import fs from 'fs';
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -30,3 +31,35 @@ fs.copyFileSync(
 );
 
 console.log('[electron] Main e Preload compilados em dist-electron/');
+
+// Notifica cliente Electron ativo para recarregar a interface automaticamente
+async function notifyRunningElectron() {
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        hostname: '127.0.0.1',
+        port: 45721,
+        path: '/api/dev/reload',
+        method: 'GET',
+        timeout: 800,
+      },
+      (res) => {
+        if (res.statusCode === 200) {
+          console.log('[electron] Notificação enviada: Cliente osu!radar recarregado com sucesso!');
+        }
+        resolve();
+      }
+    );
+    req.on('error', () => {
+      resolve();
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve();
+    });
+    req.end();
+  });
+}
+
+await notifyRunningElectron();
+

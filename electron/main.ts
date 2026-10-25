@@ -57,6 +57,7 @@ app.commandLine.appendSwitch('force_high_performance_gpu');
 
 let mainWindow: BrowserWindow | null = null;
 let localServer: RunningLocalAppServer | null = null;
+let stopDistWatcher: (() => void) | null = null;
 let activeAppOrigin = '';
 
 function getAppRoot(): string {
@@ -348,6 +349,94 @@ function registerIpcHandlers(appLogger: DesktopLogger): void {
   );
 }
 
+function setupAutoReloadWatcher(
+  targetRoot: string,
+  appLogger: DesktopLogger,
+  getWindow: () => BrowserWindow | null
+): () => void {
+  const distDir = path.join(targetRoot, 'dist');
+  const indexHtml = path.join(distDir, 'index.html');
+
+  let debounceTimer: NodeJS.Timeout | null = null;
+  let pollInterval: NodeJS.Timeout | null = null;
+  let watcher: fs.FSWatcher | null = null;
+  let lastMtime = 0;
+  let isWatching = true;
+
+  try {
+    if (fs.existsSync(indexHtml)) {
+      lastMtime = fs.statSync(indexHtml).mtimeMs;
+    }
+  } catch {}
+
+  const triggerReload = (reason: string) => {
+    if (!isWatching) return;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      const win = getWindow();
+      if (!win || win.isDestroyed()) return;
+
+      try {
+        if (!fs.existsSync(indexHtml)) return;
+        const stat = fs.statSync(indexHtml);
+        if (stat.size === 0) return;
+        lastMtime = stat.mtimeMs;
+
+        appLogger.info(
+          'AutoReload',
+          `[ATUALIZAÇÃO DETECTADA] ${reason}. Recarregando interface do osu!radar automaticamente...`
+        );
+        win.webContents.reloadIgnoringCache();
+      } catch (err) {
+        appLogger.warn('AutoReload', 'Erro ao validar index.html para recarregamento:', err);
+      }
+    }, 600);
+  };
+
+  // 1. fs.watch no diretório dist/
+  try {
+    if (fs.existsSync(distDir)) {
+      watcher = fs.watch(distDir, { recursive: true }, (_eventType, filename) => {
+        if (!filename) return;
+        const norm = filename.replace(/\\/g, '/');
+        if (norm.endsWith('index.html') || norm === 'index.html') {
+          triggerReload(`Arquivo ${filename} modificado em disco`);
+        }
+      });
+      appLogger.info('AutoReload', `Monitor de compilação ativo em: ${distDir}`);
+    }
+  } catch (err) {
+    appLogger.warn('AutoReload', 'Aviso ao iniciar fs.watch em dist/:', err);
+  }
+
+  // 2. Polling secundário por mtimeMs de index.html a cada 1.5s
+  pollInterval = setInterval(() => {
+    if (!isWatching) return;
+    try {
+      if (fs.existsSync(indexHtml)) {
+        const currentMtime = fs.statSync(indexHtml).mtimeMs;
+        if (lastMtime > 0 && currentMtime > lastMtime + 50) {
+          lastMtime = currentMtime;
+          triggerReload('Timestamp de modificação (mtime) de dist/index.html atualizado');
+        } else if (lastMtime === 0) {
+          lastMtime = currentMtime;
+        }
+      }
+    } catch {}
+  }, 1500);
+
+  return () => {
+    isWatching = false;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    if (pollInterval) clearInterval(pollInterval);
+    if (watcher) {
+      try {
+        watcher.close();
+      } catch {}
+    }
+  };
+}
+
 async function createMainWindow(appLogger: DesktopLogger): Promise<void> {
   const devServerUrl = process.env.VITE_DEV_SERVER_URL?.trim();
 
@@ -358,9 +447,22 @@ async function createMainWindow(appLogger: DesktopLogger): Promise<void> {
   } else {
     const distDir = path.join(appRoot, 'dist');
     appLogger.info('Main', `Iniciando servidor loopback embutido com suporte nativo (dist: ${distDir})...`);
-    localServer = await startLocalAppServer({ distDir, logger: appLogger });
+    localServer = await startLocalAppServer({
+      distDir,
+      logger: appLogger,
+      onReloadRequested: () => {
+        appLogger.info('AutoReload', 'Recarregamento da interface solicitado via endpoint /api/dev/reload');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.reloadIgnoringCache();
+        }
+      },
+    });
     targetUrl = localServer.url;
     appLogger.info('Main', `Servidor loopback pronto em ${targetUrl} (porta: ${localServer.port})`);
+
+    if (!stopDistWatcher) {
+      stopDistWatcher = setupAutoReloadWatcher(appRoot, appLogger, () => mainWindow);
+    }
   }
 
   activeAppOrigin = new URL(targetUrl).origin;
@@ -532,7 +634,7 @@ async function createMainWindow(appLogger: DesktopLogger): Promise<void> {
     appLogger.info('Renderer', 'A interface voltou a responder normalmente (responsive).');
   });
 
-  // Keyboard shortcuts: F11 fullscreen toggle, Ctrl+Shift+I DevTools
+  // Keyboard shortcuts: F11 fullscreen toggle, F5 / Ctrl+R reload, Ctrl+Shift+I DevTools
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
     if (input.key === 'F11') {
@@ -540,6 +642,10 @@ async function createMainWindow(appLogger: DesktopLogger): Promise<void> {
       const nextFull = !win.isFullScreen();
       appLogger.info('Window', `Atalho F11 acionado: Tela cheia -> ${nextFull}`);
       win.setFullScreen(nextFull);
+    } else if (input.key === 'F5' || ((input.control || input.meta) && input.key.toLowerCase() === 'r')) {
+      event.preventDefault();
+      appLogger.info('Window', 'Atalho F5 / Ctrl+R acionado: Recarregando interface...');
+      win.webContents.reloadIgnoringCache();
     } else if ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i') {
       event.preventDefault();
       appLogger.info('Window', 'Atalho Ctrl+Shift+I acionado: alternando DevTools...');
@@ -664,12 +770,16 @@ if (!hasSingleInstanceLock) {
   logSystemDiagnostics(logger, appRoot);
 
   app.on('second-instance', (_event, commandLine, workingDirectory) => {
-    logger.info('Main', `Segunda tentativa de abertura detectada (args: ${commandLine.join(' ')}, cwd: ${workingDirectory}). Focando janela existente.`);
-    if (mainWindow) {
+    logger.info(
+      'Main',
+      `Segunda tentativa de abertura detectada (args: ${commandLine.join(' ')}, cwd: ${workingDirectory}). Focando e recarregando com a versão mais recente.`
+    );
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) {
         mainWindow.restore();
       }
       mainWindow.focus();
+      mainWindow.webContents.reloadIgnoringCache();
     }
   });
 
@@ -702,6 +812,10 @@ if (!hasSingleInstanceLock) {
 
   app.on('will-quit', () => {
     logger.info('Main', 'Evento "will-quit": desligando servidor loopback embutido e descarregando logs...');
+    if (stopDistWatcher) {
+      stopDistWatcher();
+      stopDistWatcher = null;
+    }
     if (localServer) {
       localServer.close().catch(() => {});
       localServer = null;

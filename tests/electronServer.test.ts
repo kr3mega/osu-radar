@@ -70,4 +70,23 @@ describe('Servidor Local Embutido do Electron (Standalone sem Navegador/Vite)', 
     const skinsJson = await skinsRes.json();
     expect(skinsJson.available).toBe(true);
   });
+
+  it('permite recarregamento dinâmico da interface via endpoint /api/dev/reload disparando callback', async () => {
+    tmpDist = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'osu-radar-reload-test-'));
+    let reloadTriggered = false;
+
+    running = await startLocalAppServer({
+      distDir: tmpDist,
+      preferredPort: 0,
+      onReloadRequested: () => {
+        reloadTriggered = true;
+      },
+    });
+
+    const res = await fetch(`${running.url}/api/dev/reload`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.reloaded).toBe(true);
+    expect(reloadTriggered).toBe(true);
+  });
 });

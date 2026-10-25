@@ -123,6 +123,7 @@ export async function startLocalAppServer(options: {
   distDir: string;
   preferredPort?: number;
   logger?: DesktopLogger;
+  onReloadRequested?: () => void;
 }): Promise<RunningLocalAppServer> {
   const resolvedDist = path.resolve(options.distDir);
   const songsMiddleware = createLocalSongsMiddleware();
@@ -166,6 +167,16 @@ export async function startLocalAppServer(options: {
             relPathname = decodeURIComponent(parsed.pathname);
           } catch {
             relPathname = parsed.pathname;
+          }
+
+          if (relPathname === '/api/dev/reload' || relPathname === '/api/reload') {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ reloaded: true, timestamp: Date.now() }));
+            if (options.onReloadRequested) {
+              options.onReloadRequested();
+            }
+            return;
           }
 
           const relativeCandidate = relPathname.replace(/^\/+/, '') || 'index.html';
