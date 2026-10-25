@@ -300,6 +300,7 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   toggleExpandedSet: (key) =>
     set((state) => {
       const nextOpen = !state.expandedSetKeys[key];
+      console.log('[PoolStore] Grupo de beatmaps alternado:', key, 'aberto:', nextOpen);
       const nextMap = { ...state.expandedSetKeys };
       if (nextOpen) nextMap[key] = true;
       else delete nextMap[key];
@@ -452,30 +453,37 @@ export const usePoolStore = create<PoolState>((set, get) => ({
     }));
   },
 
-  selectMap: (id) => set({ selectedMapId: id }),
-  setFilterOrigin: (filterOrigin) =>
+  selectMap: (id) => {
+    console.log('[PoolStore] Beatmap selecionado ID:', id);
+    set({ selectedMapId: id });
+  },
+  setFilterOrigin: (filterOrigin) => {
+    console.log('[PoolStore] Filtro de origem alterado para:', filterOrigin);
     set((state) => ({
       filterOrigin,
       sortBy:
         filterOrigin === 'local_songs' && state.sortBy === 'slot'
           ? 'sr'
           : state.sortBy,
-    })),
+    }));
+  },
   setFilterMod: (filterMod) => set({ filterMod }),
   setFilterTournament: (filterTournament) => set({ filterTournament }),
   setFilterStage: (filterStage) => set({ filterStage }),
-  setStarRatingRange: (srMin, srMax) =>
-    set((state) => {
-      const clampedMin = Math.max(0, Math.min(srMin, srMax));
-      const clampedMax = Math.max(clampedMin, srMax);
-      return {
-        trainingFilters: {
-          ...state.trainingFilters,
-          srMin: Math.round(clampedMin * 100) / 100,
-          srMax: Math.round(clampedMax * 100) / 100,
-        },
-      };
-    }),
+  setStarRatingRange: (srMin, srMax) => {
+    const clampedMin = Math.max(0, Math.min(srMin, srMax));
+    const clampedMax = Math.max(clampedMin, srMax);
+    const rMin = Math.round(clampedMin * 100) / 100;
+    const rMax = Math.round(clampedMax * 100) / 100;
+    console.log('[PoolStore] Faixa de Star Rating definida:', rMin, 'a', rMax, 'estrelas');
+    set((state) => ({
+      trainingFilters: {
+        ...state.trainingFilters,
+        srMin: rMin,
+        srMax: rMax,
+      },
+    }));
+  },
   setTrainingFilters: (partial) =>
     set((state) => ({
       trainingFilters: {
@@ -485,6 +493,7 @@ export const usePoolStore = create<PoolState>((set, get) => ({
       activeTrainingPreset: null,
     })),
   applyTrainingPreset: (presetId) => {
+    console.log('[PoolStore] Preset de treino selecionado:', presetId || 'nenhum (reset)');
     const prevSrMin = get().trainingFilters.srMin;
     const prevSrMax = get().trainingFilters.srMax;
     if (!presetId || get().activeTrainingPreset === presetId) {
@@ -569,7 +578,12 @@ export const usePoolStore = create<PoolState>((set, get) => ({
             : 'slot'
           : state.sortBy,
     })),
-  setSearchQuery: (searchQuery) => set({ searchQuery }),
+  setSearchQuery: (searchQuery) => {
+    if (searchQuery.trim()) {
+      console.log('[PoolStore] Termo de busca:', searchQuery.trim());
+    }
+    set({ searchQuery });
+  },
   setSortBy: (sortBy) => set({ sortBy }),
   setSortDirection: (sortDirection) => set({ sortDirection }),
   toggleSort: (option) => {

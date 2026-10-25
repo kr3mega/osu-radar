@@ -71,6 +71,7 @@ export const useAudioStore = create<AudioStoreState>((set, get) => {
     setVolume: (v: number) => {
       const clamped = Math.min(1, Math.max(0, v));
       const nextMuted = clamped === 0;
+      console.log('[AudioStore] Volume alterado para:', Math.round(clamped * 100) + '%', nextMuted ? '(Mudo)' : '');
       set({ volume: clamped, isMuted: nextMuted });
       try {
         localStorage.setItem(STORAGE_KEY, clamped.toString());
@@ -81,6 +82,7 @@ export const useAudioStore = create<AudioStoreState>((set, get) => {
 
     toggleMute: () => {
       const nextMuted = !get().isMuted;
+      console.log('[AudioStore] Mudo alternado para:', nextMuted);
       set({ isMuted: nextMuted });
       try {
         localStorage.setItem(MUTE_KEY, nextMuted.toString());

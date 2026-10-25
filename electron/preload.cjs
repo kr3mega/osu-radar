@@ -19,4 +19,6 @@ contextBridge.exposeInMainWorld('osuRadarDesktop', {
   },
   selectDirectory: (options) => ipcRenderer.invoke('osu-radar:select-directory', options || {}),
   openExternal: (url) => ipcRenderer.invoke('osu-radar:open-external', url),
+  log: (level, tag, message, extra) =>
+    ipcRenderer.invoke('osu-radar:log', { level, tag, message, extra }),
 });

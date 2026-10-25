@@ -2,6 +2,7 @@ import fs from 'fs';
 import http from 'http';
 import path from 'path';
 import type { AddressInfo } from 'net';
+import type { DesktopLogger } from './logger';
 import { createLocalSongsMiddleware } from '../src/server/localSongsPlugin';
 import { createLocalSkinsMiddleware } from '../src/server/localSkinsPlugin';
 
@@ -65,6 +66,12 @@ function streamStaticFile(
     res.setHeader('Cache-Control', 'private, max-age=3600');
   }
 
+  (res as any).__meta = {
+    mime,
+    range: rangeHeader,
+    bytes: totalSize,
+  };
+
   if (rangeHeader) {
     const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
     if (match) {
@@ -79,6 +86,8 @@ function streamStaticFile(
       res.statusCode = 206;
       res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
       res.setHeader('Content-Length', String(end - start + 1));
+      (res as any).__meta.range = `${start}-${end}/${totalSize}`;
+      (res as any).__meta.bytes = end - start + 1;
       const stream = fs.createReadStream(filePath, { start, end });
       stream.on('error', () => res.end());
       stream.pipe(res);
@@ -113,12 +122,41 @@ export interface RunningLocalAppServer {
 export async function startLocalAppServer(options: {
   distDir: string;
   preferredPort?: number;
+  logger?: DesktopLogger;
 }): Promise<RunningLocalAppServer> {
   const resolvedDist = path.resolve(options.distDir);
   const songsMiddleware = createLocalSongsMiddleware();
   const skinsMiddleware = createLocalSkinsMiddleware();
 
   const server = http.createServer((req, res) => {
+    const startMs = Date.now();
+    const reqMethod = req.method || 'GET';
+    const reqUrl = req.url || '/';
+
+    let logged = false;
+    const logRequestCompletion = () => {
+      if (logged) return;
+      logged = true;
+      if (options.logger) {
+        const duration = Date.now() - startMs;
+        const meta = (res as any).__meta;
+        const clientIp = req.socket.remoteAddress;
+        options.logger.http(reqMethod, reqUrl, res.statusCode, duration, {
+          mime: meta?.mime || (res.getHeader('content-type') as string | undefined),
+          range: meta?.range,
+          bytes: meta?.bytes,
+          clientIp,
+        });
+      }
+    };
+
+    res.once('finish', logRequestCompletion);
+    res.once('close', () => {
+      if (!res.writableEnded) {
+        logRequestCompletion();
+      }
+    });
+
     songsMiddleware(req, res, () => {
       skinsMiddleware(req, res, async () => {
         try {
@@ -161,6 +199,7 @@ export async function startLocalAppServer(options: {
           res.setHeader('Content-Type', 'text/plain; charset=utf-8');
           res.end('Not found');
         } catch (err) {
+          options.logger?.error('Server', `Erro ao processar requisição ${reqMethod} ${reqUrl}:`, err);
           res.statusCode = 500;
           res.setHeader('Content-Type', 'text/plain; charset=utf-8');
           res.end(err instanceof Error ? err.message : 'Internal server error');
@@ -192,11 +231,15 @@ export async function startLocalAppServer(options: {
     boundPort = await listenOnPort(preferred);
   } catch (err: any) {
     if (err && err.code === 'EADDRINUSE' && preferred !== 0) {
+      options.logger?.warn('Server', `Porta padrão ${preferred} ocupada. Alocando porta dinâmica livre...`);
       boundPort = await listenOnPort(0);
     } else {
+      options.logger?.error('Server', `Falha ao iniciar servidor HTTP na porta ${preferred}:`, err);
       throw err;
     }
   }
+
+  options.logger?.info('Server', `Servidor local loopback ativo em http://127.0.0.1:${boundPort}`);
 
   return {
     url: `http://127.0.0.1:${boundPort}`,
@@ -204,7 +247,11 @@ export async function startLocalAppServer(options: {
     server,
     close: () =>
       new Promise<void>((resolve) => {
-        server.close(() => resolve());
+        options.logger?.info('Server', 'Encerrando servidor local loopback...');
+        server.close(() => {
+          options.logger?.info('Server', 'Servidor local encerrado com sucesso.');
+          resolve();
+        });
       }),
   };
 }

@@ -11,6 +11,12 @@ export interface OsuRadarDesktopBridge {
     defaultPath?: string;
   }) => Promise<string | null>;
   openExternal: (url: string) => Promise<void>;
+  log?: (
+    level: 'info' | 'warn' | 'error' | 'debug',
+    tag: string,
+    message: string,
+    extra?: any
+  ) => Promise<void>;
 }
 
 declare global {

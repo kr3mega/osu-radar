@@ -190,6 +190,7 @@ export const useSkinStore = create<SkinStoreState>((set, get) => ({
   },
 
   selectSkin: (skinId) => {
+    console.log('[SkinStore] Skin selecionada:', skinId);
     try {
       localStorage.setItem(SELECTED_SKIN_STORAGE_KEY, skinId);
     } catch {}
@@ -197,6 +198,7 @@ export const useSkinStore = create<SkinStoreState>((set, get) => ({
   },
 
   resolveSkinById: async (skinId) => {
+    console.log('[SkinStore] Carregando assets da skin ID:', skinId);
     if (!skinId || skinId === 'default') {
       return loadDefaultSkin('/skin/default');
     }
