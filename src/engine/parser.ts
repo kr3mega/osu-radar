@@ -28,7 +28,7 @@ export function extractSetIdFromFolderName(folderName?: string): number | undefi
  * without parsing HitObjects.
  */
 export function extractOsuModeQuick(text: string): number {
-  const headerSlice = text.slice(0, 2048);
+  const headerSlice = text.slice(0, 4096);
   const match = headerSlice.match(/^\s*Mode\s*:\s*(\d+)/im);
   if (!match) return 0;
   return parseInt(match[1], 10) || 0;

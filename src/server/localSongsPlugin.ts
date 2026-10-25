@@ -448,11 +448,14 @@ export function createLocalSongsMiddleware() {
         const resolvedPath = path.resolve(requestedPath);
         const ext = path.extname(resolvedPath).toLowerCase();
 
+        // If file has no extension (e.g. osu!lazer CAS storage) or is not inside authorized stable roots,
+        // delegate to next middleware (such as lazerMiddleware) instead of rejecting with 403.
         if (
+          !ext ||
           !ALLOWED_STREAM_EXTENSIONS.has(ext) ||
           !isPathInsideAuthorizedRoots(resolvedPath, authorizedRoots)
         ) {
-          return sendJson(res, 403, { error: 'Acesso negado fora da pasta Songs autorizada.' });
+          return next();
         }
 
         const stat = await fs.promises.stat(resolvedPath);

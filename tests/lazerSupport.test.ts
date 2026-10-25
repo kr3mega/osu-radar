@@ -280,6 +280,74 @@ AudioFilename: audio.mp3
       expect(batch[0].localBgPath).toBe(bgPath);
       expect(batch[0].text).toContain('AudioFilename: audio.mp3');
     });
+
+    it('strictly excludes non-standard modes (Taiko, Catch, Mania) during scan and batch read', async () => {
+      const stdHash = '1111111111111111111111111111111111111111111111111111111111111111';
+      const taikoHash = '2222222222222222222222222222222222222222222222222222222222222222';
+      const catchHash = '3333333333333333333333333333333333333333333333333333333333333333';
+      const maniaHash = '4444444444444444444444444444444444444444444444444444444444444444';
+
+      const b1 = path.join(tempFilesDir, '1', '11');
+      const b2 = path.join(tempFilesDir, '2', '22');
+      const b3 = path.join(tempFilesDir, '3', '33');
+      const b4 = path.join(tempFilesDir, '4', '44');
+
+      fs.mkdirSync(b1, { recursive: true });
+      fs.mkdirSync(b2, { recursive: true });
+      fs.mkdirSync(b3, { recursive: true });
+      fs.mkdirSync(b4, { recursive: true });
+
+      const stdPath = path.join(b1, stdHash);
+      const taikoPath = path.join(b2, taikoHash);
+      const catchPath = path.join(b3, catchHash);
+      const maniaPath = path.join(b4, maniaHash);
+
+      const baseMap = (mode: number) => `osu file format v14
+[General]
+AudioFilename: audio.mp3
+Mode: ${mode}
+
+[Metadata]
+Title: Test Beatmap
+Artist: Test Artist
+Creator: Mapper
+Version: Diff ${mode}
+
+[Difficulty]
+HPDrainRate: 5
+CircleSize: 4
+OverallDifficulty: 8
+ApproachRate: 9
+`;
+
+      fs.writeFileSync(stdPath, baseMap(0), 'utf8');
+      fs.writeFileSync(taikoPath, baseMap(1), 'utf8');
+      fs.writeFileSync(catchPath, baseMap(2), 'utf8');
+      fs.writeFileSync(maniaPath, baseMap(3), 'utf8');
+
+      // 1. Scan directory: only standard mode map should be indexed
+      const scanResult = await scanOsuLazerDirectory(tempLazerDir);
+      const foundHashes = scanResult.entries.map((e) => e.hash);
+      expect(foundHashes).toContain(stdHash);
+      expect(foundHashes).not.toContain(taikoHash);
+      expect(foundHashes).not.toContain(catchHash);
+      expect(foundHashes).not.toContain(maniaHash);
+
+      // 2. Batch reader: strictly ignores non-standard modes even if requested directly
+      const batch = await readLocalLazerBatch(
+        [
+          { osuPath: stdPath, hash: stdHash },
+          { osuPath: taikoPath, hash: taikoHash },
+          { osuPath: catchPath, hash: catchHash },
+          { osuPath: maniaPath, hash: maniaHash },
+        ],
+        tempLazerDir,
+        new Set([path.resolve(tempLazerDir)])
+      );
+
+      expect(batch.length).toBe(1);
+      expect(batch[0].hash).toBe(stdHash);
+    });
   });
 
   describe('osu!lazer Protocol & URL Generation', () => {
