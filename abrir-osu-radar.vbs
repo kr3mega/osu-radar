@@ -5,6 +5,10 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 Set shell = CreateObject("WScript.Shell")
 
 rootDir = fso.GetParentFolderName(WScript.ScriptFullName)
+If Right(rootDir, 1) = "\" Then
+  rootDir = Left(rootDir, Len(rootDir) - 1)
+End If
+
 electronExe = rootDir & "\node_modules\electron\dist\electron.exe"
 distHtml = rootDir & "\dist\index.html"
 mainJs = rootDir & "\dist-electron\electron\main.js"
