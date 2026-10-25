@@ -9,18 +9,46 @@ export interface ParsedBeatmapRaw {
 }
 
 /**
+ * Extracts BeatmapSetID from standard osu!stable Songs folder naming convention:
+ * "<BeatmapSetID> <Artist> - <Title>" (e.g. "3875 Gojou Kai - Voyage 1969-1970").
+ */
+export function extractSetIdFromFolderName(folderName?: string): number | undefined {
+  if (!folderName) return undefined;
+  const baseName = folderName.replace(/\\/g, '/').split('/').filter(Boolean).pop() || folderName;
+  const match = baseName.trim().match(/^(\d{1,10})(?:\s+|$|[-_])/);
+  if (match) {
+    const id = parseInt(match[1], 10);
+    if (id > 0) return id;
+  }
+  return undefined;
+}
+
+/**
+ * Fast header scan to detect osu! game mode (0 = standard, 1 = taiko, 2 = catch, 3 = mania)
+ * without parsing HitObjects.
+ */
+export function extractOsuModeQuick(text: string): number {
+  const headerSlice = text.slice(0, 2048);
+  const match = headerSlice.match(/^\s*Mode\s*:\s*(\d+)/im);
+  if (!match) return 0;
+  return parseInt(match[1], 10) || 0;
+}
+
+/**
  * High-performance client-side .osu format parser.
  * Extracts hitobjects, timing points, difficulty settings, and metadata.
  */
 export function parseOsuBeatmap(text: string): ParsedBeatmapRaw {
   const lines = text.split(/\r?\n/);
   let currentSection = '';
+  let hasApproachRate = false;
 
   const metadata: BeatmapMetadata = {
     title: '',
     artist: '',
     creator: '',
     version: '',
+    mode: 0,
   };
 
   const difficulty: BeatmapDifficulty = {
@@ -54,6 +82,11 @@ export function parseOsuBeatmap(text: string): ParsedBeatmapRaw {
         const key = line.slice(0, colonIdx).trim();
         const value = line.slice(colonIdx + 1).trim();
         if (key === 'AudioFilename') metadata.audioFilename = value;
+        else if (key === 'Mode') metadata.mode = parseInt(value, 10) || 0;
+        else if (key === 'PreviewTime') {
+          const pt = parseInt(value, 10);
+          if (!isNaN(pt)) metadata.previewTime = pt;
+        }
       }
     } else if (currentSection === 'Metadata') {
       const colonIdx = line.indexOf(':');
@@ -69,8 +102,13 @@ export function parseOsuBeatmap(text: string): ParsedBeatmapRaw {
         else if (key === 'Version') metadata.version = value;
         else if (key === 'Source') metadata.source = value;
         else if (key === 'Tags') metadata.tags = value.split(' ').filter(Boolean);
-        else if (key === 'BeatmapID') metadata.beatmapId = parseInt(value, 10) || undefined;
-        else if (key === 'BeatmapSetID') metadata.beatmapSetId = parseInt(value, 10) || undefined;
+        else if (key === 'BeatmapID') {
+          const parsedId = parseInt(value, 10);
+          metadata.beatmapId = parsedId > 0 ? parsedId : undefined;
+        } else if (key === 'BeatmapSetID') {
+          const parsedSetId = parseInt(value, 10);
+          metadata.beatmapSetId = parsedSetId > 0 ? parsedSetId : undefined;
+        }
       }
     } else if (currentSection === 'Difficulty') {
       const colonIdx = line.indexOf(':');
@@ -78,12 +116,26 @@ export function parseOsuBeatmap(text: string): ParsedBeatmapRaw {
         const key = line.slice(0, colonIdx).trim();
         const val = parseFloat(line.slice(colonIdx + 1).trim());
 
-        if (key === 'HPDrainRate') difficulty.hp = val;
-        else if (key === 'CircleSize') difficulty.cs = val;
-        else if (key === 'OverallDifficulty') difficulty.od = val;
-        else if (key === 'ApproachRate') difficulty.ar = val;
-        else if (key === 'SliderMultiplier') difficulty.sliderMultiplier = val;
-        else if (key === 'SliderTickRate') difficulty.sliderTickRate = val;
+        if (!isNaN(val)) {
+          if (key === 'HPDrainRate') difficulty.hp = val;
+          else if (key === 'CircleSize') difficulty.cs = val;
+          else if (key === 'OverallDifficulty') difficulty.od = val;
+          else if (key === 'ApproachRate') {
+            difficulty.ar = val;
+            hasApproachRate = true;
+          } else if (key === 'SliderMultiplier') difficulty.sliderMultiplier = val;
+          else if (key === 'SliderTickRate') difficulty.sliderTickRate = val;
+        }
+      }
+    } else if (currentSection === 'Events') {
+      if (!metadata.backgroundFilename && (line.startsWith('0,') || line.startsWith('Background,'))) {
+        const parts = line.split(',');
+        if (parts.length >= 3) {
+          const candidate = parts[2].trim().replace(/^"|"$/g, '');
+          if (candidate && /\.(jpe?g|png|webp|bmp)$/i.test(candidate)) {
+            metadata.backgroundFilename = candidate;
+          }
+        }
       }
     } else if (currentSection === 'TimingPoints') {
       const parts = line.split(',');
@@ -167,6 +219,11 @@ export function parseOsuBeatmap(text: string): ParsedBeatmapRaw {
         }
       }
     }
+  }
+
+  // Legacy osu! file format v3–v7 did not have a separate ApproachRate field; AR equaled OD
+  if (!hasApproachRate) {
+    difficulty.ar = difficulty.od;
   }
 
   // Fallback for metadata if missing

@@ -10,3 +10,4 @@ export * from './mods';
 export * from './OsuPreviewController';
 export * from './audioResolver';
 export * from './previewAudio';
+export * from './localMedia';

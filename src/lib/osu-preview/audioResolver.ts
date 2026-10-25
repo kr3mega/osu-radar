@@ -1,6 +1,7 @@
 import { unzipSync } from 'fflate';
 import { BeatmapAnalysisResult } from '../../engine/types';
 import { db } from '../../db';
+import { getLocalSongFileUrl } from './localMedia';
 
 export interface AudioResolveStatus {
   state: 'idle' | 'loading' | 'ready' | 'error';
@@ -215,6 +216,26 @@ export async function resolveBeatmapAudio(
   map: BeatmapAnalysisResult,
   onStatusChange?: (status: AudioResolveStatus) => void
 ): Promise<Blob | undefined> {
+  // 0. Direct local osu! Songs audio file stream (zero mirror download needed)
+  if (map.localAudioPath) {
+    const localUrl = getLocalSongFileUrl(map.localAudioPath);
+    if (localUrl) {
+      try {
+        onStatusChange?.({ state: 'loading', message: 'Carregando música da pasta Songs...' });
+        const res = await fetch(localUrl);
+        if (res.ok) {
+          const blob = await res.blob();
+          if (blob.size > 1000) {
+            onStatusChange?.({ state: 'ready', message: 'Música carregada da pasta Songs' });
+            return blob;
+          }
+        }
+      } catch {
+        // Fallback to IndexedDB / online mirrors if local server is offline
+      }
+    }
+  }
+
   // 1. Existing in-memory audioBlob (if passed directly during local folder import)
   if (map.audioBlob && map.audioBlob instanceof Blob && map.audioBlob.size > 1000) {
     onStatusChange?.({ state: 'ready', message: 'Música carregada do cache' });

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import {
   OsuPreviewController,
   getOrReconstructBeatmapText,
+  hydrateBeatmapRawText,
   OsuMod,
   clamp,
   resolveBeatmapAudio,
@@ -100,6 +101,9 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     state: 'idle',
     message: '',
   });
+  const [hydratedRawText, setHydratedRawText] = useState<string | null>(
+    map.rawText && map.rawText.length > 50 ? map.rawText : null
+  );
 
   // 1. Derive mod from beatmap slot (HD, HR, DT, EZ, or none)
   const slotMod = useMemo(() => getModFromSlot(map.modSlot), [map.modSlot]);
@@ -125,7 +129,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const detectedPatterns = useMemo<DetectedPattern[]>(() => {
     const rateMultiplier = activeMods.has('dt') ? 1.5 : activeMods.has('ht') ? 0.75 : 1.0;
     try {
-      const rawText = getOrReconstructBeatmapText(map);
+      const rawText = hydratedRawText || getOrReconstructBeatmapText(map);
       const parsed = parseOsuBeatmap(rawText);
       const computed = detectBeatmapPatterns(parsed.hitObjects, parsed.timingPoints, rateMultiplier);
       if (computed.length > 0) {
@@ -141,7 +145,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       return [...map.patterns].sort((a, b) => a.startTimeMs - b.startTimeMs);
     }
     return [];
-  }, [patterns, map.id, map.rawText, activeMods]);
+  }, [patterns, map.id, map.rawText, hydratedRawText, activeMods]);
 
   const filteredPatterns = useMemo(() => {
     return detectedPatterns.filter((p) => {
@@ -188,7 +192,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     return filteredPatterns.find((p) => p.id === selectedPatternId) || null;
   }, [filteredPatterns, currentTimeMs, activeTopLivePattern, selectedPatternId]);
 
-  // Initialize OsuPreviewController
+  // Initialize OsuPreviewController (with on-demand .osu text hydration for local Songs library)
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -203,15 +207,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       initialMods.add(slotMod);
     }
 
-    const rawText = getOrReconstructBeatmapText(map);
-    controller
-      .init(rawText, initialTimeMs, map.audioBlob || map.audioUrl, initialMods)
-      .then(() => {
-        controller.setVolume(getEffectiveVolume());
-        controller.setMuted(isMuted);
-        controller.setBackgroundDim(bgDim);
-      });
-
     const unsubscribe = controller.subscribe((state) => {
       setCurrentTimeMs(state.currentTimeMs);
       setDurationMs(state.durationMs);
@@ -221,13 +216,27 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     });
 
     let isCancelled = false;
-    resolveBeatmapAudio(map, (status) => {
-      if (!isCancelled) setAudioStatus(status);
-    }).then((blob) => {
-      if (blob && !isCancelled && controllerRef.current) {
-        controllerRef.current.loadAudioTrack(blob);
+    setHydratedRawText(map.rawText && map.rawText.length > 50 ? map.rawText : null);
+
+    (async () => {
+      const resolvedRawText = await hydrateBeatmapRawText(map);
+      if (isCancelled) return;
+      setHydratedRawText(resolvedRawText);
+
+      await controller.init(resolvedRawText, initialTimeMs, map.audioBlob || map.audioUrl, initialMods);
+      if (isCancelled) return;
+
+      controller.setVolume(getEffectiveVolume());
+      controller.setMuted(isMuted);
+      controller.setBackgroundDim(bgDim);
+
+      const blob = await resolveBeatmapAudio(map, (status) => {
+        if (!isCancelled) setAudioStatus(status);
+      });
+      if (blob && !isCancelled && controllerRef.current === controller) {
+        controller.loadAudioTrack(blob);
       }
-    });
+    })();
 
     const handleResize = () => {
       controller.resize();

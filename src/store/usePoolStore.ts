@@ -1,6 +1,12 @@
 import { create } from 'zustand';
-import { BeatmapAnalysisResult, Mappool, SkillAttributes } from '../engine/types';
-import { cacheBeatmaps, clearAllData, db } from '../db';
+import {
+  BeatmapAnalysisResult,
+  Mappool,
+  PatternCounts,
+  SkillAttributes,
+} from '../engine/types';
+import { computePatternCounts } from '../engine/analyzer';
+import { cacheBeatmaps, clearAllData, clearLocalSongsFromDb, db } from '../db';
 import { startBackgroundPoolAudioSync, clearAudioCache as clearDbAudioCache } from '../lib/osu-preview';
 
 import { TournamentTier } from '../engine/bws';
@@ -11,10 +17,154 @@ export interface ActiveTournamentFilter {
   entries: SheetBeatmapEntry[];
 }
 
+export type OriginFilter = 'ALL' | 'local_songs' | 'tournament';
+
+export type PatternDensityFilter = 'any' | 'none' | 'low' | 'medium' | 'high';
+
+export type TrainingPresetId =
+  | 'streams_stamina'
+  | 'jump_aim'
+  | 'flow_aim'
+  | 'speed_bursts'
+  | 'finger_control'
+  | 'tech_reading'
+  | 'accuracy';
+
+export interface TrainingFilterState {
+  srMin: number;
+  srMax: number;
+  bpmMin: number;
+  bpmMax: number;
+  odMin: number;
+  odMax: number;
+  arMin: number;
+  arMax: number;
+  csMin: number;
+  csMax: number;
+  durationMinSec: number;
+  durationMaxSec: number;
+  streamsDensity: PatternDensityFilter;
+  jumpsDensity: PatternDensityFilter;
+  burstsDensity: PatternDensityFilter;
+  techDensity: PatternDensityFilter;
+  minSkills?: Partial<SkillAttributes>;
+}
+
+export const DEFAULT_TRAINING_FILTERS: TrainingFilterState = {
+  srMin: 0,
+  srMax: 12,
+  bpmMin: 0,
+  bpmMax: 400,
+  odMin: 0,
+  odMax: 11,
+  arMin: 0,
+  arMax: 11,
+  csMin: 0,
+  csMax: 10,
+  durationMinSec: 0,
+  durationMaxSec: 900,
+  streamsDensity: 'any',
+  jumpsDensity: 'any',
+  burstsDensity: 'any',
+  techDensity: 'any',
+  minSkills: undefined,
+};
+
+export interface TrainingPresetDefinition {
+  id: TrainingPresetId;
+  label: string;
+  description: string;
+  icon: string;
+  sortBy: SortOption;
+  filters: Partial<TrainingFilterState>;
+}
+
+export const TRAINING_PRESETS: TrainingPresetDefinition[] = [
+  {
+    id: 'streams_stamina',
+    label: 'Streams & Stamina',
+    description: 'Foco em streams contínuas, deathstreams e resistência física',
+    icon: 'fas fa-water',
+    sortBy: 'stamina',
+    filters: {
+      streamsDensity: 'high',
+      minSkills: { stamina: 20 },
+    },
+  },
+  {
+    id: 'jump_aim',
+    label: 'Jump / Snap Aim',
+    description: 'Muitos jumps angulares com pouca ou nenhuma stream',
+    icon: 'fas fa-crosshairs',
+    sortBy: 'snapAim',
+    filters: {
+      jumpsDensity: 'high',
+      streamsDensity: 'low',
+      minSkills: { snapAim: 25 },
+    },
+  },
+  {
+    id: 'flow_aim',
+    label: 'Flow Aim',
+    description: 'Transições fluidas, spaced streams e padrões circulares',
+    icon: 'fas fa-bezier-curve',
+    sortBy: 'flowAim',
+    filters: {
+      minSkills: { flowAim: 28 },
+    },
+  },
+  {
+    id: 'speed_bursts',
+    label: 'Speed & Bursts',
+    description: 'Alta velocidade de tapping, bursts intensos e BPM elevado',
+    icon: 'fas fa-bolt',
+    sortBy: 'speed',
+    filters: {
+      burstsDensity: 'high',
+      bpmMin: 185,
+      minSkills: { speed: 25 },
+    },
+  },
+  {
+    id: 'finger_control',
+    label: 'Finger Control',
+    description: 'Trocas de subdivisão rítmica (1/3, 1/4, 1/6), bursts alternados e controle',
+    icon: 'fas fa-drum',
+    sortBy: 'fingerControl',
+    filters: {
+      minSkills: { fingerControl: 28 },
+    },
+  },
+  {
+    id: 'tech_reading',
+    label: 'Tech / SV / Reading',
+    description: 'Mudanças de Slider Velocity, ritmos quebrados e leitura densa',
+    icon: 'fas fa-random',
+    sortBy: 'readingTech',
+    filters: {
+      techDensity: 'high',
+      minSkills: { readingTech: 22 },
+    },
+  },
+  {
+    id: 'accuracy',
+    label: 'Accuracy / Consistência',
+    description: 'OD elevado (≥ 8,0) e duração consistente (≥ 1m15s) para treino de precisão',
+    icon: 'fas fa-bullseye',
+    sortBy: 'od',
+    filters: {
+      odMin: 8.0,
+      durationMinSec: 75,
+    },
+  },
+];
+
 export type SortOption =
   | 'slot'
   | 'sr'
   | 'bpm'
+  | 'od'
+  | 'drain'
   | 'snapAim'
   | 'flowAim'
   | 'speed'
@@ -35,9 +185,12 @@ export interface AudioSyncStatus {
 interface PoolState {
   currentPool: Mappool;
   selectedMapId: string | null;
+  filterOrigin: OriginFilter; // 'ALL' | 'local_songs' | 'tournament'
   filterMod: string; // 'ALL', 'NM', 'HD', 'HR', 'DT', 'FM', 'TB'
   filterTournament: string; // 'ALL' or specific tournament name
   filterStage: string; // 'ALL' or specific stage name
+  trainingFilters: TrainingFilterState;
+  activeTrainingPreset: TrainingPresetId | null;
   searchQuery: string;
   sortBy: SortOption;
   sortDirection: SortDirection;
@@ -51,12 +204,18 @@ interface PoolState {
 
   // Actions
   addBeatmaps: (results: BeatmapAnalysisResult[]) => Promise<void>;
+  upsertLocalBeatmaps: (results: BeatmapAnalysisResult[], removedIds?: string[]) => Promise<void>;
+  clearLocalSongs: () => Promise<void>;
   removeBeatmap: (id: string) => void;
   updateModSlot: (id: string, newSlot: string) => void;
   selectMap: (id: string | null) => void;
+  setFilterOrigin: (origin: OriginFilter) => void;
   setFilterMod: (mod: string) => void;
   setFilterTournament: (tournament: string) => void;
   setFilterStage: (stage: string) => void;
+  setTrainingFilters: (partial: Partial<TrainingFilterState>) => void;
+  applyTrainingPreset: (presetId: TrainingPresetId | null) => void;
+  resetTrainingFilters: () => void;
   setSearchQuery: (query: string) => void;
   setSortBy: (sort: SortOption) => void;
   setSortDirection: (dir: SortDirection) => void;
@@ -88,9 +247,12 @@ export const usePoolStore = create<PoolState>((set, get) => ({
     maps: [],
   },
   selectedMapId: null,
+  filterOrigin: 'ALL',
   filterMod: 'ALL',
   filterTournament: 'ALL',
   filterStage: 'ALL',
+  trainingFilters: { ...DEFAULT_TRAINING_FILTERS },
+  activeTrainingPreset: null,
   searchQuery: '',
   sortBy: 'slot',
   sortDirection: 'asc',
@@ -148,6 +310,80 @@ export const usePoolStore = create<PoolState>((set, get) => ({
     }));
   },
 
+  upsertLocalBeatmaps: async (results, removedIds) => {
+    const taggedResults = results.map((m) => ({
+      ...m,
+      origin: 'local_songs' as const,
+      modSlot: m.modSlot || 'LOCAL',
+    }));
+
+    try {
+      if (removedIds && removedIds.length > 0) {
+        await db.beatmaps.bulkDelete(removedIds);
+      }
+      if (taggedResults.length > 0) {
+        await cacheBeatmaps(taggedResults);
+      }
+    } catch (e) {
+      console.warn('Could not persist local beatmaps to IndexedDB:', e);
+    }
+
+    const lightweightIncoming = taggedResults.map(stripHeavyFieldsForMemory);
+    const incomingIds = new Set(lightweightIncoming.map((m) => m.id));
+    const incomingPaths = new Set(
+      lightweightIncoming
+        .map((m) => m.localOsuPath?.toLowerCase())
+        .filter((p): p is string => Boolean(p))
+    );
+    const removeSet = new Set(removedIds || []);
+
+    set((state) => {
+      const kept = state.currentPool.maps.filter((m) => {
+        if (removeSet.has(m.id) || incomingIds.has(m.id)) return false;
+        if (
+          m.origin === 'local_songs' &&
+          m.localOsuPath &&
+          incomingPaths.has(m.localOsuPath.toLowerCase())
+        ) {
+          return false;
+        }
+        return true;
+      });
+      const merged = [...kept, ...lightweightIncoming];
+      return {
+        currentPool: {
+          ...state.currentPool,
+          maps: merged,
+          updatedAt: Date.now(),
+        },
+        selectedMapId: state.selectedMapId || (merged.length > 0 ? merged[0].id : null),
+      };
+    });
+  },
+
+  clearLocalSongs: async () => {
+    try {
+      await clearLocalSongsFromDb();
+    } catch (e) {
+      console.warn('Could not clear local songs from IndexedDB:', e);
+    }
+    set((state) => {
+      const remaining = state.currentPool.maps.filter((m) => m.origin !== 'local_songs');
+      return {
+        currentPool: {
+          ...state.currentPool,
+          maps: remaining,
+          updatedAt: Date.now(),
+        },
+        filterOrigin: state.filterOrigin === 'local_songs' ? 'ALL' : state.filterOrigin,
+        selectedMapId:
+          state.selectedMapId && remaining.some((m) => m.id === state.selectedMapId)
+            ? state.selectedMapId
+            : remaining[0]?.id || null,
+      };
+    });
+  },
+
   removeBeatmap: (id) => {
     set((state) => {
       const updated = state.currentPool.maps.filter((m) => m.id !== id);
@@ -175,9 +411,50 @@ export const usePoolStore = create<PoolState>((set, get) => ({
   },
 
   selectMap: (id) => set({ selectedMapId: id }),
+  setFilterOrigin: (filterOrigin) =>
+    set((state) => ({
+      filterOrigin,
+      sortBy:
+        filterOrigin === 'local_songs' && state.sortBy === 'slot'
+          ? 'sr'
+          : state.sortBy,
+    })),
   setFilterMod: (filterMod) => set({ filterMod }),
   setFilterTournament: (filterTournament) => set({ filterTournament }),
   setFilterStage: (filterStage) => set({ filterStage }),
+  setTrainingFilters: (partial) =>
+    set((state) => ({
+      trainingFilters: {
+        ...state.trainingFilters,
+        ...partial,
+      },
+      activeTrainingPreset: null,
+    })),
+  applyTrainingPreset: (presetId) => {
+    if (!presetId || get().activeTrainingPreset === presetId) {
+      set({
+        trainingFilters: { ...DEFAULT_TRAINING_FILTERS },
+        activeTrainingPreset: null,
+      });
+      return;
+    }
+    const def = TRAINING_PRESETS.find((p) => p.id === presetId);
+    if (!def) return;
+    set({
+      trainingFilters: {
+        ...DEFAULT_TRAINING_FILTERS,
+        ...def.filters,
+      },
+      activeTrainingPreset: presetId,
+      sortBy: def.sortBy,
+      sortDirection: 'desc',
+    });
+  },
+  resetTrainingFilters: () =>
+    set({
+      trainingFilters: { ...DEFAULT_TRAINING_FILTERS },
+      activeTrainingPreset: null,
+    }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSortBy: (sortBy) => set({ sortBy }),
   setSortDirection: (sortDirection) => set({ sortDirection }),
@@ -427,6 +704,50 @@ export const usePoolStore = create<PoolState>((set, get) => ({
 }));
 
 /**
+ * Resolves pattern counts for any beatmap (exact from patternCounts/patterns, or estimated from skills for legacy cache).
+ */
+export function getEffectivePatternCounts(m: BeatmapAnalysisResult): PatternCounts {
+  if (m.patternCounts) {
+    return m.patternCounts;
+  }
+  if (Array.isArray(m.patterns) && m.patterns.length > 0) {
+    return computePatternCounts(m.patterns);
+  }
+  return {
+    streams: Math.round((m.skills?.stamina || 0) / 14),
+    streamNotes: Math.round((m.skills?.stamina || 0) * 1.8),
+    deathstreams: (m.skills?.stamina || 0) >= 65 ? 1 : 0,
+    jumps: Math.round((m.skills?.snapAim || 0) / 12),
+    bursts: Math.round((m.skills?.speed || 0) / 12),
+    tech: Math.round((m.skills?.readingTech || 0) / 14),
+  };
+}
+
+/**
+ * Counts how many training filter parameters differ from their default unrestricted state.
+ */
+export function countActiveTrainingFilters(tf: TrainingFilterState): number {
+  let count = 0;
+  if (tf.srMin > DEFAULT_TRAINING_FILTERS.srMin || tf.srMax < DEFAULT_TRAINING_FILTERS.srMax) count++;
+  if (tf.bpmMin > DEFAULT_TRAINING_FILTERS.bpmMin || tf.bpmMax < DEFAULT_TRAINING_FILTERS.bpmMax) count++;
+  if (tf.odMin > DEFAULT_TRAINING_FILTERS.odMin || tf.odMax < DEFAULT_TRAINING_FILTERS.odMax) count++;
+  if (tf.arMin > DEFAULT_TRAINING_FILTERS.arMin || tf.arMax < DEFAULT_TRAINING_FILTERS.arMax) count++;
+  if (tf.csMin > DEFAULT_TRAINING_FILTERS.csMin || tf.csMax < DEFAULT_TRAINING_FILTERS.csMax) count++;
+  if (
+    tf.durationMinSec > DEFAULT_TRAINING_FILTERS.durationMinSec ||
+    tf.durationMaxSec < DEFAULT_TRAINING_FILTERS.durationMaxSec
+  ) {
+    count++;
+  }
+  if (tf.streamsDensity !== 'any') count++;
+  if (tf.jumpsDensity !== 'any') count++;
+  if (tf.burstsDensity !== 'any') count++;
+  if (tf.techDensity !== 'any') count++;
+  if (tf.minSkills && Object.values(tf.minSkills).some((v) => (v || 0) > 0)) count++;
+  return count;
+}
+
+/**
  * Strips heavy binary/object arrays from the in-memory Zustand store (keeping audioBlob safely
  * in IndexedDB to be loaded on-demand only for the currently active beatmap).
  */
@@ -436,11 +757,17 @@ function stripHeavyFieldsForMemory(m: BeatmapAnalysisResult): BeatmapAnalysisRes
       URL.revokeObjectURL(m.audioUrl);
     } catch {}
   }
+  const isLocalLibrary = m.origin === 'local_songs';
+  const patternCounts = m.patternCounts || (m.patterns ? computePatternCounts(m.patterns) : undefined);
+
   return {
     ...m,
+    patternCounts,
     audioBlob: undefined,
     audioUrl: m.audioUrl?.startsWith('blob:') ? undefined : m.audioUrl,
-    hitObjects: m.rawText ? undefined : m.hitObjects,
+    rawText: isLocalLibrary ? undefined : m.rawText,
+    patterns: isLocalLibrary ? undefined : m.patterns,
+    hitObjects: m.rawText || isLocalLibrary ? undefined : m.hitObjects,
     timeline: [],
   };
 }
@@ -455,12 +782,44 @@ function assignDefaultModSlots(
 ): BeatmapAnalysisResult[] {
   return newMaps.map((m) => ({
     ...m,
+    origin: m.origin || 'tournament',
     modSlot: m.modSlot || 'NM',
   }));
 }
 
+function matchesStreamsDensity(counts: PatternCounts, density: PatternDensityFilter): boolean {
+  if (density === 'any') return true;
+  if (density === 'none') return counts.streams === 0;
+  if (density === 'low') {
+    return counts.streams <= 2 && counts.deathstreams === 0 && counts.streamNotes < 48;
+  }
+  if (density === 'medium') {
+    return (
+      (counts.streams >= 2 && counts.streams <= 5 && counts.streamNotes < 180) ||
+      (counts.streamNotes >= 32 && counts.streamNotes < 120)
+    );
+  }
+  if (density === 'high') {
+    return counts.streams >= 4 || counts.deathstreams >= 1 || counts.streamNotes >= 64;
+  }
+  return true;
+}
+
+function matchesGenericDensity(
+  count: number,
+  density: PatternDensityFilter,
+  highThreshold: number = 4
+): boolean {
+  if (density === 'any') return true;
+  if (density === 'none') return count === 0;
+  if (density === 'low') return count <= 2;
+  if (density === 'medium') return count >= 2 && count <= highThreshold + 2;
+  if (density === 'high') return count >= highThreshold;
+  return true;
+}
+
 /**
- * Filter and sort beatmaps according to current UI selections.
+ * Filter and sort beatmaps according to current UI selections (Tournament + Personal Training).
  */
 export function getFilteredAndSortedMaps(
   maps: BeatmapAnalysisResult[],
@@ -469,26 +828,101 @@ export function getFilteredAndSortedMaps(
   sortBy: SortOption,
   sortDirection: SortDirection = 'desc',
   filterTournament: string = 'ALL',
-  filterStage: string = 'ALL'
+  filterStage: string = 'ALL',
+  filterOrigin: OriginFilter = 'ALL',
+  trainingFilters?: TrainingFilterState
 ): BeatmapAnalysisResult[] {
   let filtered = maps;
 
-  // Filter by Mod
-  if (filterMod !== 'ALL') {
-    filtered = filtered.filter((m) => m.modSlot?.startsWith(filterMod));
+  // 1. Filter by Origin (All vs Local osu! Songs vs Tournaments)
+  if (filterOrigin === 'local_songs') {
+    filtered = filtered.filter((m) => m.origin === 'local_songs');
+  } else if (filterOrigin === 'tournament') {
+    filtered = filtered.filter((m) => m.origin !== 'local_songs');
   }
 
-  // Filter by Tournament (when specific tournament is chosen)
-  if (filterTournament && filterTournament !== 'ALL') {
-    filtered = filtered.filter((m) => m.tournamentName === filterTournament);
+  // 2. Tournament-specific filters (skipped when strictly viewing Personal Local Library)
+  if (filterOrigin !== 'local_songs') {
+    if (filterMod !== 'ALL') {
+      filtered = filtered.filter((m) => m.modSlot?.startsWith(filterMod));
+    }
+
+    if (filterTournament && filterTournament !== 'ALL') {
+      filtered = filtered.filter((m) => m.tournamentName === filterTournament);
+    }
+
+    if (filterStage && filterStage !== 'ALL') {
+      filtered = filtered.filter((m) => m.stageName === filterStage);
+    }
   }
 
-  // Filter by Stage / Pool difficulty (when specific stage is chosen)
-  if (filterStage && filterStage !== 'ALL') {
-    filtered = filtered.filter((m) => m.stageName === filterStage);
+  // 3. Training & Mechanical Pattern Filters
+  if (trainingFilters && countActiveTrainingFilters(trainingFilters) > 0) {
+    const tf = trainingFilters;
+    const checkSr =
+      tf.srMin > DEFAULT_TRAINING_FILTERS.srMin || tf.srMax < DEFAULT_TRAINING_FILTERS.srMax;
+    const checkBpm =
+      tf.bpmMin > DEFAULT_TRAINING_FILTERS.bpmMin || tf.bpmMax < DEFAULT_TRAINING_FILTERS.bpmMax;
+    const checkOd =
+      tf.odMin > DEFAULT_TRAINING_FILTERS.odMin || tf.odMax < DEFAULT_TRAINING_FILTERS.odMax;
+    const checkAr =
+      tf.arMin > DEFAULT_TRAINING_FILTERS.arMin || tf.arMax < DEFAULT_TRAINING_FILTERS.arMax;
+    const checkCs =
+      tf.csMin > DEFAULT_TRAINING_FILTERS.csMin || tf.csMax < DEFAULT_TRAINING_FILTERS.csMax;
+    const checkDur =
+      tf.durationMinSec > DEFAULT_TRAINING_FILTERS.durationMinSec ||
+      tf.durationMaxSec < DEFAULT_TRAINING_FILTERS.durationMaxSec;
+    const checkPatterns =
+      tf.streamsDensity !== 'any' ||
+      tf.jumpsDensity !== 'any' ||
+      tf.burstsDensity !== 'any' ||
+      tf.techDensity !== 'any';
+    const minSkillEntries = tf.minSkills
+      ? (Object.entries(tf.minSkills) as Array<[keyof SkillAttributes, number]>).filter(
+          ([, v]) => v > 0
+        )
+      : [];
+
+    filtered = filtered.filter((m) => {
+      if (checkSr && (m.stats.starRating < tf.srMin || m.stats.starRating > tf.srMax)) {
+        return false;
+      }
+      if (checkBpm && (m.stats.bpmMode < tf.bpmMin || m.stats.bpmMode > tf.bpmMax)) {
+        return false;
+      }
+      if (checkOd && (m.difficulty.od < tf.odMin || m.difficulty.od > tf.odMax)) {
+        return false;
+      }
+      if (checkAr && (m.difficulty.ar < tf.arMin || m.difficulty.ar > tf.arMax)) {
+        return false;
+      }
+      if (checkCs && (m.difficulty.cs < tf.csMin || m.difficulty.cs > tf.csMax)) {
+        return false;
+      }
+      if (checkDur) {
+        const durSec = (m.stats.drainTimeMs || m.stats.durationMs || 0) / 1000;
+        if (durSec < tf.durationMinSec || durSec > tf.durationMaxSec) {
+          return false;
+        }
+      }
+      for (let i = 0; i < minSkillEntries.length; i++) {
+        const [skillKey, minVal] = minSkillEntries[i];
+        if ((m.skills[skillKey] || 0) < minVal) {
+          return false;
+        }
+      }
+      if (checkPatterns) {
+        const counts = getEffectivePatternCounts(m);
+        if (!matchesStreamsDensity(counts, tf.streamsDensity)) return false;
+        if (!matchesGenericDensity(counts.jumps, tf.jumpsDensity, 4)) return false;
+        if (!matchesGenericDensity(counts.bursts, tf.burstsDensity, 5)) return false;
+        if (!matchesGenericDensity(counts.tech, tf.techDensity, 3)) return false;
+      }
+      return true;
+    });
   }
 
-  // Filter by Search Query
+  // 4. Filter by Search Query (Title, Artist, Version, Mapper, Tags, Slot, Tournament)
   if (searchQuery.trim()) {
     const q = searchQuery.toLowerCase();
     filtered = filtered.filter(
@@ -497,13 +931,14 @@ export function getFilteredAndSortedMaps(
         m.metadata.artist.toLowerCase().includes(q) ||
         m.metadata.version.toLowerCase().includes(q) ||
         m.metadata.creator.toLowerCase().includes(q) ||
+        (m.metadata.tags && m.metadata.tags.some((t) => t.toLowerCase().includes(q))) ||
         (m.modSlot && m.modSlot.toLowerCase().includes(q)) ||
         (m.tournamentName && m.tournamentName.toLowerCase().includes(q)) ||
         (m.stageName && m.stageName.toLowerCase().includes(q))
     );
   }
 
-  // Sort
+  // 5. Sort
   const sorted = [...filtered];
   const modOrder: Record<string, number> = {
     NM: 1,
@@ -532,6 +967,10 @@ export function getFilteredAndSortedMaps(
       diff = b.stats.starRating - a.stats.starRating;
     } else if (sortBy === 'bpm') {
       diff = b.stats.bpmMode - a.stats.bpmMode;
+    } else if (sortBy === 'od') {
+      diff = b.difficulty.od - a.difficulty.od;
+    } else if (sortBy === 'drain') {
+      diff = (b.stats.drainTimeMs || b.stats.durationMs) - (a.stats.drainTimeMs || a.stats.durationMs);
     } else {
       const skillKey = sortBy as keyof SkillAttributes;
       if (skillKey in a.skills) {

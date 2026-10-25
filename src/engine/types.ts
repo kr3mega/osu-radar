@@ -24,6 +24,9 @@ export interface BeatmapMetadata {
   beatmapId?: number;
   beatmapSetId?: number;
   audioFilename?: string;
+  backgroundFilename?: string;
+  previewTime?: number;
+  mode?: number; // 0 = osu!standard, 1 = taiko, 2 = catch, 3 = mania
 }
 
 export interface BeatmapDifficulty {
@@ -77,6 +80,17 @@ export interface BeatmapStats {
   starRating: number;
 }
 
+export interface PatternCounts {
+  streams: number;      // stream + spaced_stream + deathstream sections
+  streamNotes: number;  // total notes in stream sections
+  deathstreams: number; // 32+ note continuous stream sections
+  jumps: number;        // snap_jumps + flow_aim sections
+  bursts: number;       // 3-8 note burst sections
+  tech: number;         // sv_spike + rhythm_switch + choke_point sections
+}
+
+export type BeatmapOrigin = 'tournament' | 'local_songs';
+
 export interface BeatmapAnalysisResult {
   id: string; // Hash or unique id
   fileName: string;
@@ -86,6 +100,7 @@ export interface BeatmapAnalysisResult {
   skills: SkillAttributes;
   timeline: StrainPoint[];
   patterns?: import('./patterns').DetectedPattern[];
+  patternCounts?: PatternCounts;
   hitObjects?: HitObject[];
   rawText?: string;
   audioBlob?: Blob;
@@ -94,6 +109,11 @@ export interface BeatmapAnalysisResult {
   modSlot?: string; // "NM1", "HD2", "HR1", "DT1", "FM1", "TB"
   tournamentName?: string; // e.g. "6WC 2026", "OWC 2025"
   stageName?: string;      // e.g. "Grand Finals", "Finals", "Qualifiers"
+  origin?: BeatmapOrigin;  // 'tournament' | 'local_songs'
+  localOsuPath?: string;   // Local osu!stable Songs .osu file path
+  localAudioPath?: string; // Local osu!stable Songs audio file path
+  localBgPath?: string;    // Local osu!stable Songs background image path
+  fileMtimeMs?: number;    // File last modified timestamp for incremental sync
   calculatedAt: number;
 }
 

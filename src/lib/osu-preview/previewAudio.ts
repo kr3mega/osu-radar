@@ -1,5 +1,6 @@
 import { BeatmapAnalysisResult } from '../../engine/types';
 import { resolveBeatmapSetId } from './audioResolver';
+import { getLocalSongFileUrl } from './localMedia';
 
 export type PreviewAudioState = 'stopped' | 'loading' | 'playing';
 
@@ -97,35 +98,46 @@ class BeatmapPreviewAudioManager {
     this.progress = 0;
     this.notify();
 
-    const candidateUrls: string[] = [];
+    const candidateUrls: Array<{ url: string; seekPreviewMs?: number }> = [];
+
+    // 0. Direct local Songs/ audio stream (instant, offline-capable, works on unsubmitted/custom maps)
+    const localAudioUrl = getLocalSongFileUrl(map.localAudioPath);
+    if (localAudioUrl) {
+      candidateUrls.push({
+        url: localAudioUrl,
+        seekPreviewMs: map.metadata.previewTime ?? -1,
+      });
+    }
 
     // 1. Official osu! b.ppy.sh 10-second preview stream
     let setId = map.metadata.beatmapSetId;
     if (!setId || setId <= 0) {
-      try {
-        setId = await resolveBeatmapSetId(map);
-      } catch {}
+      if (!localAudioUrl) {
+        try {
+          setId = await resolveBeatmapSetId(map);
+        } catch {}
+      }
     }
 
     if (currentToken !== this.requestToken) return;
 
     if (setId && setId > 0) {
-      candidateUrls.push(`https://b.ppy.sh/preview/${setId}.mp3`);
+      candidateUrls.push({ url: `https://b.ppy.sh/preview/${setId}.mp3` });
     }
 
     // 2. Local cached audio fallback
     if (map.audioUrl) {
-      candidateUrls.push(map.audioUrl);
+      candidateUrls.push({ url: map.audioUrl });
     } else if (map.audioBlob instanceof Blob) {
       try {
         map.audioUrl = URL.createObjectURL(map.audioBlob);
-        candidateUrls.push(map.audioUrl);
+        candidateUrls.push({ url: map.audioUrl });
       } catch {}
     }
 
-    for (const url of candidateUrls) {
+    for (const cand of candidateUrls) {
       if (currentToken !== this.requestToken) return;
-      const started = await this.tryPlayUrl(url, currentToken);
+      const started = await this.tryPlayUrl(cand.url, currentToken, cand.seekPreviewMs);
       if (started) return;
     }
 
@@ -134,7 +146,7 @@ class BeatmapPreviewAudioManager {
     }
   }
 
-  private tryPlayUrl(url: string, token: number): Promise<boolean> {
+  private tryPlayUrl(url: string, token: number, seekPreviewMs?: number): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       if (typeof Audio === 'undefined') {
         resolve(false);
@@ -151,6 +163,24 @@ class BeatmapPreviewAudioManager {
         settled = true;
         resolve(ok);
       };
+
+      if (seekPreviewMs !== undefined) {
+        audio.addEventListener(
+          'loadedmetadata',
+          () => {
+            if (token !== this.requestToken) return;
+            const dur = audio.duration;
+            if (dur && isFinite(dur) && dur > 5) {
+              if (seekPreviewMs > 0 && seekPreviewMs / 1000 < dur - 2) {
+                audio.currentTime = seekPreviewMs / 1000;
+              } else if (dur > 25) {
+                audio.currentTime = dur * 0.35;
+              }
+            }
+          },
+          { once: true }
+        );
+      }
 
       audio.addEventListener('playing', () => {
         if (token !== this.requestToken) {

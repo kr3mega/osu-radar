@@ -2,13 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { BeatmapAnalysisResult } from '../../engine/types';
 import { getStarRatingColor, getStarRatingTextColor, TOURNAMENT_MOD_COLORS } from '../../utils/osuColors';
 import { formatTimestamp } from '../../engine/strains';
-import { previewAudioManager, PreviewAudioState } from '../../lib/osu-preview';
+import {
+  buildBeatmapCoverCss,
+  previewAudioManager,
+  PreviewAudioState,
+} from '../../lib/osu-preview';
+import { getEffectivePatternCounts } from '../../store/usePoolStore';
 
 interface LazerCarouselItemProps {
   map: BeatmapAnalysisResult;
   isSelected: boolean;
   onSelect: () => void;
   onRemove?: () => void;
+  deferred?: boolean;
 }
 
 /**
@@ -19,8 +25,11 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   isSelected,
   onSelect,
   onRemove,
+  deferred = false,
 }) => {
   const { metadata, stats, difficulty, modSlot, topSkills, skills } = map;
+  const isLocalSong = map.origin === 'local_songs';
+  const patternCounts = getEffectivePatternCounts(map);
 
   const [audioState, setAudioState] = useState<PreviewAudioState>('stopped');
   const [audioProgress, setAudioProgress] = useState<number>(0);
@@ -37,24 +46,19 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
     });
   }, [map.id]);
 
-  const listCoverUrl = metadata.beatmapSetId
-    ? `https://assets.ppy.sh/beatmaps/${metadata.beatmapSetId}/covers/list.jpg`
-    : null;
-  const listCover2xUrl = metadata.beatmapSetId
-    ? `https://assets.ppy.sh/beatmaps/${metadata.beatmapSetId}/covers/list@2x.jpg`
-    : null;
-  const cardCoverUrl = metadata.beatmapSetId
-    ? `https://assets.ppy.sh/beatmaps/${metadata.beatmapSetId}/covers/card.jpg`
-    : null;
-  const cardCover2xUrl = metadata.beatmapSetId
-    ? `https://assets.ppy.sh/beatmaps/${metadata.beatmapSetId}/covers/card@2x.jpg`
-    : null;
+  const listCoverCss = buildBeatmapCoverCss(map, 'list');
+  const listCover2xCss = buildBeatmapCoverCss(map, 'list@2x') || listCoverCss;
+  const cardCoverCss = buildBeatmapCoverCss(map, 'card');
+  const cardCover2xCss = buildBeatmapCoverCss(map, 'card@2x') || cardCoverCss;
 
   const starColor = getStarRatingColor(stats.starRating);
   const starTextColor = getStarRatingTextColor(stats.starRating);
 
   const modPrefix = (modSlot || 'NM').slice(0, 2).toUpperCase();
-  const modColorConfig = TOURNAMENT_MOD_COLORS[modPrefix] || TOURNAMENT_MOD_COLORS.NM;
+  const modColorConfig = isLocalSong
+    ? { bg: 'hsl(var(--hsl-h1))', text: 'hsl(var(--hsl-b6))' }
+    : TOURNAMENT_MOD_COLORS[modPrefix] || TOURNAMENT_MOD_COLORS.NM;
+  const badgeLabel = isLocalSong ? 'OSU!' : modSlot || 'NM1';
 
   const handleTogglePreview = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -64,12 +68,21 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   return (
     <div
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      tabIndex={0}
+      role="option"
+      aria-selected={isSelected}
       data-audio-state={audioState}
       data-audio-over50={audioProgress > 0.5 ? '1' : '0'}
       style={{ '--progress': audioProgress } as React.CSSProperties}
       className={`beatmapset-panel beatmapset-panel--size-normal ${
         isSelected ? 'beatmapset-panel--selected' : ''
-      }`}
+      } ${deferred ? 'osu-radar-card-deferred' : ''}`}
     >
       {/* Dual-Column Cover Container (exact osu-web structure) */}
       <div className="beatmapset-panel__cover-container">
@@ -77,10 +90,10 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
           <div
             className="beatmapset-cover beatmapset-cover--full"
             style={
-              listCoverUrl
+              listCoverCss
                 ? ({
-                    '--bg': `url("${listCoverUrl}")`,
-                    '--bg-2x': `url("${listCover2xUrl || listCoverUrl}")`,
+                    '--bg': listCoverCss,
+                    '--bg-2x': listCover2xCss,
                   } as React.CSSProperties)
                 : undefined
             }
@@ -90,10 +103,10 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
           <div
             className="beatmapset-cover beatmapset-cover--full"
             style={
-              cardCoverUrl
+              cardCoverCss
                 ? ({
-                    '--bg': `url("${cardCoverUrl}")`,
-                    '--bg-2x': `url("${cardCover2xUrl || cardCoverUrl}")`,
+                    '--bg': cardCoverCss,
+                    '--bg-2x': cardCover2xCss,
                   } as React.CSSProperties)
                 : undefined
             }
@@ -141,7 +154,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                 color: modColorConfig.text,
               }}
             >
-              {modSlot || 'NM1'}
+              {badgeLabel}
             </span>
           </div>
         </div>
@@ -238,8 +251,9 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                   backgroundColor: modColorConfig.bg,
                   color: modColorConfig.text,
                 }}
+                title={isLocalSong ? 'Instalado localmente na pasta Songs do osu!' : undefined}
               >
-                {modSlot || 'NM1'}
+                {isLocalSong ? 'LOCAL' : modSlot || 'NM1'}
               </div>
             </div>
 
@@ -256,6 +270,21 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                 style={{ '--bg': starColor } as React.CSSProperties}
               />
             </div>
+
+            {isLocalSong && (patternCounts.streams > 0 || patternCounts.jumps > 0) && (
+              <div className="beatmapset-panel__extra-item">
+                <div
+                  className="beatmapset-status beatmapset-status--panel"
+                  style={{
+                    backgroundColor: 'hsl(var(--hsl-b4))',
+                    color: 'hsl(var(--hsl-l1))',
+                  }}
+                  title={`Streams: ${patternCounts.streams} (${patternCounts.streamNotes} notas) • Jumps: ${patternCounts.jumps} • Bursts: ${patternCounts.bursts} • Tech: ${patternCounts.tech}`}
+                >
+                  S:{patternCounts.streams} · J:{patternCounts.jumps} · B:{patternCounts.bursts}
+                </div>
+              </div>
+            )}
 
             {map.stageName && (
               <div className="beatmapset-panel__extra-item">
@@ -311,10 +340,29 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
         {/* Right Slide-Out Menu Area */}
         <div className="beatmapset-panel__menu-container">
           <div className="beatmapset-panel__menu">
-            {metadata.beatmapId && (
+            {(metadata.beatmapId || metadata.beatmapSetId) && (
               <a
                 className="beatmapset-panel__menu-item"
-                href={`https://osu.ppy.sh/b/${metadata.beatmapId}`}
+                href={
+                  metadata.beatmapId
+                    ? `osu://b/${metadata.beatmapId}`
+                    : `osu://s/${metadata.beatmapSetId}`
+                }
+                onClick={(e) => e.stopPropagation()}
+                title="Abrir direto no osu! (osu!direct)"
+              >
+                <span className="fas fa-gamepad" />
+              </a>
+            )}
+
+            {(metadata.beatmapId || metadata.beatmapSetId) && (
+              <a
+                className="beatmapset-panel__menu-item"
+                href={
+                  metadata.beatmapId
+                    ? `https://osu.ppy.sh/b/${metadata.beatmapId}`
+                    : `https://osu.ppy.sh/beatmapsets/${metadata.beatmapSetId}`
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}

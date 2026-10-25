@@ -36,6 +36,7 @@ export function parseBeatmapText(
 
   const lines = text.split('\n');
   let currentCategory = '';
+  let hasApproachRate = false;
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
@@ -67,7 +68,10 @@ export function parseBeatmapText(
           if (key === 'HPDrainRate') result.Difficulty.HPDrainRate = val;
           else if (key === 'CircleSize') result.Difficulty.CircleSize = val;
           else if (key === 'OverallDifficulty') result.Difficulty.OverallDifficulty = val;
-          else if (key === 'ApproachRate') result.Difficulty.ApproachRate = val;
+          else if (key === 'ApproachRate') {
+            result.Difficulty.ApproachRate = val;
+            hasApproachRate = true;
+          }
           else if (key === 'SliderMultiplier') result.Difficulty.SliderMultiplier = val;
           else if (key === 'SliderTickRate') result.Difficulty.SliderTickRate = val;
         }
@@ -131,6 +135,10 @@ export function parseBeatmapText(
         break;
       }
     }
+  }
+
+  if (!hasApproachRate) {
+    result.Difficulty.ApproachRate = result.Difficulty.OverallDifficulty;
   }
 
   // 1. Sort timing points

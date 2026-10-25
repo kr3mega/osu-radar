@@ -1,12 +1,65 @@
-import { BeatmapAnalysisResult, BeatmapStats, SkillAttributes } from './types';
-import { parseOsuBeatmap } from './parser';
+import {
+  BeatmapAnalysisResult,
+  BeatmapOrigin,
+  BeatmapStats,
+  PatternCounts,
+  SkillAttributes,
+} from './types';
+import { extractSetIdFromFolderName, parseOsuBeatmap } from './parser';
 import { analyzeTemporalChannel } from './channels/temporal';
 import { analyzeSpatialChannel } from './channels/spatial';
 import { analyzeAngularChannel } from './channels/angular';
 import { analyzeTechChannel } from './channels/tech';
 import { calculateRollingStrains } from './strains';
-import { detectBeatmapPatterns } from './patterns';
+import { DetectedPattern, detectBeatmapPatterns } from './patterns';
 import { calculateStarRating } from './starRating';
+
+export interface AnalyzeBeatmapOptions {
+  folderName?: string;
+  lightweight?: boolean;
+  origin?: BeatmapOrigin;
+  localOsuPath?: string;
+  localAudioPath?: string;
+  localBgPath?: string;
+  fileMtimeMs?: number;
+}
+
+/**
+ * Aggregates pattern occurrences by mechanical family for fast training filters.
+ */
+export function computePatternCounts(patterns: DetectedPattern[]): PatternCounts {
+  let streams = 0;
+  let streamNotes = 0;
+  let deathstreams = 0;
+  let jumps = 0;
+  let bursts = 0;
+  let tech = 0;
+
+  for (const p of patterns) {
+    if (p.type === 'stream' || p.type === 'spaced_stream' || p.type === 'deathstream') {
+      streams++;
+      streamNotes += p.noteCount || 0;
+      if (p.type === 'deathstream') {
+        deathstreams++;
+      }
+    } else if (p.type === 'snap_jumps' || p.type === 'flow_aim') {
+      jumps++;
+    } else if (p.type === 'burst') {
+      bursts++;
+    } else if (p.type === 'sv_spike' || p.type === 'rhythm_switch' || p.type === 'choke_point') {
+      tech++;
+    }
+  }
+
+  return {
+    streams,
+    streamNotes,
+    deathstreams,
+    jumps,
+    bursts,
+    tech,
+  };
+}
 
 /**
  * Calculates a fast 32-bit hash from string content for unique beatmap identification.
@@ -30,10 +83,18 @@ export async function analyzeBeatmap(
   fileName: string = 'beatmap.osu',
   _fileBytes?: Uint8Array,
   officialStarRating?: number,
-  audioBlob?: Blob
+  audioBlob?: Blob,
+  options?: AnalyzeBeatmapOptions
 ): Promise<BeatmapAnalysisResult> {
   const parsed = parseOsuBeatmap(rawText);
   const { metadata, difficulty, timingPoints, hitObjects } = parsed;
+
+  if (!metadata.beatmapSetId && options?.folderName) {
+    const inferredSetId = extractSetIdFromFolderName(options.folderName);
+    if (inferredSetId) {
+      metadata.beatmapSetId = inferredSetId;
+    }
+  }
 
   // 1. Calculate BPM statistics
   const uninheritedTps = timingPoints.filter((tp) => tp.uninherited && tp.beatLength > 0);
@@ -94,6 +155,7 @@ export async function analyzeBeatmap(
 
   const { timeline, skills } = calculateRollingStrains(hitObjects, timingPoints, difficulty.ar);
   const patterns = detectBeatmapPatterns(hitObjects, timingPoints);
+  const patternCounts = computePatternCounts(patterns);
 
   // 6. Identify Top Skills (the 2 highest scoring attributes)
   const skillEntries = Object.entries(skills) as Array<[keyof SkillAttributes, number]>;
@@ -107,10 +169,17 @@ export async function analyzeBeatmap(
     return match ? match[1].toUpperCase() : undefined;
   };
 
-  modSlot = matchSlot(fileName) || matchSlot(metadata.version) || matchSlot(metadata.title);
+  if (options?.origin !== 'local_songs') {
+    modSlot = matchSlot(fileName) || matchSlot(metadata.version) || matchSlot(metadata.title);
+  }
 
-  const id = metadata.beatmapId ? metadata.beatmapId.toString() : simpleHash(rawText);
+  const baseId = metadata.beatmapId ? metadata.beatmapId.toString() : simpleHash(rawText);
+  const id =
+    options?.origin === 'local_songs'
+      ? `local_${baseId}_${simpleHash(options.localOsuPath || `${options.folderName || ''}/${fileName}`)}`
+      : baseId;
   const audioUrl = audioBlob ? URL.createObjectURL(audioBlob) : undefined;
+  const isLightweight = Boolean(options?.lightweight);
 
   return {
     id,
@@ -119,14 +188,20 @@ export async function analyzeBeatmap(
     difficulty,
     stats,
     skills,
-    timeline,
-    patterns,
-    hitObjects,
-    rawText,
+    timeline: isLightweight ? [] : timeline,
+    patterns: isLightweight ? undefined : patterns,
+    patternCounts,
+    hitObjects: isLightweight ? undefined : hitObjects,
+    rawText: isLightweight ? undefined : rawText,
     audioBlob,
     audioUrl,
     topSkills,
     modSlot,
+    origin: options?.origin || 'tournament',
+    localOsuPath: options?.localOsuPath,
+    localAudioPath: options?.localAudioPath,
+    localBgPath: options?.localBgPath,
+    fileMtimeMs: options?.fileMtimeMs,
     calculatedAt: Date.now(),
   };
 }

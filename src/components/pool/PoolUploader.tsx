@@ -1,15 +1,20 @@
 import React, { useState, useRef } from 'react';
 import { PoolSheetSync } from './PoolSheetSync';
+import { LocalSongsSyncPanel } from './LocalSongsSyncPanel';
 import { extractOsuFilesFromZip } from '../../utils/unzip';
 import { analyzeBeatmap } from '../../engine/analyzer';
 import { usePoolStore } from '../../store/usePoolStore';
 import { BeatmapAnalysisResult } from '../../engine/types';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 
-type UploaderTab = 'sheet' | 'files' | 'json';
+export type UploaderTab = 'osu_songs' | 'sheet' | 'files' | 'json';
 
-export const PoolUploader: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<UploaderTab>('sheet');
+interface PoolUploaderProps {
+  initialTab?: UploaderTab;
+}
+
+export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_songs' }) => {
+  const [activeTab, setActiveTab] = useState<UploaderTab>(initialTab);
   const [isDragging, setIsDragging] = useState(false);
   const [localTournamentName, setLocalTournamentName] = useState('Coleção Local');
   const [localStageName, setLocalStageName] = useState('Mappool');
@@ -160,6 +165,16 @@ export const PoolUploader: React.FC = () => {
         >
           <button
             type="button"
+            onClick={() => setActiveTab('osu_songs')}
+            className={`osu-radar-player__mod-btn ${activeTab === 'osu_songs' ? 'osu-radar-player__mod-btn--active' : ''}`}
+            style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
+          >
+            <i className="fas fa-hdd" style={{ marginRight: '6px' }} />
+            Pasta Songs do osu! (Treino)
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('sheet')}
             className={`osu-radar-player__mod-btn ${activeTab === 'sheet' ? 'osu-radar-player__mod-btn--active' : ''}`}
             style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
@@ -175,7 +190,7 @@ export const PoolUploader: React.FC = () => {
             style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
           >
             <i className="fas fa-folder-open" style={{ marginRight: '6px' }} />
-            Arquivos Locais (.osz / .osu / Pasta)
+            Arquivos Locais (.osz / .osu)
           </button>
 
           <button
@@ -188,6 +203,9 @@ export const PoolUploader: React.FC = () => {
             Backup JSON (Exportar / Importar)
           </button>
         </div>
+
+        {/* Tab 0: Local osu!stable Songs Library Sync */}
+        {activeTab === 'osu_songs' && <LocalSongsSyncPanel />}
 
         {/* Tab 1: Google Sheets Sync */}
         {activeTab === 'sheet' && <PoolSheetSync />}

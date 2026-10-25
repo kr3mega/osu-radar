@@ -448,3 +448,275 @@
     padding: 20px;
   }
 }
+
+// Deferred rendering ONLY for beatmapset cards strictly below the initial viewport fold
+.osu-radar-card-deferred {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 100px;
+}
+
+// Brand-consistent Training Assistant & Local Songs Sync Form Controls
+:root {
+  --osu-brand-accent: #ff66ab;
+}
+
+.osu-radar-training-form {
+  color-scheme: dark;
+  accent-color: var(--osu-brand-accent);
+}
+
+.osu-radar-training-panel {
+  margin-top: 10px;
+  padding: 14px 16px;
+  border-radius: @border-radius--large;
+  background-color: hsla(var(--hsl-b6), 0.78);
+  border: 1px solid @osu-colour-b3;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 700;
+    color: @osu-colour-l1;
+  }
+
+  &__density-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 8px 14px;
+  }
+
+  &__density-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background-color: @osu-colour-b5;
+    border: 1px solid @osu-colour-b4;
+    flex-wrap: wrap;
+  }
+
+  &__density-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  &__ranges-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+    gap: 10px;
+  }
+}
+
+.osu-radar-range-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background-color: @osu-colour-b5;
+  border: 1px solid @osu-colour-b4;
+
+  &__label {
+    font-size: 11px;
+    font-weight: 700;
+    color: @osu-colour-l1;
+    margin: 0;
+  }
+
+  &__inputs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: @osu-colour-l2;
+
+    input[type="number"] {
+      width: 68px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      background-color: @osu-colour-b6;
+      border: 1px solid @osu-colour-b2;
+      color: #fff;
+      font-family: "AzeretMono", monospace;
+      font-size: 11px;
+      outline: none;
+
+      &:focus {
+        border-color: var(--osu-brand-accent);
+      }
+    }
+  }
+
+  input[type="range"] {
+    width: 100%;
+    cursor: pointer;
+    accent-color: var(--osu-brand-accent);
+  }
+}
+
+.osu-radar-brand-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+
+  input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    accent-color: var(--osu-brand-accent);
+  }
+}
+
+.osu-radar-progress {
+  height: 8px;
+  border-radius: 1000px;
+  overflow: hidden;
+  accent-color: var(--osu-brand-accent);
+}
+
+// Progressive enhancement fallback for environments without CSS accent-color support
+@supports not (accent-color: #ff66ab) {
+  .osu-radar-training-form input[type="checkbox"].osu-radar-fallback-check {
+    position: absolute !important;
+    clip-path: inset(50%) !important;
+    overflow: hidden !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: -1px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .osu-radar-brand-checkbox {
+    position: relative;
+    padding-left: 24px;
+  }
+
+  .osu-radar-brand-checkbox input[type="checkbox"] + span::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid @osu-colour-b2;
+    background-color: @osu-colour-b6;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+
+  .osu-radar-brand-checkbox input[type="checkbox"]:focus-visible + span::before {
+    outline: 2px solid var(--osu-brand-accent);
+    outline-offset: 2px;
+  }
+
+  .osu-radar-brand-checkbox input[type="checkbox"]:checked + span::before {
+    background-color: var(--osu-brand-accent);
+    border-color: var(--osu-brand-accent);
+  }
+
+  .osu-radar-brand-checkbox input[type="checkbox"]:checked + span::after {
+    content: "\2713";
+    position: absolute;
+    left: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: @osu-colour-b6;
+    font-weight: 800;
+    font-size: 11px;
+  }
+
+  .osu-radar-training-form input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+  }
+
+  .osu-radar-training-form input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(
+      to right,
+      var(--osu-brand-accent) var(--progress, 0%),
+      @osu-colour-b2 var(--progress, 0%)
+    );
+    border-radius: 4px;
+  }
+
+  .osu-radar-training-form input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 14px;
+    width: 14px;
+    border-radius: 50%;
+    background: var(--osu-brand-accent);
+    cursor: pointer;
+    margin-top: -4px;
+  }
+
+  .osu-radar-training-form input[type="range"]::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    background: @osu-colour-b2;
+    border-radius: 4px;
+  }
+
+  .osu-radar-training-form input[type="range"]::-moz-range-thumb {
+    height: 14px;
+    width: 14px;
+    border-radius: 50%;
+    background: var(--osu-brand-accent);
+    cursor: pointer;
+  }
+
+  .osu-radar-training-form input[type="range"]::-moz-range-progress {
+    background-color: var(--osu-brand-accent);
+    height: 6px;
+    border-radius: 4px;
+  }
+
+  .osu-radar-training-form progress {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border: none;
+    background: @osu-colour-b2;
+    height: 8px;
+    border-radius: 4px;
+  }
+
+  .osu-radar-training-form progress::-webkit-progress-bar {
+    background-color: @osu-colour-b2;
+    border-radius: 4px;
+  }
+
+  .osu-radar-training-form progress::-webkit-progress-value {
+    background-color: var(--osu-brand-accent);
+    border-radius: 4px;
+  }
+
+  .osu-radar-training-form progress::-moz-progress-bar {
+    background-color: var(--osu-brand-accent);
+    border-radius: 4px;
+  }
+}

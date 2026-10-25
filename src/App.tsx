@@ -1,17 +1,24 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { usePoolStore, getFilteredAndSortedMaps, SortOption } from './store/usePoolStore';
+import {
+  usePoolStore,
+  getFilteredAndSortedMaps,
+  SortOption,
+  countActiveTrainingFilters,
+} from './store/usePoolStore';
 import { LazerToolbar } from './components/layout/LazerToolbar';
 import { LazerBottomBar } from './components/layout/LazerBottomBar';
 import { LazerFloatingAudioPlayer } from './components/layout/LazerFloatingAudioPlayer';
 import { LazerWedge } from './components/beatmap/LazerWedge';
-import { LazerCarouselItem } from './components/beatmap/LazerCarouselItem';
+import { VirtualBeatmapList } from './components/beatmap/VirtualBeatmapList';
+import { TrainingFiltersPanel } from './components/beatmap/TrainingFiltersPanel';
 import { PoolOverview } from './components/pool/PoolOverview';
-import { PoolUploader } from './components/pool/PoolUploader';
+import { PoolUploader, UploaderTab } from './components/pool/PoolUploader';
 import { SkillAttributes } from './engine/types';
 import { extractOsuFilesFromZip } from './utils/unzip';
 import { analyzeBeatmap } from './engine/analyzer';
 import { extractQuickOsuMeta, matchOsuFileToTournamentEntry } from './utils/sheetParser';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { buildBeatmapCoverCss } from './lib/osu-preview';
 
 const MOD_FILTERS: Array<{ id: string; label: string }> = [
   { id: 'ALL', label: 'Qualquer' },
@@ -23,10 +30,12 @@ const MOD_FILTERS: Array<{ id: string; label: string }> = [
   { id: 'TB', label: 'Tiebreaker (TB)' },
 ];
 
-const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
-  { value: 'slot', label: 'Slot' },
+const SORT_OPTIONS: Array<{ value: SortOption; label: string; hideInLocal?: boolean }> = [
+  { value: 'slot', label: 'Slot', hideInLocal: true },
   { value: 'sr', label: 'Dificuldade (★)' },
   { value: 'bpm', label: 'BPM' },
+  { value: 'od', label: 'Precisão (OD)' },
+  { value: 'drain', label: 'Duração' },
   { value: 'snapAim', label: 'Snap Aim' },
   { value: 'flowAim', label: 'Flow Aim' },
   { value: 'speed', label: 'Speed' },
@@ -39,9 +48,11 @@ export const App: React.FC = () => {
   const {
     currentPool,
     selectedMapId,
+    filterOrigin,
     filterMod,
     filterTournament,
     filterStage,
+    trainingFilters,
     searchQuery,
     sortBy,
     sortDirection,
@@ -49,11 +60,12 @@ export const App: React.FC = () => {
     selectMap,
     removeBeatmap,
     updateModSlot,
+    setFilterOrigin,
     setFilterMod,
     setFilterTournament,
     setFilterStage,
+    resetTrainingFilters,
     setSearchQuery,
-    setSortBy: _setSortBy,
     initFromDb,
     addBeatmaps,
     setIsAnalyzing,
@@ -63,7 +75,13 @@ export const App: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'select' | 'overview'>('select');
   const [isUploaderOpen, setIsUploaderOpen] = useState(false);
+  const [uploaderInitialTab, setUploaderInitialTab] = useState<UploaderTab>('osu_songs');
   const [isGlobalDragging, setIsGlobalDragging] = useState(false);
+
+  const openUploader = (tab: UploaderTab = 'osu_songs') => {
+    setUploaderInitialTab(tab);
+    setIsUploaderOpen(true);
+  };
 
   // Measure Left Wedge container height to sync the right beatmapset-panel list height
   const wedgeContainerRef = useRef<HTMLDivElement | null>(null);
@@ -88,21 +106,40 @@ export const App: React.FC = () => {
 
   const maps = currentPool.maps;
 
+  const { localMapsCount, tournamentMapsCount } = useMemo(() => {
+    let local = 0;
+    let tourney = 0;
+    for (let i = 0; i < maps.length; i++) {
+      if (maps[i].origin === 'local_songs') local++;
+      else tourney++;
+    }
+    return { localMapsCount: local, tournamentMapsCount: tourney };
+  }, [maps]);
+
+  const tournamentMaps = useMemo(
+    () => maps.filter((m) => m.origin !== 'local_songs'),
+    [maps]
+  );
+
   const availableTournaments = useMemo(() => {
     return Array.from(
-      new Set(maps.map((m) => m.tournamentName).filter((t): t is string => Boolean(t && t.trim())))
+      new Set(
+        tournamentMaps
+          .map((m) => m.tournamentName)
+          .filter((t): t is string => Boolean(t && t.trim()))
+      )
     );
-  }, [maps]);
+  }, [tournamentMaps]);
 
   const availableStages = useMemo(() => {
     const pool =
       filterTournament !== 'ALL'
-        ? maps.filter((m) => m.tournamentName === filterTournament)
-        : maps;
+        ? tournamentMaps.filter((m) => m.tournamentName === filterTournament)
+        : tournamentMaps;
     return Array.from(
       new Set(pool.map((m) => m.stageName).filter((s): s is string => Boolean(s && s.trim())))
     );
-  }, [maps, filterTournament]);
+  }, [tournamentMaps, filterTournament]);
 
   // Cleanly fallback if a selected tournament or stage filter was removed
   useEffect(() => {
@@ -117,44 +154,71 @@ export const App: React.FC = () => {
     }
   }, [availableStages, filterStage, setFilterStage]);
 
-  const filteredMaps = getFilteredAndSortedMaps(
-    maps,
-    filterMod,
-    searchQuery,
-    sortBy,
-    sortDirection,
-    filterTournament,
-    filterStage
+  const filteredMaps = useMemo(
+    () =>
+      getFilteredAndSortedMaps(
+        maps,
+        filterMod,
+        searchQuery,
+        sortBy,
+        sortDirection,
+        filterTournament,
+        filterStage,
+        filterOrigin,
+        trainingFilters
+      ),
+    [
+      maps,
+      filterMod,
+      searchQuery,
+      sortBy,
+      sortDirection,
+      filterTournament,
+      filterStage,
+      filterOrigin,
+      trainingFilters,
+    ]
   );
-  const activeMap = maps.find((m) => m.id === selectedMapId) || maps[0] || null;
 
-  const activeCoverUrl = activeMap?.metadata.beatmapSetId
-    ? `https://assets.ppy.sh/beatmaps/${activeMap.metadata.beatmapSetId}/covers/cover.jpg`
-    : null;
-
-  // Calculate pool average skills for comparison in the Wedge
-  const avgSkills: SkillAttributes = {
-    snapAim: 0,
-    flowAim: 0,
-    speed: 0,
-    stamina: 0,
-    fingerControl: 0,
-    readingTech: 0,
-  };
-
-  if (maps.length > 0) {
-    for (const m of maps) {
-      avgSkills.snapAim += m.skills.snapAim;
-      avgSkills.flowAim += m.skills.flowAim;
-      avgSkills.speed += m.skills.speed;
-      avgSkills.stamina += m.skills.stamina;
-      avgSkills.fingerControl += m.skills.fingerControl;
-      avgSkills.readingTech += m.skills.readingTech;
+  const activeMap = useMemo(() => {
+    if (selectedMapId) {
+      const found = maps.find((m) => m.id === selectedMapId);
+      if (found) return found;
     }
-    (Object.keys(avgSkills) as Array<keyof SkillAttributes>).forEach((k) => {
-      avgSkills[k] = Math.round((avgSkills[k] / maps.length) * 10) / 10;
+    return filteredMaps[0] || maps[0] || null;
+  }, [maps, filteredMaps, selectedMapId]);
+
+  const activeCoverCss = buildBeatmapCoverCss(activeMap, 'cover');
+
+  // Calculate average skills across currently viewed origin/pool for comparison in the Wedge
+  const avgSkills = useMemo<SkillAttributes | undefined>(() => {
+    const refPool = filteredMaps.length > 1 ? filteredMaps : maps;
+    if (refPool.length <= 1) return undefined;
+
+    const sum: SkillAttributes = {
+      snapAim: 0,
+      flowAim: 0,
+      speed: 0,
+      stamina: 0,
+      fingerControl: 0,
+      readingTech: 0,
+    };
+
+    for (let i = 0; i < refPool.length; i++) {
+      const s = refPool[i].skills;
+      sum.snapAim += s.snapAim;
+      sum.flowAim += s.flowAim;
+      sum.speed += s.speed;
+      sum.stamina += s.stamina;
+      sum.fingerControl += s.fingerControl;
+      sum.readingTech += s.readingTech;
+    }
+
+    (Object.keys(sum) as Array<keyof SkillAttributes>).forEach((k) => {
+      sum[k] = Math.round((sum[k] / refPool.length) * 10) / 10;
     });
-  }
+    return sum;
+  }, [filteredMaps, maps]);
 
   // Global Drag & Drop Handler
   const handleWindowDragOver = (e: React.DragEvent) => {
@@ -241,6 +305,8 @@ export const App: React.FC = () => {
     }
   };
 
+  const hasActiveTrainingFilters = countActiveTrainingFilters(trainingFilters) > 0;
+
   return (
     <div
       onDragOver={handleWindowDragOver}
@@ -252,7 +318,7 @@ export const App: React.FC = () => {
       <LazerToolbar
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
-        onOpenUpload={() => setIsUploaderOpen(true)}
+        onOpenUpload={() => openUploader('osu_songs')}
       />
 
       {/* 2. Main osu-web Page Content */}
@@ -266,10 +332,10 @@ export const App: React.FC = () => {
                   <div
                     className="beatmapset-cover beatmapset-cover--full"
                     style={
-                      activeCoverUrl
+                      activeCoverCss
                         ? ({
-                            '--bg': `url("${activeCoverUrl}")`,
-                            '--bg-2x': `url("${activeCoverUrl}")`,
+                            '--bg': activeCoverCss,
+                            '--bg-2x': activeCoverCss,
                           } as React.CSSProperties)
                         : undefined
                     }
@@ -287,7 +353,7 @@ export const App: React.FC = () => {
                       type="search"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="procurar beatmap por título, artista, mapper, diff ou slot..."
+                      placeholder="procurar beatmap por título, artista, mapper, diff, tag ou slot..."
                     />
                   </label>
                   {searchQuery && (
@@ -304,119 +370,208 @@ export const App: React.FC = () => {
 
                 {/* Official osu-web Filter Grid (.beatmapsets-search__filter-grid) */}
                 <div className="beatmapsets-search__filter-grid">
+                  {/* Origin Filter Row: All vs Personal osu! Songs vs Tournaments */}
                   <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
-                    <span className="beatmapsets-search-filter__header">Slot / Mod</span>
-                    <div className="beatmapsets-search-filter__items">
-                      {MOD_FILTERS.map((mod) => {
-                        const cnt =
-                          mod.id === 'ALL'
-                            ? maps.length
-                            : maps.filter((m) => m.modSlot?.startsWith(mod.id)).length;
-                        const isSelected = filterMod === mod.id;
+                    <span className="beatmapsets-search-filter__header">Origem</span>
+                    <div
+                      className="beatmapsets-search-filter__items"
+                      style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 10px' }}
+                    >
+                      <a
+                        href="#origin-all"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setFilterOrigin('ALL');
+                        }}
+                        className={`beatmapsets-search-filter__item ${
+                          filterOrigin === 'ALL' ? 'beatmapsets-search-filter__item--active' : ''
+                        }`}
+                      >
+                        Qualquer ({maps.length})
+                      </a>
 
-                        return (
-                          <a
-                            key={mod.id}
-                            href={`#mod-${mod.id}`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setFilterMod(mod.id);
-                            }}
-                            className={`beatmapsets-search-filter__item ${
-                              isSelected ? 'beatmapsets-search-filter__item--active' : ''
-                            }`}
-                          >
-                            {mod.label} ({cnt})
-                          </a>
-                        );
-                      })}
+                      <a
+                        href="#origin-local"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setFilterOrigin('local_songs');
+                        }}
+                        className={`beatmapsets-search-filter__item ${
+                          filterOrigin === 'local_songs'
+                            ? 'beatmapsets-search-filter__item--active'
+                            : ''
+                        }`}
+                      >
+                        <i
+                          className="fas fa-hdd"
+                          style={{ marginRight: '5px', fontSize: '10px', color: 'hsl(var(--hsl-h1))' }}
+                        />
+                        Meus Beatmaps / Songs ({localMapsCount})
+                      </a>
+
+                      <a
+                        href="#origin-tournament"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setFilterOrigin('tournament');
+                        }}
+                        className={`beatmapsets-search-filter__item ${
+                          filterOrigin === 'tournament'
+                            ? 'beatmapsets-search-filter__item--active'
+                            : ''
+                        }`}
+                      >
+                        <i
+                          className="fas fa-trophy"
+                          style={{ marginRight: '5px', fontSize: '10px', color: '#e5b32e' }}
+                        />
+                        Torneios ({tournamentMapsCount})
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={() => openUploader('osu_songs')}
+                        className="osu-radar-player__mod-btn osu-radar-player__mod-btn--active"
+                        style={{
+                          marginLeft: '4px',
+                          padding: '3px 10px',
+                          fontSize: '11px',
+                          textTransform: 'none',
+                        }}
+                        title="Indexar ou atualizar automaticamente sua pasta Songs instalada no osu!"
+                      >
+                        <i className="fas fa-sync-alt" style={{ marginRight: '5px' }} />
+                        Sincronizar Pasta Songs
+                      </button>
                     </div>
                   </div>
 
-                  {/* Tournament Filter Row (Shown when tournaments exist) */}
-                  {availableTournaments.length > 0 && (
-                    <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
-                      <span className="beatmapsets-search-filter__header">Torneio</span>
-                      <div className="beatmapsets-search-filter__items">
-                        <a
-                          href="#tourney-all"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setFilterTournament('ALL');
-                          }}
-                          className={`beatmapsets-search-filter__item ${
-                            filterTournament === 'ALL' ? 'beatmapsets-search-filter__item--active' : ''
-                          }`}
-                        >
-                          Todos os Torneios ({maps.length})
-                        </a>
-                        {availableTournaments.map((tourney: string) => {
-                          const cnt = maps.filter((m) => m.tournamentName === tourney).length;
-                          const isSelected = filterTournament === tourney;
-                          return (
-                            <a
-                              key={tourney}
-                              href={`#tourney-${tourney}`}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setFilterTournament(tourney);
-                              }}
-                              className={`beatmapsets-search-filter__item ${
-                                isSelected ? 'beatmapsets-search-filter__item--active' : ''
-                              }`}
-                            >
-                              <i className="fas fa-trophy" style={{ marginRight: '5px', fontSize: '10px', color: '#e5b32e' }} />
-                              {tourney} ({cnt})
-                            </a>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  {/* Personal Training Presets + Pattern Density / Range Filters */}
+                  <TrainingFiltersPanel />
 
-                  {/* Stage / Pool Difficulty Filter Row (Shown when stages exist) */}
-                  {availableStages.length > 0 && (
-                    <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
-                      <span className="beatmapsets-search-filter__header">Etapa / Dificuldade</span>
-                      <div className="beatmapsets-search-filter__items">
-                        <a
-                          href="#stage-all"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setFilterStage('ALL');
-                          }}
-                          className={`beatmapsets-search-filter__item ${
-                            filterStage === 'ALL' ? 'beatmapsets-search-filter__item--active' : ''
-                          }`}
-                        >
-                          Todas as Etapas ({filterTournament === 'ALL' ? maps.length : maps.filter(m => m.tournamentName === filterTournament).length})
-                        </a>
-                        {availableStages.map((stage: string) => {
-                          const cnt = maps.filter(
-                            (m) =>
-                              (filterTournament === 'ALL' || m.tournamentName === filterTournament) &&
-                              m.stageName === stage
-                          ).length;
-                          const isSelected = filterStage === stage;
-                          return (
+                  {/* Tournament-specific filters (shown when not strictly filtering Local Songs) */}
+                  {filterOrigin !== 'local_songs' && (
+                    <>
+                      <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
+                        <span className="beatmapsets-search-filter__header">Slot / Mod</span>
+                        <div className="beatmapsets-search-filter__items">
+                          {MOD_FILTERS.map((mod) => {
+                            const basePool = filterOrigin === 'tournament' ? tournamentMaps : maps;
+                            const cnt =
+                              mod.id === 'ALL'
+                                ? basePool.length
+                                : basePool.filter((m) => m.modSlot?.startsWith(mod.id)).length;
+                            const isSelected = filterMod === mod.id;
+
+                            return (
+                              <a
+                                key={mod.id}
+                                href={`#mod-${mod.id}`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setFilterMod(mod.id);
+                                }}
+                                className={`beatmapsets-search-filter__item ${
+                                  isSelected ? 'beatmapsets-search-filter__item--active' : ''
+                                }`}
+                              >
+                                {mod.label} ({cnt})
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Tournament Filter Row (Shown when tournaments exist) */}
+                      {availableTournaments.length > 0 && (
+                        <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
+                          <span className="beatmapsets-search-filter__header">Torneio</span>
+                          <div className="beatmapsets-search-filter__items">
                             <a
-                              key={stage}
-                              href={`#stage-${stage}`}
+                              href="#tourney-all"
                               onClick={(e) => {
                                 e.preventDefault();
-                                setFilterStage(stage);
+                                setFilterTournament('ALL');
                               }}
                               className={`beatmapsets-search-filter__item ${
-                                isSelected ? 'beatmapsets-search-filter__item--active' : ''
+                                filterTournament === 'ALL' ? 'beatmapsets-search-filter__item--active' : ''
                               }`}
                             >
-                              <i className="fas fa-layer-group" style={{ marginRight: '5px', fontSize: '10px' }} />
-                              {stage} ({cnt})
+                              Todos os Torneios ({tournamentMaps.length})
                             </a>
-                          );
-                        })}
-                      </div>
-                    </div>
+                            {availableTournaments.map((tourney: string) => {
+                              const cnt = tournamentMaps.filter((m) => m.tournamentName === tourney).length;
+                              const isSelected = filterTournament === tourney;
+                              return (
+                                <a
+                                  key={tourney}
+                                  href={`#tourney-${tourney}`}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setFilterTournament(tourney);
+                                  }}
+                                  className={`beatmapsets-search-filter__item ${
+                                    isSelected ? 'beatmapsets-search-filter__item--active' : ''
+                                  }`}
+                                >
+                                  <i className="fas fa-trophy" style={{ marginRight: '5px', fontSize: '10px', color: '#e5b32e' }} />
+                                  {tourney} ({cnt})
+                                </a>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Stage / Pool Difficulty Filter Row (Shown when stages exist) */}
+                      {availableStages.length > 0 && (
+                        <div className="beatmapsets-search-filter beatmapsets-search-filter--grid">
+                          <span className="beatmapsets-search-filter__header">Etapa / Dificuldade</span>
+                          <div className="beatmapsets-search-filter__items">
+                            <a
+                              href="#stage-all"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setFilterStage('ALL');
+                              }}
+                              className={`beatmapsets-search-filter__item ${
+                                filterStage === 'ALL' ? 'beatmapsets-search-filter__item--active' : ''
+                              }`}
+                            >
+                              Todas as Etapas (
+                              {filterTournament === 'ALL'
+                                ? tournamentMaps.length
+                                : tournamentMaps.filter((m) => m.tournamentName === filterTournament).length}
+                              )
+                            </a>
+                            {availableStages.map((stage: string) => {
+                              const cnt = tournamentMaps.filter(
+                                (m) =>
+                                  (filterTournament === 'ALL' || m.tournamentName === filterTournament) &&
+                                  m.stageName === stage
+                              ).length;
+                              const isSelected = filterStage === stage;
+                              return (
+                                <a
+                                  key={stage}
+                                  href={`#stage-${stage}`}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setFilterStage(stage);
+                                  }}
+                                  className={`beatmapsets-search-filter__item ${
+                                    isSelected ? 'beatmapsets-search-filter__item--active' : ''
+                                  }`}
+                                >
+                                  <i className="fas fa-layer-group" style={{ marginRight: '5px', fontSize: '10px' }} />
+                                  {stage} ({cnt})
+                                </a>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -429,20 +584,31 @@ export const App: React.FC = () => {
                 <div ref={wedgeContainerRef} className="osu-radar-left-col">
                   <LazerWedge
                     map={activeMap}
-                    poolAverageSkills={maps.length > 1 ? avgSkills : undefined}
+                    poolAverageSkills={avgSkills}
                     onSlotChange={(id, newSlot) => updateModSlot(id, newSlot)}
                   />
                 </div>
 
-                {/* Right Column: Official .beatmapsets Toolbar + .beatmapset-panel List */}
+                {/* Right Column: Official .beatmapsets Toolbar + Virtualized .beatmapset-panel List */}
                 <div className="osu-radar-right-col">
                   {/* Official ppy/osu-web .beatmapsets__toolbar & .sort (resources/js/beatmaps/search-sort.tsx) */}
-                  <div className="beatmapsets__toolbar">
+                  <div
+                    className="beatmapsets__toolbar"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                    }}
+                  >
                     <div className="beatmapsets__toolbar-item">
                       <div className="sort sort--beatmapsets">
                         <div className="sort__items">
                           <span className="sort__item sort__item--title">ordenar por</span>
-                          {SORT_OPTIONS.map((opt) => {
+                          {SORT_OPTIONS.filter(
+                            (opt) => !(filterOrigin === 'local_songs' && opt.hideInLocal)
+                          ).map((opt) => {
                             const active = sortBy === opt.value;
                             return (
                               <a
@@ -471,27 +637,30 @@ export const App: React.FC = () => {
                         </div>
                       </div>
                     </div>
+
+                    <div
+                      style={{
+                        paddingRight: '12px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: 'hsl(var(--hsl-l2))',
+                      }}
+                    >
+                      <strong style={{ color: '#fff' }}>
+                        {filteredMaps.length.toLocaleString('pt-BR')}
+                      </strong>{' '}
+                      beatmap{filteredMaps.length === 1 ? '' : 's'}
+                    </div>
                   </div>
 
-                  {/* Beatmapset Panels List (sized to match Left Column) */}
-                  <div
-                    style={{
-                      height: wedgeHeight > 0 ? `${Math.max(460, wedgeHeight - 48)}px` : undefined,
-                      maxHeight: wedgeHeight > 0 ? `${Math.max(460, wedgeHeight - 48)}px` : undefined,
-                    }}
-                    className="osu-radar-beatmapsets-list"
-                  >
-                    {filteredMaps.length > 0 ? (
-                      filteredMaps.map((map) => (
-                        <LazerCarouselItem
-                          key={map.id}
-                          map={map}
-                          isSelected={map.id === selectedMapId}
-                          onSelect={() => selectMap(map.id)}
-                          onRemove={() => removeBeatmap(map.id)}
-                        />
-                      ))
-                    ) : (
+                  {/* Virtualized Beatmapset Panels List */}
+                  <VirtualBeatmapList
+                    maps={filteredMaps}
+                    selectedMapId={activeMap?.id || selectedMapId}
+                    maxHeightPx={wedgeHeight > 0 ? Math.max(460, wedgeHeight - 48) : undefined}
+                    onSelectMap={(id) => selectMap(id)}
+                    onRemoveMap={(id) => removeBeatmap(id)}
+                    emptyState={
                       <div
                         className="beatmapsets__empty"
                         style={{
@@ -507,26 +676,64 @@ export const App: React.FC = () => {
                           style={{ maxWidth: '180px', opacity: 0.85 }}
                         />
                         <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff' }}>
-                          Nenhum beatmap encontrado nesta visualização
+                          {hasActiveTrainingFilters && maps.length > 0
+                            ? 'Nenhum beatmap atende aos filtros de treino atuais'
+                            : filterOrigin === 'local_songs' && localMapsCount === 0
+                            ? 'Sua pasta Songs do osu! ainda não foi sincronizada'
+                            : 'Nenhum beatmap encontrado nesta visualização'}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'hsl(var(--hsl-l2))', maxWidth: '380px' }}>
-                          Arraste pacotes <strong>.osz</strong> ou arquivos <strong>.osu</strong> para a janela, ou clique abaixo para importar uma mappool / planilha do Google Sheets.
+                        <div style={{ fontSize: '12px', color: 'hsl(var(--hsl-l2))', maxWidth: '420px' }}>
+                          {hasActiveTrainingFilters && maps.length > 0
+                            ? 'Experimente flexibilizar as faixas de estrelas/BPM/padrões ou clique abaixo para resetar os filtros.'
+                            : 'Sincronize todos os mapas instalados localmente na sua pasta Songs do osu! para treinar Streams, Jumps, Tech e Accuracy, ou importe uma planilha de torneio.'}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setIsUploaderOpen(true)}
-                          className="btn-osu-big btn-osu-big--rounded"
-                        >
-                          <div className="btn-osu-big__content">
-                            <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
-                              <i className="fas fa-cloud-upload-alt" />
-                            </span>
-                            <span>Importar Beatmaps / Google Sheets</span>
-                          </div>
-                        </button>
+
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                          {hasActiveTrainingFilters && maps.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={resetTrainingFilters}
+                              className="btn-osu-big btn-osu-big--rounded"
+                            >
+                              <div className="btn-osu-big__content">
+                                <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
+                                  <i className="fas fa-undo" />
+                                </span>
+                                <span>Resetar Filtros de Treino</span>
+                              </div>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => openUploader('osu_songs')}
+                            className="btn-osu-big btn-osu-big--rounded"
+                          >
+                            <div className="btn-osu-big__content">
+                              <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
+                                <i className="fas fa-hdd" />
+                              </span>
+                              <span>Sincronizar Pasta Songs (osu!)</span>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => openUploader('sheet')}
+                            className="btn-osu-big btn-osu-big--rounded"
+                            style={{ backgroundColor: 'hsl(var(--hsl-b3))' }}
+                          >
+                            <div className="btn-osu-big__content">
+                              <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
+                                <i className="fas fa-table" />
+                              </span>
+                              <span>Importar Torneio / Sheets</span>
+                            </div>
+                          </button>
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    }
+                  />
                 </div>
               </div>
             </div>
@@ -542,13 +749,13 @@ export const App: React.FC = () => {
       {/* 3. Official ppy/osu-web Footer */}
       <LazerBottomBar
         onBackClick={() => setActiveTab('select')}
-        onOpenUpload={() => setIsUploaderOpen(true)}
+        onOpenUpload={() => openUploader('osu_songs')}
       />
 
       {/* 3.1 Official osu-web Floating Audio Player for Previews */}
       <LazerFloatingAudioPlayer />
 
-      {/* 4. Uploader Modal */}
+      {/* 4. Uploader & Songs Sync Modal */}
       {isUploaderOpen && (
         <div
           className="osu-radar-modal-backdrop"
@@ -560,8 +767,8 @@ export const App: React.FC = () => {
           >
             <div className="osu-radar-modal__header">
               <span style={{ fontWeight: 700, fontSize: '16px', color: 'hsl(var(--hsl-c1))' }}>
-                <i className="fas fa-cloud-upload-alt" style={{ marginRight: '8px', color: 'hsl(var(--hsl-h1))' }} />
-                Importador de Mappool & Sincronizador Google Sheets
+                <i className="fas fa-hdd" style={{ marginRight: '8px', color: 'hsl(var(--hsl-h1))' }} />
+                Biblioteca osu! Songs & Importador de Mappools
               </span>
               <button
                 type="button"
@@ -572,8 +779,8 @@ export const App: React.FC = () => {
               </button>
             </div>
             <div className="osu-radar-modal__body">
-              <ErrorBoundary fallbackTitle="Erro ao carregar o importador de beatmaps">
-                <PoolUploader />
+              <ErrorBoundary fallbackTitle="Erro ao carregar o sincronizador de beatmaps">
+                <PoolUploader key={uploaderInitialTab} initialTab={uploaderInitialTab} />
               </ErrorBoundary>
             </div>
           </div>

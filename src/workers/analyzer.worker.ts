@@ -1,18 +1,29 @@
 import { analyzeBeatmap } from '../engine/analyzer';
-import { BeatmapAnalysisResult } from '../engine/types';
+import { extractOsuModeQuick } from '../engine/parser';
+import { BeatmapAnalysisResult, BeatmapOrigin } from '../engine/types';
+
+export interface WorkerAnalyzeFileInput {
+  fileName: string;
+  text: string;
+  bytes?: Uint8Array;
+  folderName?: string;
+  lightweight?: boolean;
+  origin?: BeatmapOrigin;
+  localOsuPath?: string;
+  localAudioPath?: string;
+  localBgPath?: string;
+  fileMtimeMs?: number;
+  skipNonStandard?: boolean;
+}
 
 export interface WorkerAnalyzePayload {
   type: 'ANALYZE_BATCH';
-  files: Array<{
-    fileName: string;
-    text: string;
-    bytes?: Uint8Array;
-  }>;
+  files: WorkerAnalyzeFileInput[];
 }
 
 export type WorkerMessage =
   | { type: 'PROGRESS'; current: number; total: number; currentFileName: string }
-  | { type: 'SUCCESS'; results: BeatmapAnalysisResult[] }
+  | { type: 'SUCCESS'; results: BeatmapAnalysisResult[]; skippedNonStandard: number }
   | { type: 'ERROR'; message: string };
 
 self.onmessage = async (event: MessageEvent<WorkerAnalyzePayload>) => {
@@ -21,6 +32,7 @@ self.onmessage = async (event: MessageEvent<WorkerAnalyzePayload>) => {
   if (type === 'ANALYZE_BATCH') {
     try {
       const results: BeatmapAnalysisResult[] = [];
+      let skippedNonStandard = 0;
       const total = files.length;
 
       for (let i = 0; i < total; i++) {
@@ -33,13 +45,40 @@ self.onmessage = async (event: MessageEvent<WorkerAnalyzePayload>) => {
           currentFileName: file.fileName,
         } as WorkerMessage);
 
-        const result = await analyzeBeatmap(file.text, file.fileName, file.bytes);
+        if (file.skipNonStandard && extractOsuModeQuick(file.text) !== 0) {
+          skippedNonStandard++;
+          continue;
+        }
+
+        const result = await analyzeBeatmap(
+          file.text,
+          file.fileName,
+          file.bytes,
+          undefined,
+          undefined,
+          {
+            folderName: file.folderName,
+            lightweight: file.lightweight,
+            origin: file.origin,
+            localOsuPath: file.localOsuPath,
+            localAudioPath: file.localAudioPath,
+            localBgPath: file.localBgPath,
+            fileMtimeMs: file.fileMtimeMs,
+          }
+        );
+
+        if (file.skipNonStandard && (result.metadata.mode ?? 0) !== 0) {
+          skippedNonStandard++;
+          continue;
+        }
+
         results.push(result);
       }
 
       self.postMessage({
         type: 'SUCCESS',
         results,
+        skippedNonStandard,
       } as WorkerMessage);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
