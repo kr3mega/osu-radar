@@ -21,4 +21,5 @@ contextBridge.exposeInMainWorld('osuRadarDesktop', {
   openExternal: (url) => ipcRenderer.invoke('osu-radar:open-external', url),
   log: (level, tag, message, extra) =>
     ipcRenderer.invoke('osu-radar:log', { level, tag, message, extra }),
+  getGPUStatus: () => ipcRenderer.invoke('osu-radar:get-gpu-status'),
 });

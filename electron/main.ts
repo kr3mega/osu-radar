@@ -40,6 +40,21 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('com.osuradar.desktop');
 }
 
+// Forçar Aceleração de Hardware por padrão no Chromium / Electron
+// Ignora blocklists de drivers antigos e força rasterização e composição direta na GPU
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('enable-accelerated-video-decode');
+app.commandLine.appendSwitch('enable-accelerated-mjpeg-decode');
+app.commandLine.appendSwitch('enable-native-gpu-memory-buffers');
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('use-angle', 'd3d11');
+  app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,D3D11VideoDecoder,CanvasOopif');
+}
+// Força o uso da GPU dedicada/alta performance em máquinas com placas híbridas (ex: notebooks)
+app.commandLine.appendSwitch('force_high_performance_gpu');
+
 let mainWindow: BrowserWindow | null = null;
 let localServer: RunningLocalAppServer | null = null;
 let activeAppOrigin = '';
@@ -124,6 +139,32 @@ function logDisplayDiagnostics(appLogger: DesktopLogger) {
     });
   } catch (err) {
     appLogger.warn('Display', 'Não foi possível ler as métricas dos monitores:', err);
+  }
+}
+
+async function logGPUDiagnostics(appLogger: DesktopLogger) {
+  try {
+    const status = app.getGPUFeatureStatus();
+    appLogger.system(
+      'GPU',
+      `Aceleração de Hardware: Canvas 2D: ${status['2d_canvas']} | WebGL: ${status.webgl} | WebGL2: ${status.webgl2} | Rasterização GPU: ${status.rasterization} | Video Decode: ${status.video_decode}`
+    );
+    const gpuInfo = await app.getGPUInfo('basic');
+    if (gpuInfo) {
+      const devices = (gpuInfo as any).gpuDevice || [];
+      if (Array.isArray(devices) && devices.length > 0) {
+        devices.forEach((dev: any, i: number) => {
+          const vendorHex = (dev.vendorId || 0).toString(16).toUpperCase();
+          const deviceHex = (dev.deviceId || 0).toString(16).toUpperCase();
+          appLogger.system(
+            'GPU',
+            `  -> Adaptador Gráfico #${i + 1}: Vendor ID 0x${vendorHex} | Device ID 0x${deviceHex} | Ativo: ${dev.active ? 'SIM' : 'NÃO'}`
+          );
+        });
+      }
+    }
+  } catch (err) {
+    appLogger.warn('GPU', 'Não foi possível ler status detalhado da GPU:', err);
   }
 }
 
@@ -283,6 +324,11 @@ function registerIpcHandlers(appLogger: DesktopLogger): void {
     }
   });
 
+  ipcMain.handle('osu-radar:get-gpu-status', () => {
+    appLogger.ipc('get-gpu-status', 'Consulta de aceleração de hardware solicitada pela interface');
+    return app.getGPUFeatureStatus();
+  });
+
   ipcMain.handle(
     'osu-radar:log',
     (_event, payload?: { level?: string; tag?: string; message?: string; extra?: any }) => {
@@ -350,6 +396,7 @@ async function createMainWindow(appLogger: DesktopLogger): Promise<void> {
       nodeIntegration: false,
       sandbox: true,
       backgroundThrottling: false,
+      webgl: true,
     },
   });
 
@@ -629,6 +676,7 @@ if (!hasSingleInstanceLock) {
   app.whenReady().then(async () => {
     logger.info('Main', 'app.whenReady() concluído com sucesso.');
     logDisplayDiagnostics(logger);
+    await logGPUDiagnostics(logger);
     registerIpcHandlers(logger);
     await createMainWindow(logger);
 

@@ -17,6 +17,7 @@ export interface OsuRadarDesktopBridge {
     message: string,
     extra?: any
   ) => Promise<void>;
+  getGPUStatus?: () => Promise<Record<string, string>>;
 }
 
 declare global {
