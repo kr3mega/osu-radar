@@ -12,7 +12,9 @@
     "electron:build-main": "node scripts/build-electron.mjs",
     "electron:build": "npm run build && npm run electron:build-main",
     "electron:start": "electron .",
+    "electron": "electron .",
     "electron:dev": "node scripts/dev-electron.mjs",
+    "start": "npm run app",
     "app": "npm run electron:build && electron ."
   },
   "dependencies": {

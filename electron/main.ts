@@ -783,6 +783,7 @@ if (!hasSingleInstanceLock) {
   logger.warn('Main', 'Sinalizando restauração e foco para a janela já em execução.');
   logger.warn('Main', 'Encerrando esta nova instância para prevenir colisões de portas e bancos IndexedDB.');
   logger.warn('Main', '================================================================================');
+  console.log('\n[osu!skills] O aplicativo já está em execução! Trazendo a janela principal para o primeiro plano...\n');
   app.quit();
 } else {
   logSystemDiagnostics(logger, appRoot);
@@ -799,7 +800,9 @@ if (!hasSingleInstanceLock) {
       if (!mainWindow.isVisible()) {
         mainWindow.show();
       }
+      mainWindow.setAlwaysOnTop(true);
       mainWindow.focus();
+      mainWindow.setAlwaysOnTop(false);
     }
   });
 

@@ -62,7 +62,9 @@ function streamStaticFile(
   res.setHeader('Content-Type', mime);
   res.setHeader('Accept-Ranges', 'bytes');
   if (ext === '.html') {
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
   } else {
     res.setHeader('Cache-Control', 'private, max-age=3600');
   }
