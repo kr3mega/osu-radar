@@ -595,32 +595,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       {/* Top Toolbar */}
       <div className="osu-radar-player__toolbar">
         <div className="osu-radar-player__toolbar-left">
-          <strong
-            className="u-ellipsis-overflow"
-            style={{ color: '#fff', maxWidth: '280px', flexShrink: 1 }}
-            title={map.metadata.title}
-          >
-            {map.metadata.title}
-          </strong>
-          <span
-            className="u-ellipsis-overflow"
-            style={{ color: 'hsl(var(--hsl-l2))', fontSize: '11px', maxWidth: '160px', flexShrink: 2 }}
-            title={map.metadata.version}
-          >
-            [{map.metadata.version}]
-          </span>
-          <span
-            className="osu-radar-mod-pill"
-            style={{
-              backgroundColor: 'hsl(var(--hsl-h2))',
-              color: '#fff',
-              fontSize: '10px',
-              flexShrink: 0,
-            }}
-          >
-            {map.modSlot || 'NM'}
-          </span>
-
           {audioStatus.state === 'loading' ? (
             <span
               className="osu-radar-mod-pill"
@@ -654,7 +628,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
         </div>
 
         <div className="osu-radar-player__toolbar-right">
-          {/* Custom Skin Selector Dropdown + Quick .osk Import */}
+          {/* Custom Skin Selector Dropdown */}
           <div className="osu-radar-skin-switcher" ref={skinDropdownRef}>
             <button
               type="button"
@@ -682,16 +656,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                   isSkinDropdownOpen ? 'osu-radar-skin-trigger__chevron--open' : ''
                 }`}
               />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => skinInputRef.current?.click()}
-              className="osu-radar-skin-import-btn"
-              title="Importar arquivo de skin .osk / .zip"
-            >
-              <i className="fas fa-plus" />
-              <span>.osk</span>
             </button>
 
             {isSkinDropdownOpen && (
