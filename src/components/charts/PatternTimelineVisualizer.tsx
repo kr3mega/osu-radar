@@ -108,7 +108,7 @@ export const PatternTimelineVisualizer: React.FC<PatternTimelineVisualizerProps>
               className={`absolute h-5 rounded-sm cursor-pointer transition-all duration-150 ${barColor} ${
                 isHighlight ? 'ring-2 ring-white scale-y-125 z-20' : 'opacity-70 hover:opacity-100 hover:scale-y-110 z-10'
               }`}
-              title={`${p.label} [${p.startTimestamp}] — Clique para visualizar ao vivo`}
+              title={`${p.label} [${p.startTimestamp}] — Clique para reproduzir`}
             />
           );
         })}

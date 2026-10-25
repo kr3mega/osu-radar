@@ -226,7 +226,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     });
   }, [detectedPatterns, patternCategory]);
 
-  // All patterns that are currently live ("AO VIVO" with glowing border)
+  // All patterns that are currently playing
   const livePatterns = useMemo(() => {
     return filteredPatterns.filter(
       (p) => currentTimeMs >= p.startTimeMs && currentTimeMs <= p.endTimeMs
@@ -609,31 +609,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                 }}
               >
                 Clique para Jogar
-              </span>
-            </div>
-          )}
-
-          {activeTopLivePattern && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '8px',
-                left: '8px',
-                backgroundColor: 'rgba(0,0,0,0.75)',
-                padding: '3px 8px',
-                borderRadius: '1000px',
-                fontSize: '10px',
-                fontWeight: 700,
-                color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              <i className="fas fa-circle" style={{ color: 'hsl(var(--hsl-h1))', fontSize: '7px' }} />
-              <span>
-                {activeTopLivePattern.label}
-                {livePatterns.length > 1 ? ` (+${livePatterns.length - 1})` : ''}
               </span>
             </div>
           )}

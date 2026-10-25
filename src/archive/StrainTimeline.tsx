@@ -8,7 +8,7 @@
  * Descrição:
  * Renderiza um histograma bicromático (amarelo/laranja) da tensão contínua calculada
  * ao longo da duração do beatmap, permitindo interatividade ao passar o mouse e clicar
- * para sincronizar o reprodutor de vídeo/preview ao vivo em determinado segundo.
+ * para sincronizar o reprodutor de vídeo/preview em determinado segundo.
  * 
  * Como restaurar no futuro se necessário:
  * 1. Importar: `import { StrainTimeline } from '../archive/StrainTimeline';`
@@ -78,12 +78,12 @@ export const StrainTimeline: React.FC<StrainTimelineProps> = ({
               Tensão: {activePoint.totalStrain.toFixed(1).replace('.', ',')}%
             </span>
             <span className="text-osu-pink text-[10px] font-semibold hidden sm:inline">
-              (Clique para ver ao vivo)
+              (Clique para reproduzir)
             </span>
           </div>
         ) : (
           <span className="text-[10px] text-white/40">
-            Clique em qualquer ponto para ver o padrão ao vivo
+            Clique em qualquer ponto para reproduzir o padrão
           </span>
         )}
       </div>
