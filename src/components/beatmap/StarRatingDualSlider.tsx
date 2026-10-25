@@ -1,4 +1,4 @@
-import React, { useId, useRef } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { DEFAULT_TRAINING_FILTERS, usePoolStore } from '../../store/usePoolStore';
 import { getStarRatingColor, getStarRatingTextColor } from '../../utils/osuColors';
 
@@ -13,7 +13,7 @@ function clampSr(val: number): number {
 /**
  * Dual-thumb draggable Star Rating range bar (`srMin` — `srMax`).
  * Built on two labeled native `<input type="range">` controls to preserve
- * keyboard navigation, touch dragging, and screen-reader `aria-valuetext`.
+ * keyboard navigation, touch dragging, screen-reader `aria-valuetext`, and direct text typing.
  */
 export const StarRatingDualSlider: React.FC = () => {
   const { trainingFilters, setStarRatingRange } = usePoolStore();
@@ -22,6 +22,13 @@ export const StarRatingDualSlider: React.FC = () => {
   const trackWrapRef = useRef<HTMLDivElement | null>(null);
   const minInputRef = useRef<HTMLInputElement | null>(null);
   const maxInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [isEditingMin, setIsEditingMin] = useState(false);
+  const [isEditingMax, setIsEditingMax] = useState(false);
+  const [minInputVal, setMinInputVal] = useState('');
+  const [maxInputVal, setMaxInputVal] = useState('');
+  const minTextRef = useRef<HTMLInputElement | null>(null);
+  const maxTextRef = useRef<HTMLInputElement | null>(null);
 
   const srMin = clampSr(trainingFilters.srMin);
   const srMax = clampSr(trainingFilters.srMax);
@@ -44,6 +51,42 @@ export const StarRatingDualSlider: React.FC = () => {
   const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextMax = clampSr(Math.max(Number(e.target.value), srMin));
     setStarRatingRange(srMin, nextMax);
+  };
+
+  const startEditMin = () => {
+    setMinInputVal(srMin.toFixed(2).replace('.', ','));
+    setIsEditingMin(true);
+    setTimeout(() => {
+      minTextRef.current?.focus();
+      minTextRef.current?.select();
+    }, 10);
+  };
+
+  const commitMin = () => {
+    setIsEditingMin(false);
+    const parsed = parseFloat(minInputVal.replace(',', '.'));
+    if (!isNaN(parsed)) {
+      const nextMin = clampSr(Math.min(Math.max(SR_MIN_LIMIT, parsed), srMax));
+      setStarRatingRange(nextMin, srMax);
+    }
+  };
+
+  const startEditMax = () => {
+    setMaxInputVal(srMax >= SR_MAX_LIMIT ? '12' : srMax.toFixed(2).replace('.', ','));
+    setIsEditingMax(true);
+    setTimeout(() => {
+      maxTextRef.current?.focus();
+      maxTextRef.current?.select();
+    }, 10);
+  };
+
+  const commitMax = () => {
+    setIsEditingMax(false);
+    const parsed = parseFloat(maxInputVal.replace(',', '.'));
+    if (!isNaN(parsed)) {
+      const nextMax = clampSr(Math.max(Math.min(SR_MAX_LIMIT, parsed), srMin));
+      setStarRatingRange(srMin, nextMax);
+    }
   };
 
   // Allow clicking anywhere along the rail to snap the nearest thumb
@@ -77,14 +120,33 @@ export const StarRatingDualSlider: React.FC = () => {
 
   return (
     <div className="osu-radar-dual-slider" data-filtered={isFiltered ? '1' : '0'}>
-      {/* Left formatted value badge (ordinary DOM content) */}
-      <span
-        className="osu-radar-dual-slider__badge"
-        style={{ backgroundColor: minBadgeBg, color: minBadgeText }}
-        title="Dificuldade mínima permitida (arraste o pino esquerdo)"
-      >
-        {minFormatted}
-      </span>
+      {/* Left formatted value badge: direct click-to-edit support */}
+      {isEditingMin ? (
+        <input
+          ref={minTextRef}
+          type="text"
+          className="osu-radar-dual-slider__badge osu-radar-dual-slider__badge--input"
+          style={{ backgroundColor: minBadgeBg, color: minBadgeText }}
+          value={minInputVal}
+          onChange={(e) => setMinInputVal(e.target.value)}
+          onBlur={commitMin}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitMin();
+            if (e.key === 'Escape') setIsEditingMin(false);
+          }}
+          autoFocus
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={startEditMin}
+          className="osu-radar-dual-slider__badge osu-radar-dual-slider__badge--clickable"
+          style={{ backgroundColor: minBadgeBg, color: minBadgeText }}
+          title="Clique para digitar a dificuldade mínima"
+        >
+          {minFormatted}
+        </button>
+      )}
 
       {/* Dual native <input type="range"> track container */}
       <div
@@ -155,32 +217,54 @@ export const StarRatingDualSlider: React.FC = () => {
         />
       </div>
 
-      {/* Right formatted value badge (ordinary DOM content) */}
-      <span
-        className="osu-radar-dual-slider__badge"
-        style={{ backgroundColor: maxBadgeBg, color: maxBadgeText }}
-        title="Dificuldade máxima permitida (arraste o pino direito)"
-      >
-        {maxFormatted}
-      </span>
-
-      {isFiltered && (
+      {/* Right formatted value badge: direct click-to-edit support */}
+      {isEditingMax ? (
+        <input
+          ref={maxTextRef}
+          type="text"
+          className="osu-radar-dual-slider__badge osu-radar-dual-slider__badge--input"
+          style={{ backgroundColor: maxBadgeBg, color: maxBadgeText }}
+          value={maxInputVal}
+          onChange={(e) => setMaxInputVal(e.target.value)}
+          onBlur={commitMax}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitMax();
+            if (e.key === 'Escape') setIsEditingMax(false);
+          }}
+          autoFocus
+        />
+      ) : (
         <button
           type="button"
-          onClick={() =>
-            setStarRatingRange(
-              DEFAULT_TRAINING_FILTERS.srMin,
-              DEFAULT_TRAINING_FILTERS.srMax
-            )
-          }
-          className="osu-radar-player__mod-btn"
-          style={{ padding: '2px 8px', fontSize: '10px', textTransform: 'none', flexShrink: 0 }}
-          title="Remover limite de Star Rating (0,00★ – 12,0★+)"
+          onClick={startEditMax}
+          className="osu-radar-dual-slider__badge osu-radar-dual-slider__badge--clickable"
+          style={{ backgroundColor: maxBadgeBg, color: maxBadgeText }}
+          title="Clique para digitar a dificuldade máxima"
         >
-          <i className="fas fa-undo" style={{ marginRight: '4px' }} />
-          Resetar ★
+          {maxFormatted}
         </button>
       )}
+
+      {/* Stable Slot: Resetar ★ appears right beside max diff without pushing it to the side */}
+      <div className="osu-radar-dual-slider__reset-slot">
+        {isFiltered && (
+          <button
+            type="button"
+            onClick={() =>
+              setStarRatingRange(
+                DEFAULT_TRAINING_FILTERS.srMin,
+                DEFAULT_TRAINING_FILTERS.srMax
+              )
+            }
+            className="osu-radar-player__mod-btn"
+            style={{ padding: '2px 8px', fontSize: '10px', textTransform: 'none', flexShrink: 0 }}
+            title="Remover limite de Star Rating (0,00★ – 12,0★+)"
+          >
+            <i className="fas fa-undo" style={{ marginRight: '4px' }} />
+            Resetar ★
+          </button>
+        )}
+      </div>
     </div>
   );
 };

@@ -52,7 +52,7 @@
 
   @media (min-width: 1100px) {
     grid-template-columns: 580px 1fr;
-    align-items: start;
+    align-items: stretch;
   }
 
   @media (min-width: 1360px) {
@@ -64,6 +64,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  height: 100%;
   background-color: @osu-colour-b4;
   border-radius: @border-radius--large;
   overflow: hidden;
@@ -168,6 +169,8 @@
   flex-direction: column;
   background-color: @osu-colour-b5;
   border-top: 1px solid @osu-colour-b3;
+  height: 100%;
+  flex: 1 1 auto;
 
   &--fullscreen {
     position: fixed;
@@ -367,23 +370,28 @@
   }
 
   &__transport-btn {
-    width: 34px;
-    height: 32px;
-    padding: 0;
-    display: inline-flex;
+    width: 24px !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
     align-items: center;
     justify-content: center;
+    font-size: 9px;
+    border-radius: 4px;
     flex-shrink: 0;
   }
 
   &__play-btn {
-    width: 38px;
-    height: 32px;
-    padding: 0;
-    display: inline-flex;
+    width: 26px !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: 10px;
+    border-radius: 4px;
     flex-shrink: 0;
   }
 
@@ -401,6 +409,8 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    flex: 1 1 auto;
+    min-height: 480px;
   }
 
   &__patterns-header {
@@ -411,15 +421,16 @@
     gap: 8px;
     padding-bottom: 8px;
     border-bottom: 1px solid @osu-colour-b3;
+    flex-shrink: 0;
   }
 
   &__patterns-list {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    height: 340px;
-    max-height: 420px;
-    min-height: 260px;
+    flex: 1 1 auto;
+    min-height: 420px;
+    max-height: none;
     overflow-y: auto;
     padding-right: 4px;
     .fancy-scrollbar();
@@ -785,21 +796,51 @@
 .osu-radar-dual-slider {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   inline-size: 100%;
-  max-inline-size: 620px;
+  max-inline-size: 680px;
 
   &__badge {
-    min-inline-size: 56px;
+    min-inline-size: 58px;
+    height: 24px;
     padding: 2px 8px;
     border-radius: 999px;
     font-size: 11px;
     font-weight: 800;
-    line-height: 1.4;
+    line-height: 20px;
     text-align: center;
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    border: 1px solid transparent;
+    transition: transform 100ms ease, box-shadow 100ms ease;
+
+    &--clickable {
+      cursor: pointer;
+      appearance: none;
+      background: none;
+
+      &:hover {
+        transform: scale(1.04);
+        box-shadow: 0 0 0 2px hsla(var(--hsl-h1), 0.4), 0 1px 4px rgba(0, 0, 0, 0.35);
+      }
+    }
+
+    &--input {
+      outline: none;
+      border: 1px solid #ffffff;
+      box-shadow: 0 0 0 2px hsla(var(--hsl-h1), 0.6), 0 1px 4px rgba(0, 0, 0, 0.35);
+      cursor: text;
+      font-family: inherit;
+      width: 58px;
+    }
+  }
+
+  &__reset-slot {
+    display: inline-flex;
+    align-items: center;
+    min-width: 82px;
+    flex-shrink: 0;
   }
 
   &__track-wrap {
@@ -1400,7 +1441,7 @@
 }
 
 /* ==========================================================================
-   Skills Bar Chart (Ver Skills)
+   Skills Bar Chart (Ver Skills) - Authentic osu! pastel & pink design
    ========================================================================== */
 .osu-radar-skills-panel {
   display: flex;
@@ -1444,7 +1485,7 @@
     gap: 8px;
     font-size: 12px;
     font-weight: 700;
-    color: #ffffff;
+    color: @osu-colour-c1;
 
     i {
       font-size: 11px;
@@ -1466,76 +1507,21 @@
     font-weight: 800;
     color: hsl(var(--hsl-h1));
   }
-
-  &__comp-score {
-    font-family: "AzeretMono", monospace;
-    font-size: 10px;
-    font-weight: 600;
-    color: @osu-colour-l2;
-  }
 }
 
 .osu-radar-skill-bar {
   position: relative;
   width: 100%;
-  height: 8px;
+  height: 6px;
   background-color: @osu-colour-b6;
   border-radius: 9999px;
-  overflow: visible;
+  overflow: hidden;
 
   &__fill {
     height: 100%;
     border-radius: 9999px;
-    background: linear-gradient(90deg, hsl(var(--hsl-h1)), hsl(var(--hsl-h2)));
-    box-shadow: 0 0 8px hsla(var(--hsl-h1), 0.4);
-    transition: width 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-
-  &__marker {
-    position: absolute;
-    top: -2px;
-    bottom: -2px;
-    width: 3px;
-    background-color: #ffd700;
-    border-radius: 2px;
-    transform: translateX(-50%);
-    box-shadow: 0 0 6px rgba(255, 215, 0, 0.8);
-    z-index: 2;
-  }
-}
-
-.osu-radar-skills-legend {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-  padding: 8px 12px;
-  background-color: @osu-colour-b5;
-  border: 1px solid @osu-colour-b4;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: @osu-colour-l1;
-
-  &__item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  &__badge {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-
-    &--current {
-      background: linear-gradient(90deg, hsl(var(--hsl-h1)), hsl(var(--hsl-h2)));
-    }
-
-    &--comparison {
-      background-color: #ffd700;
-      box-shadow: 0 0 4px rgba(255, 215, 0, 0.6);
-    }
+    background-color: @osu-colour-h1;
+    transition: width 200ms ease;
   }
 }
 

@@ -299,14 +299,11 @@ export const usePoolStore = create<PoolState>((set, get) => ({
     }),
   toggleExpandedSet: (key) =>
     set((state) => {
-      const nextOpen = !state.expandedSetKeys[key];
-      console.log('[PoolStore] Grupo de beatmaps alternado:', key, 'aberto:', nextOpen);
-      const nextMap = { ...state.expandedSetKeys };
-      if (nextOpen) nextMap[key] = true;
-      else delete nextMap[key];
+      const isCurrentlyOpen = Boolean(state.expandedSetKeys[key]);
+      console.log('[PoolStore] Grupo de beatmaps alternado:', key, 'aberto:', !isCurrentlyOpen);
       return {
-        expandedSetKey: nextOpen ? key : null,
-        expandedSetKeys: nextMap,
+        expandedSetKey: isCurrentlyOpen ? null : key,
+        expandedSetKeys: isCurrentlyOpen ? {} : { [key]: true },
       };
     }),
   collapseAllSets: () => set({ expandedSetKey: null, expandedSetKeys: {} }),

@@ -78,7 +78,6 @@ export const App: React.FC = () => {
     setFilterStage,
     resetTrainingFilters,
     toggleExpandedSet,
-    collapseAllSets,
     setSearchQuery,
     initFromDb,
     addBeatmaps,
@@ -359,7 +358,6 @@ export const App: React.FC = () => {
 
   const hasActiveTrainingFilters =
     countActiveTrainingFilters(trainingFilters) > 0 || prioritizedSkills.length > 0;
-  const hasAnyExpandedSets = Object.keys(expandedSetKeys).length > 0;
 
   return (
     <div
@@ -737,18 +735,6 @@ export const App: React.FC = () => {
                         color: 'hsl(var(--hsl-l2))',
                       }}
                     >
-                      {hasAnyExpandedSets && (
-                        <button
-                          type="button"
-                          onClick={collapseAllSets}
-                          className="osu-radar-player__mod-btn"
-                          style={{ padding: '2px 7px', fontSize: '10px', textTransform: 'none' }}
-                          title="Recolher todas as músicas expandidas"
-                        >
-                          <i className="fas fa-compress-alt" style={{ marginRight: '4px' }} />
-                          Recolher
-                        </button>
-                      )}
                       <span>
                         <strong style={{ color: '#fff' }}>
                           {groupedSets.length.toLocaleString('pt-BR')}

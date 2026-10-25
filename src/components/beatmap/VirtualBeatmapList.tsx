@@ -87,7 +87,7 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
       if (onToggleExpandSet) {
         onToggleExpandSet(groupKey);
       } else {
-        setLocalExpanded((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
+        setLocalExpanded((prev) => (prev[groupKey] ? {} : { [groupKey]: true }));
       }
     },
     [onToggleExpandSet]

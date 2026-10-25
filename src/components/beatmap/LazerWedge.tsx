@@ -6,7 +6,6 @@ import { StatHexagon } from '../charts/StatHexagon';
 import { OsuPreviewPlayer } from '../visualizer/OsuPreviewPlayer';
 import { formatTimestamp } from '../../engine/strains';
 import { buildBeatmapCoverCss } from '../../lib/osu-preview';
-import { formatSkillLabel } from '../../utils/skillLabels';
 
 interface LazerWedgeProps {
   map: BeatmapAnalysisResult | null;
@@ -19,7 +18,7 @@ interface LazerWedgeProps {
 export const LazerWedge: React.FC<LazerWedgeProps> = ({
   map,
   siblingDifficulties,
-  poolAverageSkills,
+  poolAverageSkills: _poolAverageSkills,
   onSlotChange,
   onSelectDifficulty,
 }) => {
@@ -77,7 +76,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: '1 1 auto' }}>
       {/* Official ppy/osu-web .beatmapset-header (resources/js/beatmapsets-show/header.tsx) */}
       <div className="beatmapset-header">
         <div className="beatmapset-header__cover">
@@ -452,39 +451,10 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            flex: '1 1 auto',
           }}
         >
-          {/* Centered top skills badge right below the header */}
-          {map.topSkills && map.topSkills.length > 0 && (
-            <div style={{ marginBottom: '14px', textAlign: 'center' }}>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '4px 16px',
-                  borderRadius: '1000px',
-                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                  border: '1px solid hsl(var(--hsl-b2))',
-                  color: 'hsl(var(--hsl-l1))',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  letterSpacing: '0.5px',
-                }}
-              >
-                <i className="fas fa-bolt" style={{ color: 'hsl(var(--hsl-h1))' }} />
-                <span>{map.topSkills.slice(0, 2).map((k) => formatSkillLabel(k)).join(' + ')}</span>
-              </span>
-            </div>
-          )}
-
-          <StatHexagon
-            skills={skills}
-            comparisonSkills={poolAverageSkills}
-            comparisonLabel="Média da Pool"
-            size={280}
-            showLegend={true}
-          />
+          <StatHexagon skills={skills} />
         </div>
       ) : (
         <OsuPreviewPlayer map={map} patterns={patterns} />
