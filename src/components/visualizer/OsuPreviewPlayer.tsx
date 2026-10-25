@@ -98,6 +98,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
     selectSkin,
     resolveSkinById,
     importSkinOskOrZip,
+    refreshSkins,
   } = useSkinStore();
   const bgDim = 0.85;
   const [activeMods, setActiveMods] = useState<Set<OsuMod>>(new Set());
@@ -115,6 +116,33 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const [hydratedRawText, setHydratedRawText] = useState<string | null>(
     map.rawText && map.rawText.length > 50 ? map.rawText : null
   );
+
+  const [isSkinDropdownOpen, setIsSkinDropdownOpen] = useState<boolean>(false);
+  const skinDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isSkinDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (skinDropdownRef.current && !skinDropdownRef.current.contains(e.target as Node)) {
+        setIsSkinDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsSkinDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isSkinDropdownOpen]);
+
+  const currentSkin = useMemo(() => {
+    return availableSkins.find((s) => s.id === selectedSkinId) || availableSkins[0];
+  }, [availableSkins, selectedSkinId]);
 
   // 1. Derive mod from beatmap slot (HD, HR, DT, EZ, or none)
   const slotMod = useMemo(() => getModFromSlot(map.modSlot), [map.modSlot]);
@@ -567,10 +595,18 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       {/* Top Toolbar */}
       <div className="osu-radar-player__toolbar">
         <div className="osu-radar-player__toolbar-left">
-          <strong className="u-ellipsis-overflow" style={{ color: '#fff', maxWidth: '185px' }}>
+          <strong
+            className="u-ellipsis-overflow"
+            style={{ color: '#fff', maxWidth: '280px', flexShrink: 1 }}
+            title={map.metadata.title}
+          >
             {map.metadata.title}
           </strong>
-          <span style={{ color: 'hsl(var(--hsl-l2))', fontSize: '11px' }}>
+          <span
+            className="u-ellipsis-overflow"
+            style={{ color: 'hsl(var(--hsl-l2))', fontSize: '11px', maxWidth: '160px', flexShrink: 2 }}
+            title={map.metadata.version}
+          >
             [{map.metadata.version}]
           </span>
           <span
@@ -579,6 +615,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               backgroundColor: 'hsl(var(--hsl-h2))',
               color: '#fff',
               fontSize: '10px',
+              flexShrink: 0,
             }}
           >
             {map.modSlot || 'NM'}
@@ -592,6 +629,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                 color: '#fff',
                 fontSize: '9px',
                 gap: '4px',
+                flexShrink: 0,
               }}
             >
               <i className="fas fa-circle-notch fa-spin" />
@@ -616,37 +654,175 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
         </div>
 
         <div className="osu-radar-player__toolbar-right">
-          {/* Skin Switcher + Quick .osk Import */}
-          <div className="osu-radar-skin-switcher" title="Alternar entre a Skin Padrão e suas Skins do osu!">
-            <i
-              className={isLoadingSkin ? 'fas fa-circle-notch fa-spin' : 'fas fa-palette'}
-              style={{ color: 'hsl(var(--hsl-h1))', fontSize: '11px' }}
-            />
-            <select
-              aria-label="Selecionar skin do preview"
-              value={selectedSkinId}
-              onChange={(e) => selectSkin(e.target.value)}
-              className="osu-radar-skin-switcher__select"
+          {/* Custom Skin Selector Dropdown + Quick .osk Import */}
+          <div className="osu-radar-skin-switcher" ref={skinDropdownRef}>
+            <button
+              type="button"
+              className={`osu-radar-skin-trigger ${isSkinDropdownOpen ? 'osu-radar-skin-trigger--open' : ''}`}
+              onClick={() => setIsSkinDropdownOpen(!isSkinDropdownOpen)}
+              title="Alternar entre a Skin Padrão e suas Skins do osu!"
+              aria-expanded={isSkinDropdownOpen}
+              aria-haspopup="listbox"
             >
-              {availableSkins.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.source === 'default'
-                    ? '★ osu!radar (Padrão)'
-                    : s.source === 'local_osu'
-                    ? `osu!: ${s.name}`
-                    : `Importada: ${s.name}`}
-                </option>
-              ))}
-            </select>
+              <i
+                className={isLoadingSkin ? 'fas fa-circle-notch fa-spin' : 'fas fa-palette'}
+                style={{ color: 'hsl(var(--hsl-h1))', fontSize: '11px', flexShrink: 0 }}
+              />
+              <span className="osu-radar-skin-trigger__name">
+                {currentSkin ? currentSkin.name : 'Selecionar Skin'}
+              </span>
+              {currentSkin?.source === 'local_osu' && (
+                <span className="osu-radar-skin-tag osu-radar-skin-tag--osu">osu!</span>
+              )}
+              {currentSkin?.source === 'imported' && (
+                <span className="osu-radar-skin-tag osu-radar-skin-tag--imported">.osk</span>
+              )}
+              <i
+                className={`fas fa-chevron-down osu-radar-skin-trigger__chevron ${
+                  isSkinDropdownOpen ? 'osu-radar-skin-trigger__chevron--open' : ''
+                }`}
+              />
+            </button>
+
             <button
               type="button"
               onClick={() => skinInputRef.current?.click()}
-              className="osu-radar-skin-switcher__import-btn"
+              className="osu-radar-skin-import-btn"
               title="Importar arquivo de skin .osk / .zip"
             >
               <i className="fas fa-plus" />
               <span>.osk</span>
             </button>
+
+            {isSkinDropdownOpen && (
+              <div className="osu-radar-skin-dropdown" role="listbox">
+                <div className="osu-radar-skin-dropdown__header">
+                  <span>Skins Disponíveis ({availableSkins.length})</span>
+                  <button
+                    type="button"
+                    className="osu-radar-skin-dropdown__refresh-btn"
+                    onClick={() => refreshSkins()}
+                    title="Recarregar skins da pasta do osu!"
+                  >
+                    <i className="fas fa-sync-alt" />
+                  </button>
+                </div>
+
+                <div className="osu-radar-skin-dropdown__list">
+                  {/* Skin Padrão */}
+                  <div className="osu-radar-skin-dropdown__section-title">Padrão</div>
+                  {availableSkins
+                    .filter((s) => s.source === 'default')
+                    .map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        role="option"
+                        aria-selected={s.id === selectedSkinId}
+                        className={`osu-radar-skin-item ${
+                          s.id === selectedSkinId ? 'osu-radar-skin-item--active' : ''
+                        }`}
+                        onClick={() => {
+                          selectSkin(s.id);
+                          setIsSkinDropdownOpen(false);
+                        }}
+                      >
+                        <div className="osu-radar-skin-item__info">
+                          <i className="fas fa-star osu-radar-skin-item__icon" />
+                          <span className="osu-radar-skin-item__name">{s.name}</span>
+                        </div>
+                        {s.id === selectedSkinId && (
+                          <i className="fas fa-check osu-radar-skin-item__check" />
+                        )}
+                      </button>
+                    ))}
+
+                  {/* Skins Locais do osu! */}
+                  {availableSkins.filter((s) => s.source === 'local_osu').length > 0 && (
+                    <>
+                      <div className="osu-radar-skin-dropdown__section-title">
+                        Skins do seu osu! ({availableSkins.filter((s) => s.source === 'local_osu').length})
+                      </div>
+                      {availableSkins
+                        .filter((s) => s.source === 'local_osu')
+                        .map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            role="option"
+                            aria-selected={s.id === selectedSkinId}
+                            className={`osu-radar-skin-item ${
+                              s.id === selectedSkinId ? 'osu-radar-skin-item--active' : ''
+                            }`}
+                            onClick={() => {
+                              selectSkin(s.id);
+                              setIsSkinDropdownOpen(false);
+                            }}
+                            title={s.name}
+                          >
+                            <div className="osu-radar-skin-item__info">
+                              <span className="osu-radar-skin-tag osu-radar-skin-tag--osu">osu!</span>
+                              <span className="osu-radar-skin-item__name">{s.name}</span>
+                            </div>
+                            {s.id === selectedSkinId && (
+                              <i className="fas fa-check osu-radar-skin-item__check" />
+                            )}
+                          </button>
+                        ))}
+                    </>
+                  )}
+
+                  {/* Skins Importadas */}
+                  {availableSkins.filter((s) => s.source === 'imported').length > 0 && (
+                    <>
+                      <div className="osu-radar-skin-dropdown__section-title">
+                        Skins Importadas ({availableSkins.filter((s) => s.source === 'imported').length})
+                      </div>
+                      {availableSkins
+                        .filter((s) => s.source === 'imported')
+                        .map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            role="option"
+                            aria-selected={s.id === selectedSkinId}
+                            className={`osu-radar-skin-item ${
+                              s.id === selectedSkinId ? 'osu-radar-skin-item--active' : ''
+                            }`}
+                            onClick={() => {
+                              selectSkin(s.id);
+                              setIsSkinDropdownOpen(false);
+                            }}
+                            title={s.name}
+                          >
+                            <div className="osu-radar-skin-item__info">
+                              <span className="osu-radar-skin-tag osu-radar-skin-tag--imported">.osk</span>
+                              <span className="osu-radar-skin-item__name">{s.name}</span>
+                            </div>
+                            {s.id === selectedSkinId && (
+                              <i className="fas fa-check osu-radar-skin-item__check" />
+                            )}
+                          </button>
+                        ))}
+                    </>
+                  )}
+                </div>
+
+                <div className="osu-radar-skin-dropdown__footer">
+                  <button
+                    type="button"
+                    className="osu-radar-skin-dropdown__upload-action"
+                    onClick={() => {
+                      setIsSkinDropdownOpen(false);
+                      skinInputRef.current?.click();
+                    }}
+                  >
+                    <i className="fas fa-file-import" />
+                    <span>Importar Skin do Computador (.osk / .zip)</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Mod Buttons (EZ, HR, DT, HD) */}
