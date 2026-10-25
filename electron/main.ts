@@ -40,20 +40,13 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('com.osuskills.desktop');
 }
 
-// Forçar Aceleração de Hardware por padrão no Chromium / Electron
-// Ignora blocklists de drivers antigos e força rasterização e composição direta na GPU
+// Configurações de aceleração gráfica seguras e compatíveis para Desktop
+// Habilita aceleração por padrão mantendo estabilidade caso a GPU esteja inativa ou em fallback de software
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
-app.commandLine.appendSwitch('enable-accelerated-video-decode');
-app.commandLine.appendSwitch('enable-accelerated-mjpeg-decode');
-app.commandLine.appendSwitch('enable-native-gpu-memory-buffers');
 if (process.platform === 'win32') {
-  app.commandLine.appendSwitch('use-angle', 'd3d11');
-  app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,D3D11VideoDecoder,CanvasOopif');
+  app.commandLine.appendSwitch('enable-features', 'D3D11VideoDecoder');
 }
-// Força o uso da GPU dedicada/alta performance em máquinas com placas híbridas (ex: notebooks)
-app.commandLine.appendSwitch('force_high_performance_gpu');
 
 let mainWindow: BrowserWindow | null = null;
 let localServer: RunningLocalAppServer | null = null;
@@ -357,6 +350,20 @@ function registerIpcHandlers(appLogger: DesktopLogger): void {
   );
 }
 
+let reloadDebounceTimer: NodeJS.Timeout | null = null;
+function requestWindowReload(appLogger: DesktopLogger, reason: string, delayMs = 350): void {
+  if (reloadDebounceTimer) {
+    clearTimeout(reloadDebounceTimer);
+  }
+  reloadDebounceTimer = setTimeout(() => {
+    reloadDebounceTimer = null;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      appLogger.info('AutoReload', `Recarregando interface (${reason})...`);
+      mainWindow.webContents.reloadIgnoringCache();
+    }
+  }, delayMs);
+}
+
 function setupAutoReloadWatcher(
   targetRoot: string,
   appLogger: DesktopLogger,
@@ -365,7 +372,6 @@ function setupAutoReloadWatcher(
   const distDir = path.join(targetRoot, 'dist');
   const indexHtml = path.join(distDir, 'index.html');
 
-  let debounceTimer: NodeJS.Timeout | null = null;
   let pollInterval: NodeJS.Timeout | null = null;
   let watcher: fs.FSWatcher | null = null;
   let lastMtime = 0;
@@ -379,26 +385,18 @@ function setupAutoReloadWatcher(
 
   const triggerReload = (reason: string) => {
     if (!isWatching) return;
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      const win = getWindow();
-      if (!win || win.isDestroyed()) return;
+    const win = getWindow();
+    if (!win || win.isDestroyed()) return;
 
-      try {
-        if (!fs.existsSync(indexHtml)) return;
-        const stat = fs.statSync(indexHtml);
-        if (stat.size === 0) return;
-        lastMtime = stat.mtimeMs;
-
-        appLogger.info(
-          'AutoReload',
-          `[ATUALIZAÇÃO DETECTADA] ${reason}. Recarregando interface do osu!skills automaticamente...`
-        );
-        win.webContents.reloadIgnoringCache();
-      } catch (err) {
-        appLogger.warn('AutoReload', 'Erro ao validar index.html para recarregamento:', err);
-      }
-    }, 600);
+    try {
+      if (!fs.existsSync(indexHtml)) return;
+      const stat = fs.statSync(indexHtml);
+      if (stat.size === 0) return;
+      lastMtime = stat.mtimeMs;
+      requestWindowReload(appLogger, `[ATUALIZAÇÃO DETECTADA] ${reason}`, 500);
+    } catch (err) {
+      appLogger.warn('AutoReload', 'Erro ao validar index.html para recarregamento:', err);
+    }
   };
 
   // 1. fs.watch no diretório dist/
@@ -435,7 +433,6 @@ function setupAutoReloadWatcher(
 
   return () => {
     isWatching = false;
-    if (debounceTimer) clearTimeout(debounceTimer);
     if (pollInterval) clearInterval(pollInterval);
     if (watcher) {
       try {
@@ -459,10 +456,7 @@ async function createMainWindow(appLogger: DesktopLogger): Promise<void> {
       distDir,
       logger: appLogger,
       onReloadRequested: () => {
-        appLogger.info('AutoReload', 'Recarregamento da interface solicitado via endpoint /api/dev/reload');
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.reloadIgnoringCache();
-        }
+        requestWindowReload(appLogger, 'solicitação via endpoint /api/dev/reload', 250);
       },
     });
     targetUrl = localServer.url;
@@ -692,6 +686,20 @@ async function createMainWindow(appLogger: DesktopLogger): Promise<void> {
     appLogger.info('Window', 'Janela principal renderizada e exibida com sucesso na tela.');
   });
 
+  const showFallbackTimer = setTimeout(() => {
+    if (win && !win.isDestroyed() && !win.isVisible() && process.env.OSU_RADAR_SMOKE_TEST !== '1') {
+      if (savedState.isMaximized) {
+        win.maximize();
+      }
+      win.show();
+      appLogger.warn('Window', 'Janela exibida via timeout de segurança (ready-to-show demorou mais de 2.5s).');
+    }
+  }, 2500);
+
+  win.once('show', () => {
+    clearTimeout(showFallbackTimer);
+  });
+
   if (process.env.OSU_RADAR_SMOKE_TEST === '1') {
     win.webContents.once('did-finish-load', async () => {
       try {
@@ -782,14 +790,16 @@ if (!hasSingleInstanceLock) {
   app.on('second-instance', (_event, commandLine, workingDirectory) => {
     logger.info(
       'Main',
-      `Segunda tentativa de abertura detectada (args: ${commandLine.join(' ')}, cwd: ${workingDirectory}). Focando e recarregando com a versão mais recente.`
+      `Segunda tentativa de abertura detectada (args: ${commandLine.join(' ')}, cwd: ${workingDirectory}). Focando janela existente.`
     );
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) {
         mainWindow.restore();
       }
+      if (!mainWindow.isVisible()) {
+        mainWindow.show();
+      }
       mainWindow.focus();
-      mainWindow.webContents.reloadIgnoringCache();
     }
   });
 
