@@ -598,7 +598,7 @@ export const App: React.FC = () => {
                     onToggleExpandSet={toggleExpandedSet}
                     prioritizedSkills={prioritizedSkills}
                     selectedMapId={activeMap?.id || selectedMapId}
-                    maxHeightPx={wedgeHeight > 0 ? Math.max(460, wedgeHeight - 48) : undefined}
+                    maxHeightPx={wedgeHeight > 0 ? Math.max(460, wedgeHeight - 72) : undefined}
                     onSelectMap={(id) => selectMap(id)}
                     onRemoveMap={(id) => removeBeatmap(id)}
                     emptyState={

@@ -74,14 +74,15 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background-color: @osu-colour-b5;
-  border-radius: @border-radius--large;
-  overflow: hidden;
+  gap: 12px;
+  background-color: transparent;
+  overflow: visible;
 
   .beatmapsets__toolbar {
     padding: 8px 16px;
     background-color: @osu-colour-b4;
-    border-bottom: 1px solid @osu-colour-b3;
+    border-radius: @border-radius--large;
+    border: 1px solid @osu-colour-b3;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -89,6 +90,7 @@
     gap: 8px;
     min-height: 44px;
     box-sizing: border-box;
+    .default-box-shadow();
   }
 
   .sort--beatmapsets {
@@ -229,8 +231,11 @@
   gap: 10px;
   padding: 12px 15px;
   background-color: @osu-colour-b5;
+  border-radius: @border-radius--large;
+  border: 1px solid @osu-colour-b3;
   overflow-y: auto;
   overflow-x: hidden;
+  .default-box-shadow();
   .fancy-scrollbar();
 
   .beatmapset-panel {
