@@ -7,6 +7,8 @@ export class MusicPlayer {
   private buffer: AudioBuffer | null = null;
   private source: AudioBufferSourceNode | null = null;
   private musicGain: GainNode | null = null;
+  private audio: HTMLAudioElement | null = null;
+  private currentObjectUrl: string | null = null;
   private startTime: number = 0;
   private pauseTime: number = 0;
   private _isPlaying: boolean = false;
@@ -18,23 +20,136 @@ export class MusicPlayer {
 
   constructor() {}
 
-  public init(audioCtx: AudioContext, destinationNode: AudioNode): void {
-    this.ctx = audioCtx;
-    this.musicGain = this.ctx.createGain();
-    this.musicGain.connect(destinationNode);
-    this.updateGain();
+  public init(audioCtx?: AudioContext, destinationNode?: AudioNode): void {
+    this.ctx = audioCtx || null;
+    if (this.ctx && typeof this.ctx.createGain === 'function') {
+      this.musicGain = this.ctx.createGain();
+      if (destinationNode && typeof this.musicGain.connect === 'function') {
+        this.musicGain.connect(destinationNode);
+      }
+      this.updateGain();
+    }
+
+    if (typeof Audio !== 'undefined' && !this.audio) {
+      this.initAudioElement();
+    }
+  }
+
+  private initAudioElement(): void {
+    if (typeof Audio === 'undefined') return;
+    try {
+      const a = new Audio();
+      a.preload = 'auto';
+      a.preservesPitch = true;
+      (a as any).webkitPreservesPitch = true;
+      (a as any).mozPreservesPitch = true;
+      a.playbackRate = this._playbackRate;
+      a.volume = this._isMuted ? 0 : this._volume;
+
+      a.onended = () => {
+        if (this._isPlaying) {
+          this.pause();
+          this.pauseTime = this._duration;
+        }
+      };
+
+      this.audio = a;
+    } catch {}
   }
 
   public async loadAudio(
     source?: Blob | ArrayBuffer | string,
     fallbackDurationSec: number = 120
   ): Promise<boolean> {
-    if (!this.ctx) return false;
     this.stopSource();
     this.buffer = null;
     this._hasRealAudio = false;
 
-    if (source) {
+    if (this.currentObjectUrl) {
+      try {
+        URL.revokeObjectURL(this.currentObjectUrl);
+      } catch {}
+      this.currentObjectUrl = null;
+    }
+
+    if (source && typeof Audio !== 'undefined') {
+      if (!this.audio) {
+        this.initAudioElement();
+      }
+
+      if (this.audio) {
+        try {
+          let srcUrl: string;
+          if (typeof source === 'string') {
+            srcUrl = source;
+          } else if (source instanceof Blob) {
+            this.currentObjectUrl = URL.createObjectURL(source);
+            srcUrl = this.currentObjectUrl;
+          } else {
+            const blob = new Blob([source], { type: 'audio/mpeg' });
+            this.currentObjectUrl = URL.createObjectURL(blob);
+            srcUrl = this.currentObjectUrl;
+          }
+
+          this.audio.src = srcUrl;
+          this.audio.playbackRate = this._playbackRate;
+          this.audio.preservesPitch = true;
+          (this.audio as any).webkitPreservesPitch = true;
+          (this.audio as any).mozPreservesPitch = true;
+          this.audio.volume = this._isMuted ? 0 : this._volume;
+
+          await new Promise<void>((resolve) => {
+            if (!this.audio) {
+              resolve();
+              return;
+            }
+            const onReady = () => {
+              cleanup();
+              if (this.audio && isFinite(this.audio.duration) && this.audio.duration > 0) {
+                this._duration = this.audio.duration;
+              }
+              this._hasRealAudio = true;
+              resolve();
+            };
+            const onError = () => {
+              cleanup();
+              resolve();
+            };
+            const cleanup = () => {
+              if (!this.audio) return;
+              this.audio.removeEventListener('loadedmetadata', onReady);
+              this.audio.removeEventListener('canplay', onReady);
+              this.audio.removeEventListener('error', onError);
+            };
+
+            if (this.audio.readyState >= 1 && isFinite(this.audio.duration) && this.audio.duration > 0) {
+              this._duration = this.audio.duration;
+              this._hasRealAudio = true;
+              resolve();
+              return;
+            }
+
+            this.audio.addEventListener('loadedmetadata', onReady, { once: true });
+            this.audio.addEventListener('canplay', onReady, { once: true });
+            this.audio.addEventListener('error', onError, { once: true });
+
+            setTimeout(() => {
+              cleanup();
+              resolve();
+            }, 3000);
+          });
+
+          if (this._hasRealAudio) {
+            return true;
+          }
+        } catch (err) {
+          console.warn('OsuPreview: Audio element load failed, falling back to WebAudio decoder:', err);
+        }
+      }
+    }
+
+    // Secondary WebAudio decoder fallback (used if HTMLAudioElement fails or in headless test envs)
+    if (source && this.ctx) {
       try {
         let arrayBuf: ArrayBuffer;
         if (typeof source === 'string') {
@@ -68,45 +183,71 @@ export class MusicPlayer {
   }
 
   public play(fromMs?: number): void {
-    if (!this.ctx) return;
-    if (this.ctx.state === 'suspended') {
+    if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
 
     if (fromMs !== undefined) {
-      this.pauseTime = clamp(0, fromMs / 1000, this._duration);
+      this.seek(fromMs);
     }
 
-    if (this.buffer) {
+    this._isPlaying = true;
+
+    if (this.audio && this._hasRealAudio) {
+      this.audio.playbackRate = this._playbackRate;
+      this.audio.preservesPitch = true;
+      (this.audio as any).webkitPreservesPitch = true;
+      (this.audio as any).mozPreservesPitch = true;
+      this.audio.play().catch(() => {});
+    } else if (this.buffer) {
       this.startSource(this.pauseTime);
     } else {
-      this.startTime = this.ctx.currentTime;
+      this.startTime = this.ctx?.currentTime || performance.now() / 1000;
     }
-    this._isPlaying = true;
   }
 
   public pause(): void {
-    this.pauseTime = this.currentTimeSec;
-    this.stopSource();
+    if (this.audio && this._hasRealAudio) {
+      try {
+        this.audio.pause();
+        this.pauseTime = this.audio.currentTime;
+      } catch {}
+    } else {
+      this.pauseTime = this.currentTimeSec;
+      this.stopSource();
+    }
     this._isPlaying = false;
   }
 
   public seek(timeMs: number): void {
     const targetSec = clamp(0, timeMs / 1000, this._duration);
     this.pauseTime = targetSec;
-    if (this._isPlaying) {
-      if (this.buffer) {
+
+    if (this.audio && this._hasRealAudio) {
+      try {
+        this.audio.currentTime = targetSec;
+      } catch {}
+    } else if (this.buffer) {
+      if (this._isPlaying) {
         this.startSource(targetSec);
-      } else if (this.ctx) {
-        this.startTime = this.ctx.currentTime;
       }
+    } else if (this.ctx) {
+      this.startTime = this.ctx.currentTime;
     }
   }
 
   public setSpeed(rate: number): void {
     const curSec = this.currentTimeSec;
     this._playbackRate = clamp(0.25, rate, 4.0);
-    if (this._isPlaying) {
+
+    if (this.audio) {
+      this.audio.playbackRate = this._playbackRate;
+      this.audio.preservesPitch = true;
+      (this.audio as any).webkitPreservesPitch = true;
+      (this.audio as any).mozPreservesPitch = true;
+    }
+
+    if (!this.audio && this._isPlaying) {
       this.pauseTime = curSec;
       this.startTime = this.ctx?.currentTime || 0;
       if (this.source) {
@@ -126,6 +267,9 @@ export class MusicPlayer {
   }
 
   private updateGain(): void {
+    if (this.audio) {
+      this.audio.volume = this._isMuted ? 0 : this._volume;
+    }
     if (this.musicGain) {
       this.musicGain.gain.value = this._isMuted ? 0 : this._volume;
     }
@@ -136,6 +280,9 @@ export class MusicPlayer {
   }
 
   public get currentTimeSec(): number {
+    if (this.audio && this._hasRealAudio) {
+      return this.audio.currentTime;
+    }
     if (!this._isPlaying || !this.ctx) {
       return this.pauseTime;
     }
@@ -153,6 +300,13 @@ export class MusicPlayer {
 
   public get hasRealAudio(): boolean {
     return this._hasRealAudio;
+  }
+
+  public get preservesPitch(): boolean {
+    if (this.audio) {
+      return Boolean(this.audio.preservesPitch ?? (this.audio as any).webkitPreservesPitch ?? true);
+    }
+    return true;
   }
 
   private startSource(offsetSec: number): void {
@@ -189,7 +343,23 @@ export class MusicPlayer {
   }
 
   public destroy(): void {
+    this.pause();
     this.stopSource();
+    if (this.audio) {
+      try {
+        this.audio.onended = null;
+        this.audio.pause();
+        this.audio.removeAttribute('src');
+        this.audio.load();
+      } catch {}
+      this.audio = null;
+    }
+    if (this.currentObjectUrl) {
+      try {
+        URL.revokeObjectURL(this.currentObjectUrl);
+      } catch {}
+      this.currentObjectUrl = null;
+    }
     if (this.musicGain) {
       try {
         this.musicGain.disconnect();

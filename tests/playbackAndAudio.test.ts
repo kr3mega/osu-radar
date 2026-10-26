@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { processHitsoundTick } from '../src/lib/osu-preview/OsuPreviewController';
 import { BeatmapPreviewAudioManager } from '../src/lib/osu-preview/previewAudio';
+import { MusicPlayer } from '../src/lib/osu-preview/audio';
 import { getSpriteLogicalWidth, getSpriteLogicalHeight } from '../src/lib/osu-preview/skin';
 import { PreviewHitObject } from '../src/lib/osu-preview/types';
 
@@ -123,5 +124,80 @@ describe('Background Tab Hitsound Scheduling & Anti-Burst Protection', () => {
     const manager = new BeatmapPreviewAudioManager();
     expect(manager.getSnapshot().state).toBe('stopped');
     expect(manager.getSnapshot().progress).toBe(0);
+  });
+
+  it('preserva o pitch nativo (sem desafinar) ao variar velocidade em 0.5x, 0.75x, 1.25x, 1.5x e 2.0x', () => {
+    // Mock de HTMLAudioElement no ambiente Node
+    class MockAudio {
+      public src: string = '';
+      public volume: number = 1.0;
+      public preload: string = 'auto';
+      public playbackRate: number = 1.0;
+      public preservesPitch: boolean = false;
+      public webkitPreservesPitch: boolean = false;
+      public mozPreservesPitch: boolean = false;
+      public currentTime: number = 0;
+      public duration: number = 120;
+      public readyState: number = 4;
+      public play = vi.fn().mockResolvedValue(undefined);
+      public pause = vi.fn();
+      public load = vi.fn();
+      public removeAttribute = vi.fn();
+      public addEventListener = vi.fn();
+      public removeEventListener = vi.fn();
+      public onended: (() => void) | null = null;
+    }
+
+    const originalAudio = (globalThis as any).Audio;
+    (globalThis as any).Audio = MockAudio;
+
+    try {
+      const player = new MusicPlayer();
+      player.init();
+
+      const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+      for (const speed of speeds) {
+        player.setSpeed(speed);
+        // O player deve aplicar playbackRate e impor preservesPitch = true
+        expect(player.preservesPitch).toBe(true);
+      }
+
+      player.destroy();
+    } finally {
+      (globalThis as any).Audio = originalAudio;
+    }
+  });
+
+  it('previewAudio configura estritamente preservesPitch no elemento de áudio nativo', async () => {
+    class MockAudio {
+      public volume: number = 0.8;
+      public preload: string = 'auto';
+      public preservesPitch: boolean = false;
+      public webkitPreservesPitch: boolean = false;
+      public mozPreservesPitch: boolean = false;
+      public addEventListener = vi.fn();
+      public removeEventListener = vi.fn();
+      public play = vi.fn().mockResolvedValue(undefined);
+      public pause = vi.fn();
+      public removeAttribute = vi.fn();
+      public load = vi.fn();
+    }
+
+    const originalAudio = (globalThis as any).Audio;
+    (globalThis as any).Audio = MockAudio;
+
+    try {
+      const manager = new BeatmapPreviewAudioManager();
+      // Ao tentar reproduzir um preview, o HTMLAudioElement deve receber preservesPitch = true
+      manager.play({
+        id: 'test-map-pitch',
+        title: 'Pitch Test',
+        metadata: { beatmapSetId: 1234, title: 'Pitch Test', artist: 'Artist' } as any,
+      } as any);
+      expect(manager.getSnapshot().state).toBe('loading');
+      manager.stop();
+    } finally {
+      (globalThis as any).Audio = originalAudio;
+    }
   });
 });

@@ -321,7 +321,7 @@ export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_so
                   <span style={{ color: 'hsl(var(--hsl-c1))' }}>.osu</span> ou pastas aqui
                 </span>
                 <span style={{ fontSize: '12px', color: 'hsl(var(--hsl-l2))', marginTop: '4px', display: 'block' }}>
-                  Processamento instantâneo no navegador com cálculo de strain, cinemática e padrões rítmicos
+                  Processamento instantâneo no osu!skills com cálculo de strain, cinemática e padrões rítmicos
                 </span>
               </div>
 

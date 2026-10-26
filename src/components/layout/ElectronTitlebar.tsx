@@ -5,8 +5,7 @@ interface ElectronTitlebarProps {
 }
 
 /**
- * Custom frameless osu!lazer-inspired titlebar rendered exclusively inside the Electron desktop app.
- * In standard web browsers (`!window.osuSkillsDesktop?.isElectron`), renders nothing.
+ * Custom frameless osu!lazer-inspired titlebar rendered in the Electron application.
  */
 export const ElectronTitlebar: React.FC<ElectronTitlebarProps> = ({ activeSubtitle }) => {
   const bridge =
@@ -51,7 +50,6 @@ export const ElectronTitlebar: React.FC<ElectronTitlebarProps> = ({ activeSubtit
           className="osu-skills-titlebar__logo"
         />
         <span className="osu-skills-titlebar__title">osu!skills</span>
-        <span className="osu-skills-titlebar__badge">desktop</span>
         {activeSubtitle && (
           <span className="osu-skills-titlebar__subtitle u-ellipsis-overflow">
             {activeSubtitle}

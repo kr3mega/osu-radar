@@ -162,6 +162,9 @@ class BeatmapPreviewAudioManager {
       const audio = new Audio();
       audio.volume = this.volume;
       audio.preload = 'auto';
+      audio.preservesPitch = true;
+      (audio as any).webkitPreservesPitch = true;
+      (audio as any).mozPreservesPitch = true;
 
       let settled = false;
       let playStartPos: number | null = null;

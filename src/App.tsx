@@ -408,7 +408,7 @@ export const App: React.FC = () => {
                           }`}
                         >
                           <i
-                            className="fas fa-desktop"
+                            className="fas fa-compact-disc"
                             style={{ marginRight: '5px', fontSize: '10px' }}
                           />
                           osu! (Stable) ({stableMapsCount})

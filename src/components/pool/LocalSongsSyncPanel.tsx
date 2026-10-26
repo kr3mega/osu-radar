@@ -3,7 +3,6 @@ import {
   detectLocalOsuSongsFolder,
   DualLocalBridgeDetection,
   LocalLibrarySyncProgress,
-  syncFromBrowserDirectoryFiles,
   syncFromLocalServerBridge,
 } from '../../lib/localLibrarySync';
 import { usePoolStore } from '../../store/usePoolStore';
@@ -27,7 +26,6 @@ export const LocalSongsSyncPanel: React.FC = () => {
   );
 
   const abortCtrlRef = useRef<AbortController | null>(null);
-  const browserFolderRef = useRef<HTMLInputElement | null>(null);
 
   const stableMapsCount = currentPool.maps.filter(
     (m) => (m.origin === 'local_songs' || !m.origin) && m.localClient !== 'lazer' && Boolean(m.localOsuPath)
@@ -120,42 +118,6 @@ export const LocalSongsSyncPanel: React.FC = () => {
     }
   };
 
-  const handleBrowserFolderChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fileList = e.target.files;
-    if (!fileList || fileList.length === 0) return;
-
-    setStatusMsg(null);
-    setIsSyncing(true);
-    const ctrl = new AbortController();
-    abortCtrlRef.current = ctrl;
-
-    try {
-      const res = await syncFromBrowserDirectoryFiles({
-        files: fileList,
-        signal: ctrl.signal,
-        onProgress: (p) => setSyncProgress(p),
-        onCommitBatch: async (maps) => {
-          await upsertLocalBeatmaps(maps);
-        },
-      });
-
-      setFilterOrigin('local_songs');
-      setStatusMsg({
-        type: 'success',
-        text: `${res.indexedStandard} mapas osu!standard importados da pasta selecionada (${res.skippedNonStandard} outros modos ignorados)!`,
-      });
-    } catch (err) {
-      setStatusMsg({
-        type: 'error',
-        text: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setIsSyncing(false);
-      abortCtrlRef.current = null;
-      if (browserFolderRef.current) browserFolderRef.current.value = '';
-    }
-  };
-
   const handleCancelSync = () => {
     abortCtrlRef.current?.abort();
   };
@@ -170,17 +132,6 @@ export const LocalSongsSyncPanel: React.FC = () => {
       className="osu-skills-training-form"
       style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
     >
-      <input
-        ref={browserFolderRef}
-        type="file"
-        // @ts-expect-error webkitdirectory is standard across modern browsers
-        webkitdirectory="true"
-        directory=""
-        multiple
-        onChange={handleBrowserFolderChange}
-        style={{ display: 'none' }}
-      />
-
       {/* Primary Card: Direct Local osu!stable Songs Bridge */}
       <div
         style={{
@@ -259,7 +210,7 @@ export const LocalSongsSyncPanel: React.FC = () => {
             className={`osu-skills-player__mod-btn ${selectedClient === 'stable' ? 'osu-skills-player__mod-btn--active' : ''}`}
             style={{ padding: '6px 14px', fontSize: '12px', fontWeight: 700 }}
           >
-            <i className="fas fa-desktop" style={{ marginRight: '6px' }} />
+            <i className="fas fa-compact-disc" style={{ marginRight: '6px' }} />
             osu! (Stable)
             {detection?.stable?.exists && (
               <span style={{ marginLeft: '6px', fontSize: '10px', opacity: 0.8 }}>
@@ -285,196 +236,194 @@ export const LocalSongsSyncPanel: React.FC = () => {
           </button>
         </div>
 
-        {detection?.available ? (
-          <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
-                <label
-                  htmlFor="osu-songs-path-input"
-                  style={{ fontSize: '11px', fontWeight: 700, color: 'hsl(var(--hsl-l1))' }}
-                >
-                  {selectedClient === 'lazer'
-                    ? 'Pasta de dados do osu!lazer (AppData/Roaming/osu):'
-                    : 'Caminho da pasta Songs do seu osu!stable:'}
-                </label>
-                {selectedClient === 'lazer' && detection.lazer?.exists && (
-                  <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-lime-1))', fontWeight: 600 }}>
-                    <i className="fas fa-check-circle" style={{ marginRight: '4px' }} />
-                    osu!lazer detectado automaticamente
-                  </span>
-                )}
-                {selectedClient === 'stable' && detection.stable?.exists && (
-                  <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-lime-1))', fontWeight: 600 }}>
-                    <i className="fas fa-check-circle" style={{ marginRight: '4px' }} />
-                    osu!stable detectado ({detection.stable.folderCount} pastas de mapas)
-                  </span>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <input
-                  id="osu-songs-path-input"
-                  type="text"
-                  value={songsPath}
-                  disabled={isSyncing}
-                  onChange={(e) => setSongsPath(e.target.value)}
-                  placeholder={
-                    selectedClient === 'lazer'
-                      ? 'Ex: C:\\Users\\Usuário\\AppData\\Roaming\\osu'
-                      : 'Ex: C:\\Users\\Usuário\\AppData\\Local\\osu!\\Songs'
-                  }
-                  style={{
-                    flex: 1,
-                    minWidth: '240px',
-                    padding: '9px 12px',
-                    borderRadius: '6px',
-                    backgroundColor: 'hsl(var(--hsl-b6))',
-                    border: '1px solid hsl(var(--hsl-b2))',
-                    color: '#fff',
-                    fontSize: '12px',
-                    fontFamily: 'AzeretMono, monospace',
-                    outline: 'none',
-                  }}
-                />
-                {typeof window !== 'undefined' &&
-                  (window.osuSkillsDesktop || window.osuRadarDesktop)?.isElectron && (
-                  <button
-                    type="button"
-                    disabled={isSyncing}
-                    onClick={async () => {
-                      const bridge = window.osuSkillsDesktop || window.osuRadarDesktop;
-                      const picked = await bridge?.selectDirectory({
-                        title:
-                          selectedClient === 'lazer'
-                            ? 'Selecionar pasta de armazenamento do osu!lazer'
-                            : 'Selecionar pasta Songs do osu! (Stable)',
-                        defaultPath: songsPath.trim() || undefined,
-                      });
-                      if (picked) {
-                        setSongsPath(picked);
-                      }
-                    }}
-                    className="btn-osu-big btn-osu-big--rounded-small"
-                    style={{ padding: '0 14px', backgroundColor: 'hsl(var(--hsl-b3))' }}
-                    title="Abrir seletor nativo de pastas do sistema"
-                  >
-                    <i className="fas fa-folder-open" style={{ marginRight: '6px' }} />
-                    <span>Procurar...</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-              <label
-                htmlFor="force-reindex-checkbox"
-                className="osu-skills-brand-checkbox"
-                style={{ fontSize: '12px', color: 'hsl(var(--hsl-l1))', cursor: 'pointer' }}
-              >
-                <input
-                  id="force-reindex-checkbox"
-                  type="checkbox"
-                  className="osu-skills-fallback-check"
-                  checked={forceReindex}
-                  disabled={isSyncing}
-                  onChange={(e) => setForceReindex(e.target.checked)}
-                />
-                <span>Forçar reanálise completa (ignorar cache incremental)</span>
-              </label>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                {!isSyncing ? (
-                  <button
-                    type="button"
-                    onClick={handleStartServerSync}
-                    className="btn-osu-big btn-osu-big--beatmapset-header"
-                    style={{ width: 'auto', padding: '9px 18px' }}
-                  >
-                    <span className="btn-osu-big__content">
-                      <span className="btn-osu-big__left">
-                        <span className="btn-osu-big__text-top">
-                          {selectedClient === 'lazer'
-                            ? 'Sincronizar Meu osu!lazer'
-                            : 'Sincronizar Meu osu! (Songs)'}
-                        </span>
-                        <span className="btn-osu-big__text-bottom">
-                          {selectedClient === 'lazer'
-                            ? 'Indexação nativa de beatmaps do Lazer'
-                            : 'Leitura direta em alta velocidade'}
-                        </span>
-                      </span>
-                      <span className="btn-osu-big__icon">
-                        <i className="fas fa-sync-alt" />
-                      </span>
-                    </span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleCancelSync}
-                    className="btn-osu-big btn-osu-big--beatmapset-header"
-                    style={{
-                      width: 'auto',
-                      padding: '9px 18px',
-                      backgroundColor: 'hsl(var(--hsl-red-3))',
-                    }}
-                  >
-                    <span className="btn-osu-big__content">
-                      <span className="btn-osu-big__left">
-                        <span className="btn-osu-big__text-top">Pausar / Salvar Parcial</span>
-                      </span>
-                      <span className="btn-osu-big__icon">
-                        <i className="fas fa-pause" />
-                      </span>
-                    </span>
-                  </button>
-                )}
-
-                {totalLocalMapsCount > 0 && !isSyncing && (
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    {lazerMapsCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => clearLocalSongs('lazer')}
-                        className="osu-skills-player__mod-btn"
-                        style={{ padding: '8px 10px', fontSize: '11px' }}
-                        title="Remove apenas os mapas do osu!lazer"
-                      >
-                        <i className="fas fa-trash-alt" style={{ marginRight: '4px' }} />
-                        Limpar Lazer ({lazerMapsCount})
-                      </button>
-                    )}
-                    {stableMapsCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => clearLocalSongs('stable')}
-                        className="osu-skills-player__mod-btn"
-                        style={{ padding: '8px 10px', fontSize: '11px' }}
-                        title="Remove apenas os mapas do osu!stable"
-                      >
-                        <i className="fas fa-trash-alt" style={{ marginRight: '4px' }} />
-                        Limpar Stable ({stableMapsCount})
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => clearLocalSongs('all')}
-                      className="osu-skills-player__mod-btn"
-                      style={{ padding: '8px 10px', fontSize: '11px' }}
-                      title="Remove todos os mapas locais indexados (mantém pools de torneios)"
-                    >
-                      <i className="fas fa-trash-alt" style={{ marginRight: '4px' }} />
-                      Limpar Todos ({totalLocalMapsCount})
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div style={{ fontSize: '12px', color: 'hsl(var(--hsl-l2))' }}>
-            Modo web estático detectado. Utilize o seletor de pastas abaixo para apontar sua pasta <strong>osu!\Songs</strong> diretamente pelo navegador.
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+            <label
+              htmlFor="osu-songs-path-input"
+              style={{ fontSize: '11px', fontWeight: 700, color: 'hsl(var(--hsl-l1))' }}
+            >
+              {selectedClient === 'lazer'
+                ? 'Pasta de dados do osu!lazer (AppData/Roaming/osu):'
+                : 'Caminho da pasta Songs do seu osu!stable:'}
+            </label>
+            {detection === null && (
+              <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-l2))' }}>
+                <i className="fas fa-circle-notch fa-spin" style={{ marginRight: '4px' }} />
+                Detectando pastas de instalação...
+              </span>
+            )}
+            {selectedClient === 'lazer' && detection?.lazer?.exists && (
+              <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-lime-1))', fontWeight: 600 }}>
+                <i className="fas fa-check-circle" style={{ marginRight: '4px' }} />
+                osu!lazer detectado automaticamente
+              </span>
+            )}
+            {selectedClient === 'stable' && detection?.stable?.exists && (
+              <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-lime-1))', fontWeight: 600 }}>
+                <i className="fas fa-check-circle" style={{ marginRight: '4px' }} />
+                osu!stable detectado ({detection.stable.folderCount} pastas de mapas)
+              </span>
+            )}
           </div>
-        )}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <input
+              id="osu-songs-path-input"
+              type="text"
+              value={songsPath}
+              disabled={isSyncing}
+              onChange={(e) => setSongsPath(e.target.value)}
+              placeholder={
+                selectedClient === 'lazer'
+                  ? 'Ex: C:\\Users\\Usuário\\AppData\\Roaming\\osu'
+                  : 'Ex: C:\\Users\\Usuário\\AppData\\Local\\osu!\\Songs'
+              }
+              style={{
+                flex: 1,
+                minWidth: '240px',
+                padding: '9px 12px',
+                borderRadius: '6px',
+                backgroundColor: 'hsl(var(--hsl-b6))',
+                border: '1px solid hsl(var(--hsl-b2))',
+                color: '#fff',
+                fontSize: '12px',
+                fontFamily: 'AzeretMono, monospace',
+                outline: 'none',
+              }}
+            />
+            <button
+              type="button"
+              disabled={isSyncing}
+              onClick={async () => {
+                const bridge =
+                  typeof window !== 'undefined'
+                    ? window.osuSkillsDesktop || window.osuRadarDesktop
+                    : undefined;
+                const picked = await bridge?.selectDirectory({
+                  title:
+                    selectedClient === 'lazer'
+                      ? 'Selecionar pasta de armazenamento do osu!lazer'
+                      : 'Selecionar pasta Songs do osu! (Stable)',
+                  defaultPath: songsPath.trim() || undefined,
+                });
+                if (picked) {
+                  setSongsPath(picked);
+                }
+              }}
+              className="btn-osu-big btn-osu-big--rounded-small"
+              style={{ padding: '0 14px', backgroundColor: 'hsl(var(--hsl-b3))' }}
+              title="Abrir seletor nativo de pastas do sistema"
+            >
+              <i className="fas fa-folder-open" style={{ marginRight: '6px' }} />
+              <span>Procurar...</span>
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <label
+            htmlFor="force-reindex-checkbox"
+            className="osu-skills-brand-checkbox"
+            style={{ fontSize: '12px', color: 'hsl(var(--hsl-l1))', cursor: 'pointer' }}
+          >
+            <input
+              id="force-reindex-checkbox"
+              type="checkbox"
+              className="osu-skills-fallback-check"
+              checked={forceReindex}
+              disabled={isSyncing}
+              onChange={(e) => setForceReindex(e.target.checked)}
+            />
+            <span>Forçar reanálise completa (ignorar cache incremental)</span>
+          </label>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {!isSyncing ? (
+              <button
+                type="button"
+                onClick={handleStartServerSync}
+                className="btn-osu-big btn-osu-big--beatmapset-header"
+                style={{ width: 'auto', padding: '9px 18px' }}
+              >
+                <span className="btn-osu-big__content">
+                  <span className="btn-osu-big__left">
+                    <span className="btn-osu-big__text-top">
+                      {selectedClient === 'lazer'
+                        ? 'Sincronizar Meu osu!lazer'
+                        : 'Sincronizar Meu osu! (Songs)'}
+                    </span>
+                    <span className="btn-osu-big__text-bottom">
+                      {selectedClient === 'lazer'
+                        ? 'Indexação nativa de beatmaps do Lazer'
+                        : 'Leitura direta em alta velocidade'}
+                    </span>
+                  </span>
+                  <span className="btn-osu-big__icon">
+                    <i className="fas fa-sync-alt" />
+                  </span>
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleCancelSync}
+                className="btn-osu-big btn-osu-big--beatmapset-header"
+                style={{
+                  width: 'auto',
+                  padding: '9px 18px',
+                  backgroundColor: 'hsl(var(--hsl-red-3))',
+                }}
+              >
+                <span className="btn-osu-big__content">
+                  <span className="btn-osu-big__left">
+                    <span className="btn-osu-big__text-top">Pausar / Salvar Parcial</span>
+                  </span>
+                  <span className="btn-osu-big__icon">
+                    <i className="fas fa-pause" />
+                  </span>
+                </span>
+              </button>
+            )}
+
+            {totalLocalMapsCount > 0 && !isSyncing && (
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {lazerMapsCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => clearLocalSongs('lazer')}
+                    className="osu-skills-player__mod-btn"
+                    style={{ padding: '8px 10px', fontSize: '11px' }}
+                    title="Remove apenas os mapas do osu!lazer"
+                  >
+                    <i className="fas fa-trash-alt" style={{ marginRight: '4px' }} />
+                    Limpar Lazer ({lazerMapsCount})
+                  </button>
+                )}
+                {stableMapsCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => clearLocalSongs('stable')}
+                    className="osu-skills-player__mod-btn"
+                    style={{ padding: '8px 10px', fontSize: '11px' }}
+                    title="Remove apenas os mapas do osu!stable"
+                  >
+                    <i className="fas fa-trash-alt" style={{ marginRight: '4px' }} />
+                    Limpar Stable ({stableMapsCount})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => clearLocalSongs('all')}
+                  className="osu-skills-player__mod-btn"
+                  style={{ padding: '8px 10px', fontSize: '11px' }}
+                  title="Remove todos os mapas locais indexados (mantém pools de torneios)"
+                >
+                  <i className="fas fa-trash-alt" style={{ marginRight: '4px' }} />
+                  Limpar Todos ({totalLocalMapsCount})
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Progress Telemetry */}
@@ -502,14 +451,20 @@ export const LocalSongsSyncPanel: React.FC = () => {
             </span>
           </div>
 
-          <progress
-            className="osu-skills-progress"
-            max={100}
-            value={syncProgress.totalToAnalyze > 0 ? progressRatio : 15}
-            style={{ width: '100%' }}
+          <div
+            className="bar bar--user-profile"
+            style={{ width: '100%', height: '6px', borderRadius: '1000px', overflow: 'hidden' }}
           >
-            {progressRatio}%
-          </progress>
+            <div
+              className="bar__fill"
+              style={{
+                width: `${syncProgress.totalToAnalyze > 0 ? progressRatio : 15}%`,
+                backgroundColor: 'hsl(var(--hsl-h1))',
+                borderRadius: '1000px',
+                transition: 'width 0.15s ease-out',
+              }}
+            />
+          </div>
 
           <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '11px', color: 'hsl(var(--hsl-l2))' }}>
             <span>
@@ -528,41 +483,6 @@ export const LocalSongsSyncPanel: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Browser Folder Picker Fallback */}
-      <div
-        style={{
-          padding: '14px 18px',
-          borderRadius: '8px',
-          backgroundColor: 'hsl(var(--hsl-b5))',
-          border: '1px solid hsl(var(--hsl-b3))',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '12px',
-        }}
-      >
-        <div>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', display: 'block' }}>
-            Alternativa: Selecionar Pasta Songs manualmente pelo Navegador
-          </span>
-          <span style={{ fontSize: '11px', color: 'hsl(var(--hsl-l2))' }}>
-            Funciona mesmo sem servidor local — lê os arquivos <code>.osu</code> em lotes leves sem travar a memória
-          </span>
-        </div>
-
-        <button
-          type="button"
-          disabled={isSyncing}
-          onClick={() => browserFolderRef.current?.click()}
-          className="osu-skills-player__mod-btn"
-          style={{ padding: '8px 14px', fontSize: '11px', fontWeight: 700 }}
-        >
-          <i className="fas fa-folder-open" style={{ marginRight: '6px' }} />
-          Escolher Pasta...
-        </button>
-      </div>
 
       {/* Status Alert */}
       {statusMsg && (

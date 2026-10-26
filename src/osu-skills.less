@@ -783,10 +783,30 @@
 }
 
 .osu-skills-progress {
-  height: 8px;
+  height: 6px;
   border-radius: 1000px;
   overflow: hidden;
-  accent-color: var(--osu-brand-accent);
+  background-color: hsl(var(--hsl-b6));
+  border: none;
+  appearance: none;
+  -webkit-appearance: none;
+  accent-color: hsl(var(--hsl-h1));
+
+  &::-webkit-progress-bar {
+    background-color: hsl(var(--hsl-b6));
+    border-radius: 1000px;
+  }
+
+  &::-webkit-progress-value {
+    background-color: hsl(var(--hsl-h1));
+    border-radius: 1000px;
+    transition: width 0.15s ease-out;
+  }
+
+  &::-moz-progress-bar {
+    background-color: hsl(var(--hsl-h1));
+    border-radius: 1000px;
+  }
 }
 
 // Progressive enhancement fallback for environments without CSS accent-color support
@@ -1854,19 +1874,6 @@
     font-weight: 800;
     letter-spacing: 0.02em;
     color: #ffffff;
-    flex-shrink: 0;
-  }
-
-  &__badge {
-    padding: 1px 6px;
-    border-radius: 999px;
-    background-color: hsla(var(--hsl-h1), 0.18);
-    border: 1px solid hsla(var(--hsl-h1), 0.45);
-    color: hsl(var(--hsl-h1));
-    font-size: 9px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     flex-shrink: 0;
   }
 
