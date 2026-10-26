@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { usePoolStore } from '../../store/usePoolStore';
 import { useAudioStore } from '../../store/useAudioStore';
 
@@ -16,9 +16,6 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
   const {
     resetAllData,
     currentPool,
-    audioSyncStatus,
-    startAudioSync,
-    clearAudioCache,
     exportPoolJson,
     importPoolJson,
   } = usePoolStore();
@@ -27,28 +24,9 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  const [showAudioMenu, setShowAudioMenu] = useState(false);
-  const [isClearingAudio, setIsClearingAudio] = useState(false);
-  const audioMenuRef = useRef<HTMLDivElement>(null);
   const jsonInputRef = useRef<HTMLInputElement>(null);
 
-  const maps = currentPool.maps;
-  const cachedAudioCount = maps.filter((m) => m.audioBlob).length;
-  const totalMaps = maps.length;
-  const cachedBytes = maps.reduce((acc, m) => acc + (m.audioBlob?.size || 0), 0);
-  const cachedMb = (cachedBytes / (1024 * 1024)).toFixed(1);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (audioMenuRef.current && !audioMenuRef.current.contains(e.target as Node)) {
-        setShowAudioMenu(false);
-      }
-    };
-    if (showAudioMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showAudioMenu]);
+  const totalMaps = currentPool.maps.length;
 
   const handleConfirmReset = async () => {
     setIsResetting(true);
@@ -57,15 +35,6 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
       setShowResetConfirm(false);
     } finally {
       setIsResetting(false);
-    }
-  };
-
-  const handleClearAudio = async () => {
-    setIsClearingAudio(true);
-    try {
-      await clearAudioCache();
-    } finally {
-      setIsClearingAudio(false);
     }
   };
 
@@ -266,112 +235,6 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                     title={`Som Global da Página: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
                   />
                 </div>
-
-                {/* Audio Cache Status Pill (osu-web notification container style) */}
-                {totalMaps > 0 && (
-                  <div className="nav2__col nav2__col--notifications" ref={audioMenuRef} style={{ position: 'relative' }}>
-                    <div className="nav2__notification-container">
-                      <button
-                        type="button"
-                        onClick={() => setShowAudioMenu(!showAudioMenu)}
-                        className="nav-button nav-button--notifications"
-                        title="Gerenciador de Áudios em Cache (IndexedDB)"
-                      >
-                        <span className="notification-icon">
-                          <i
-                            className={
-                              audioSyncStatus?.isSyncing
-                                ? 'fas fa-circle-notch fa-spin'
-                                : 'fas fa-music'
-                            }
-                          />
-                          <span className="notification-icon__count">
-                            {audioSyncStatus?.isSyncing
-                              ? `${audioSyncStatus.current}/${audioSyncStatus.total}`
-                              : `${cachedAudioCount}/${totalMaps}`}
-                          </span>
-                        </span>
-                      </button>
-                    </div>
-
-                    {showAudioMenu && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          right: 0,
-                          top: '100%',
-                          marginTop: '8px',
-                          width: '280px',
-                          backgroundColor: 'hsl(var(--hsl-b4))',
-                          borderRadius: '10px',
-                          padding: '14px',
-                          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-                          zIndex: 1000,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            paddingBottom: '8px',
-                            marginBottom: '8px',
-                            borderBottom: '1px solid hsl(var(--hsl-b2))',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          <span>
-                            <i className="fas fa-hdd" style={{ marginRight: '6px', color: 'hsl(var(--hsl-h1))' }} />
-                            Cache de Áudio (IndexedDB)
-                          </span>
-                          <span style={{ color: 'hsl(var(--hsl-l2))' }}>{cachedMb} MB</span>
-                        </div>
-
-                        <p style={{ fontSize: '11px', color: 'hsl(var(--hsl-l2))', margin: '0 0 10px' }}>
-                          Os áudios são baixados automaticamente via mirrors e armazenados no seu navegador.
-                        </p>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {cachedAudioCount < totalMaps && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                startAudioSync();
-                                setShowAudioMenu(false);
-                              }}
-                              disabled={audioSyncStatus?.isSyncing}
-                              className="btn-osu-big btn-osu-big--full btn-osu-big--rounded-thin"
-                            >
-                              <div className="btn-osu-big__content btn-osu-big__content--center">
-                                <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
-                                  <i className="fas fa-cloud-download-alt" />
-                                </span>
-                                <span>Baixar Áudios Restantes</span>
-                              </div>
-                            </button>
-                          )}
-
-                          {cachedAudioCount > 0 && (
-                            <button
-                              type="button"
-                              onClick={handleClearAudio}
-                              disabled={isClearingAudio}
-                              className="btn-osu-big btn-osu-big--danger btn-osu-big--full btn-osu-big--rounded-thin"
-                            >
-                              <div className="btn-osu-big__content btn-osu-big__content--center">
-                                <span className="btn-osu-big__icon-inline btn-osu-big__icon-inline--left">
-                                  <i className="fas fa-trash" />
-                                </span>
-                                <span>{isClearingAudio ? 'Limpando...' : 'Limpar Cache de Áudio'}</span>
-                              </div>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Reset All Button */}
                 <div className="nav2__col">

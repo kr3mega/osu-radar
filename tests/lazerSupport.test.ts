@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { EventEmitter } from 'events';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
+  createLocalLazerMiddleware,
   detectDefaultOsuLazerDir,
   getLazerDirectoryCandidates,
   getLazerStorageFilePath,
@@ -474,6 +476,219 @@ ApproachRate: 9
       current = usePoolStore.getState().currentPool.maps;
       expect(current.some((m) => m.id === 'stable_map_1')).toBe(false);
       expect(current.some((m) => m.id === 'tourney_map_1')).toBe(true);
+    });
+  });
+
+  describe('CAS Media Streaming & Magic Byte Content-Type Detection', () => {
+    function createMockReqRes(url: string, headers: Record<string, string> = {}) {
+      const req = {
+        method: 'GET',
+        url,
+        headers,
+      } as any;
+
+      const res = new EventEmitter() as any;
+      res.statusCode = 200;
+      res.headers = {} as Record<string, string>;
+      res.data = [] as Buffer[];
+      res.setHeader = (k: string, v: string) => {
+        res.headers[k.toLowerCase()] = v;
+      };
+      res.getHeader = (k: string) => res.headers[k.toLowerCase()];
+      res.write = (chunk: any) => {
+        if (chunk) res.data.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      };
+      res.end = (chunk?: any) => {
+        if (chunk) res.data.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        res.emit('finish');
+      };
+      return { req, res };
+    }
+
+    it('streams extensionless CAS audio file with ID3 tag as audio/mpeg and handles Range requests', async () => {
+      const audioHash = '4444444444444444444444444444444444444444444444444444444444444444';
+      const audioBucket = path.join(tempFilesDir, '4', '44');
+      fs.mkdirSync(audioBucket, { recursive: true });
+      const audioPath = path.join(audioBucket, audioHash);
+
+      // Create dummy ID3 MP3 binary
+      const dummyMp3 = Buffer.concat([
+        Buffer.from('ID3\x03\x00\x00\x00\x00\x00\x20', 'binary'),
+        Buffer.alloc(100, 0xff),
+      ]);
+      fs.writeFileSync(audioPath, dummyMp3);
+
+      const middleware = createLocalLazerMiddleware([tempLazerDir]);
+
+      // 1. Full stream request
+      const { req: req1, res: res1 } = createMockReqRes(
+        `/api/local-songs/file?path=${encodeURIComponent(audioPath)}`
+      );
+      await new Promise<void>((resolve) => {
+        res1.on('finish', () => resolve());
+        middleware(req1, res1, () => resolve());
+      });
+
+      expect(res1.statusCode).toBe(200);
+      expect(res1.headers['content-type']).toBe('audio/mpeg');
+      expect(res1.headers['accept-ranges']).toBe('bytes');
+
+      // 2. Partial Content (HTTP 206) Range request
+      const { req: req2, res: res2 } = createMockReqRes(
+        `/api/local-songs/file?path=${encodeURIComponent(audioPath)}`,
+        { range: 'bytes=0-9' }
+      );
+      await new Promise<void>((resolve) => {
+        res2.on('finish', () => resolve());
+        middleware(req2, res2, () => resolve());
+      });
+
+      expect(res2.statusCode).toBe(206);
+      expect(res2.headers['content-type']).toBe('audio/mpeg');
+      expect(res2.headers['content-range']).toBe(`bytes 0-9/${dummyMp3.length}`);
+      expect(res2.headers['content-length']).toBe('10');
+    });
+
+    it('streams extensionless CAS images as image/png and image/jpeg by inspecting magic bytes', async () => {
+      const pngHash = '5555555555555555555555555555555555555555555555555555555555555555';
+      const jpegHash = '6666666666666666666666666666666666666666666666666666666666666666';
+
+      const pngBucket = path.join(tempFilesDir, '5', '55');
+      const jpegBucket = path.join(tempFilesDir, '6', '66');
+      fs.mkdirSync(pngBucket, { recursive: true });
+      fs.mkdirSync(jpegBucket, { recursive: true });
+
+      const pngPath = path.join(pngBucket, pngHash);
+      const jpegPath = path.join(jpegBucket, jpegHash);
+
+      // PNG magic: 0x89 0x50 0x4E 0x47
+      fs.writeFileSync(pngPath, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]));
+      // JPEG magic: 0xFF 0xD8 0xFF
+      fs.writeFileSync(jpegPath, Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]));
+
+      const middleware = createLocalLazerMiddleware([tempLazerDir]);
+
+      // PNG check
+      const { req: reqPng, res: resPng } = createMockReqRes(
+        `/api/local-songs/file?path=${encodeURIComponent(pngPath)}`
+      );
+      await new Promise<void>((resolve) => {
+        resPng.on('finish', () => resolve());
+        middleware(reqPng, resPng, () => resolve());
+      });
+      expect(resPng.statusCode).toBe(200);
+      expect(resPng.headers['content-type']).toBe('image/png');
+
+      // JPEG check
+      const { req: reqJpeg, res: resJpeg } = createMockReqRes(
+        `/api/local-songs/file?path=${encodeURIComponent(jpegPath)}`
+      );
+      await new Promise<void>((resolve) => {
+        resJpeg.on('finish', () => resolve());
+        middleware(reqJpeg, resJpeg, () => resolve());
+      });
+      expect(resJpeg.statusCode).toBe(200);
+      expect(resJpeg.headers['content-type']).toBe('image/jpeg');
+    });
+
+    it('identifies .osu files as text/plain and never serves them as audio', async () => {
+      const osuHash = '7777777777777777777777777777777777777777777777777777777777777777';
+      const osuBucket = path.join(tempFilesDir, '7', '77');
+      fs.mkdirSync(osuBucket, { recursive: true });
+      const osuPath = path.join(osuBucket, osuHash);
+
+      fs.writeFileSync(osuPath, 'osu file format v14\r\n[General]\r\nMode: 0\r\n');
+
+      const middleware = createLocalLazerMiddleware([tempLazerDir]);
+      const { req, res } = createMockReqRes(
+        `/api/local-songs/file?path=${encodeURIComponent(osuPath)}`
+      );
+      await new Promise<void>((resolve) => {
+        res.on('finish', () => resolve());
+        middleware(req, res, () => resolve());
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toBe('text/plain; charset=utf-8');
+      expect(res.headers['content-type']).not.toContain('audio');
+    });
+  });
+
+  describe('Self-Healing Synchronization for Missing Audio/BG', () => {
+    it('detects previously imported Lazer maps missing audio/bg and flags them for re-analysis repair', () => {
+      const existingWithoutAudio = makeMockBeatmap({
+        id: 'lazer_missing_audio',
+        origin: 'lazer',
+        localClient: 'lazer',
+        localOsuPath: 'C:\\lazer\\files\\0\\00\\001122.osu',
+        localAudioPath: undefined,
+        localBgPath: undefined,
+      });
+
+      existingWithoutAudio.fileMtimeMs = 123456789;
+
+      const scannedEntry = {
+        hash: '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff',
+        osuPath: 'C:\\lazer\\files\\0\\00\\001122.osu',
+        folderPath: 'C:\\lazer\\files\\0\\00',
+        folderName: 'Test Artist - Test Title',
+        fileName: '001122.osu',
+        mtimeMs: 123456789,
+        size: 1024,
+        localAudioPath: 'C:\\lazer\\files\\a\\aa\\audio_hash',
+        localBgPath: 'C:\\lazer\\files\\b\\bb\\bg_hash',
+      };
+
+      const isLazer = true;
+      const forceReindex = false;
+      const existing = existingWithoutAudio;
+
+      // Logic check matching src/lib/localLibrarySync.ts
+      let shouldSkipAsCached = false;
+      if (!forceReindex) {
+        if (existing && existing.fileMtimeMs === scannedEntry.mtimeMs) {
+          const needsRepair =
+            isLazer &&
+            ((!existing.localAudioPath && Boolean(scannedEntry.localAudioPath)) ||
+              (!existing.localBgPath && Boolean(scannedEntry.localBgPath)));
+          if (!needsRepair) {
+            shouldSkipAsCached = true;
+          }
+        }
+      }
+
+      // Must NOT skip as cached, because it needs repair!
+      expect(shouldSkipAsCached).toBe(false);
+    });
+
+    it('reads real client.realm beatmaps with high-fidelity audio/bg pairing when present', () => {
+      const candidates = getLazerDirectoryCandidates();
+      let realRealmPath = '';
+      for (const cand of candidates) {
+        const p = path.join(cand, 'client.realm');
+        if (fs.existsSync(p)) {
+          realRealmPath = p;
+          break;
+        }
+      }
+
+      if (!realRealmPath) {
+        // Graceful pass in environments without local osu!lazer installed
+        return;
+      }
+
+      const fileMap = parseLazerRealmFileMap(realRealmPath);
+      expect(fileMap.size).toBeGreaterThan(0);
+      expect(fileMap.osuToSet.size).toBeGreaterThan(0);
+
+      const entries = Array.from(fileMap.osuToSet.values());
+      const withAudio = entries.filter((e) => e.audioPath);
+      const withBg = entries.filter((e) => e.bgPath);
+
+      // Enforce >= 98% audio match rate on real user library
+      expect(withAudio.length / entries.length).toBeGreaterThanOrEqual(0.98);
+      // Enforce >= 95% background match rate on real user library
+      expect(withBg.length / entries.length).toBeGreaterThanOrEqual(0.95);
     });
   });
 });

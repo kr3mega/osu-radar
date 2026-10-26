@@ -291,8 +291,16 @@ export async function syncFromLocalServerBridge(options: {
     if (!forceReindex) {
       const existing = existingLocalMapByPath.get(entry.osuPath.toLowerCase());
       if (existing && existing.fileMtimeMs === entry.mtimeMs) {
-        skippedCached++;
-        continue;
+        // If it's a lazer map and was previously saved without audio or without bg,
+        // but now we have discovered localAudioPath or localBgPath, re-index to repair!
+        const needsRepair =
+          isLazer &&
+          ((!existing.localAudioPath && Boolean(entry.localAudioPath)) ||
+            (!existing.localBgPath && Boolean(entry.localBgPath)));
+        if (!needsRepair) {
+          skippedCached++;
+          continue;
+        }
       }
     }
     toAnalyze.push(entry);
@@ -387,8 +395,8 @@ export async function syncFromLocalServerBridge(options: {
           origin: isLazer ? 'lazer' : 'local_songs',
           localClient: isLazer ? 'lazer' : 'stable',
           localOsuPath: lf.osuPath,
-          localAudioPath: lf.localAudioPath,
-          localBgPath: lf.localBgPath,
+          localAudioPath: lf.localAudioPath || meta?.localAudioPath,
+          localBgPath: lf.localBgPath || meta?.localBgPath,
           fileMtimeMs: meta?.mtimeMs,
           skipNonStandard: true,
         };

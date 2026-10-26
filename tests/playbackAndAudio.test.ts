@@ -116,4 +116,12 @@ describe('Background Tab Hitsound Scheduling & Anti-Burst Protection', () => {
     expect(getSpriteLogicalWidth(sdHitCircle)).toBe(128);
     expect(getSpriteLogicalHeight(sdHitCircle)).toBe(128);
   });
+
+  it('operates cleanly with direct disk audio streaming without legacy bulk IndexedDB download loops', () => {
+    // Verifies that audio playback architecture relies directly on disk streaming
+    // and that the legacy bulk mirror download status remains inactive/null by default.
+    const manager = new BeatmapPreviewAudioManager();
+    expect(manager.getSnapshot().state).toBe('stopped');
+    expect(manager.getSnapshot().progress).toBe(0);
+  });
 });

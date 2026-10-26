@@ -113,18 +113,132 @@ export function getLazerStorageFilePath(lazerDir: string, hash: string): string 
 
 export class LazerRealmFileMap extends Map<string, string> {
   public osuToFiles = new Map<string, Map<string, string>>();
+  public osuToSet = new Map<
+    string,
+    { audioPath?: string; bgPath?: string; beatmapSetId?: number }
+  >();
 }
 
 /**
  * Parses client.realm in osu!lazer and extracts file mappings: { filename.toLowerCase() -> sha256Hash },
- * as well as beatmapset cluster pairings associating each .osu hash with its specific audio & background.
+ * as well as beatmapset pairings associating each .osu hash with its specific audio & background.
+ * Uses official Realm engine when available, falling back gracefully to binary string heuristics.
  */
 export function parseLazerRealmFileMap(realmPath: string): LazerRealmFileMap {
   const fileMap = new LazerRealmFileMap();
-  try {
-    if (!fs.existsSync(realmPath)) return fileMap;
+  if (!realmPath || !fs.existsSync(realmPath)) return fileMap;
 
-    // Use synchronous read with shared read/write descriptor
+  // 1. Attempt high-fidelity native Realm parsing if realm package is present
+  try {
+    let RealmCls: any = null;
+    try {
+      // CommonJS or Node dynamic require
+      if (typeof require !== 'undefined') {
+        RealmCls = require('realm');
+      }
+    } catch {}
+
+    if (RealmCls && typeof RealmCls === 'function') {
+      const realm = new RealmCls({ path: realmPath, readOnly: true });
+      const sets = realm.objects('BeatmapSet');
+      const lazerDir = path.dirname(realmPath);
+      const filesDir = path.join(lazerDir, 'files');
+
+      for (const s of sets) {
+        const setAssets = new Map<string, string>();
+        let defaultAudioHash: string | undefined;
+        let defaultBgHash: string | undefined;
+
+        if (s.Files) {
+          for (const f of s.Files) {
+            if (!f || !f.Filename || !f.File || !f.File.Hash) continue;
+            const nameLower = f.Filename.replace(/\\/g, '/').toLowerCase();
+            const hash = f.File.Hash.toLowerCase();
+            setAssets.set(nameLower, hash);
+            fileMap.set(nameLower, hash);
+            const baseName = nameLower.split('/').pop();
+            if (baseName) {
+              setAssets.set(baseName, hash);
+              fileMap.set(baseName, hash);
+            }
+            if (/\.(mp3|ogg|wav|flac)$/i.test(nameLower) && !defaultAudioHash) {
+              defaultAudioHash = hash;
+            }
+            if (/\.(jpg|jpeg|png|webp|bmp)$/i.test(nameLower) && !defaultBgHash) {
+              if (nameLower.includes('bg') || nameLower.includes('background') || !nameLower.includes('/')) {
+                defaultBgHash = hash;
+              }
+            }
+          }
+        }
+
+        if (s.Beatmaps) {
+          for (const b of s.Beatmaps) {
+            // Strictly enforce standard mode (ruleset osu)
+            if (b.Ruleset && b.Ruleset.ShortName !== 'osu') continue;
+            const osuHash = b.Hash ? b.Hash.toLowerCase() : '';
+            if (!osuHash || osuHash.length !== 64) continue;
+
+            fileMap.osuToFiles.set(osuHash, setAssets);
+
+            let audioHash = defaultAudioHash;
+            let bgHash = defaultBgHash;
+
+            const osuFilePath = path.join(filesDir, osuHash[0], osuHash.slice(0, 2), osuHash);
+            if (fs.existsSync(osuFilePath)) {
+              try {
+                const fd = fs.openSync(osuFilePath, 'r');
+                const headBuf = Buffer.alloc(4096);
+                const readBytes = fs.readSync(fd, headBuf, 0, 4096, 0);
+                fs.closeSync(fd);
+                const headStr = headBuf.toString('utf8', 0, readBytes);
+
+                const { audioFilename, bgFilename } = extractLazerHeaderAssetNames(headStr);
+                if (audioFilename) {
+                  const cleanAudio = audioFilename.replace(/\\/g, '/').split('/').pop()?.toLowerCase();
+                  const matched = (cleanAudio && setAssets.get(cleanAudio)) || setAssets.get(audioFilename.toLowerCase());
+                  if (matched) audioHash = matched;
+                }
+                if (bgFilename) {
+                  const cleanBg = bgFilename.replace(/\\/g, '/').split('/').pop()?.toLowerCase();
+                  const matched = (cleanBg && setAssets.get(cleanBg)) || setAssets.get(bgFilename.toLowerCase());
+                  if (matched) bgHash = matched;
+                }
+              } catch {}
+            }
+
+            let audioPath: string | undefined;
+            if (audioHash) {
+              const cand = getLazerStorageFilePath(lazerDir, audioHash);
+              if (fs.existsSync(cand)) audioPath = cand;
+            }
+
+            let bgPath: string | undefined;
+            if (bgHash) {
+              const cand = getLazerStorageFilePath(lazerDir, bgHash);
+              if (fs.existsSync(cand)) bgPath = cand;
+            }
+
+            fileMap.osuToSet.set(osuHash, {
+              audioPath,
+              bgPath,
+              beatmapSetId: s.OnlineID || s.ID,
+            });
+          }
+        }
+      }
+
+      realm.close();
+      if (fileMap.size > 0 || fileMap.osuToSet.size > 0) {
+        return fileMap;
+      }
+    }
+  } catch {
+    // If native Realm open fails (e.g. mock test file), fall back to string scanner below
+  }
+
+  // 2. Fallback heuristic binary string scanner (handles mock files and test environments)
+  try {
     const fd = fs.openSync(realmPath, 'r');
     const st = fs.fstatSync(fd);
     const buf = Buffer.alloc(st.size);
@@ -132,14 +246,15 @@ export function parseLazerRealmFileMap(realmPath: string): LazerRealmFileMap {
     fs.closeSync(fd);
 
     const str = buf.toString('latin1');
-    const regex = /A([a-f0-9]{64})[\s\S]{0,100}?([^\x00-\x1f\x7f-\xff\r\n]+\.(osu|mp3|ogg|wav|jpg|jpeg|png|webp|bmp))/gi;
+    const regex = /A([a-f0-9]{64})[\s\S]{0,100}?([^\x00-\x1f\x7f-\xff\r\n]+\.(osu|mp3|ogg|wav|flac|jpg|jpeg|png|webp|bmp))/gi;
     const matches: Array<{ pos: number; hash: string; filename: string }> = [];
     let m: RegExpExecArray | null;
     while ((m = regex.exec(str)) !== null) {
       const hash = m[1].toLowerCase();
-      const filename = m[2].trim().toLowerCase();
-      fileMap.set(filename, hash);
-      matches.push({ pos: m.index, hash, filename });
+      const rawFile = m[2].trim().toLowerCase();
+      const cleanFile = rawFile.replace(/^[:;,\s0-9]+/, '') || rawFile;
+      fileMap.set(cleanFile, hash);
+      matches.push({ pos: m.index, hash, filename: cleanFile });
     }
 
     // Group adjacent file usages into beatmapset clusters
@@ -283,13 +398,61 @@ export async function scanOsuLazerDirectory(lazerDir: string): Promise<{
 }> {
   const resolvedRoot = path.resolve(lazerDir);
   const filesDir = path.join(resolvedRoot, 'files');
+  const realmPath = path.join(resolvedRoot, 'client.realm');
 
   const filesStat = await fs.promises.stat(filesDir);
   if (!filesStat.isDirectory()) {
     throw new Error(`A pasta de arquivos do osu!lazer não foi encontrada em: ${filesDir}`);
   }
 
-  // 1. Scan files/ directory across the 16 hex buckets
+  // 1. High-speed native Realm database scanning (extracts all standard beatmaps with audio & BG in < 1s)
+  if (fs.existsSync(realmPath)) {
+    try {
+      const fileMap = parseLazerRealmFileMap(realmPath);
+      if (fileMap.osuToSet.size > 0) {
+        const realmEntries: ScannedLazerEntry[] = [];
+        for (const [osuHash, setInfo] of fileMap.osuToSet.entries()) {
+          const osuPath = getLazerStorageFilePath(resolvedRoot, osuHash);
+          if (!fs.existsSync(osuPath)) continue;
+
+          let size = 0;
+          let mtimeMs = Date.now();
+          try {
+            const st = fs.statSync(osuPath);
+            size = st.size;
+            mtimeMs = Math.round(st.mtimeMs);
+          } catch {}
+
+          const p2 = path.dirname(osuPath);
+          const bucket = osuHash[0];
+          const c2 = osuHash.slice(0, 2);
+
+          realmEntries.push({
+            hash: osuHash,
+            osuPath,
+            folderPath: p2,
+            folderName: `lazer_${bucket}${c2}`,
+            fileName: `${osuHash}.osu`,
+            mtimeMs,
+            size,
+            localAudioPath: setInfo.audioPath,
+            localBgPath: setInfo.bgPath,
+          });
+        }
+
+        if (realmEntries.length > 0) {
+          return {
+            lazerDir: resolvedRoot,
+            filesDir,
+            beatmapCount: realmEntries.length,
+            entries: realmEntries,
+          };
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Fallback: scan files/ directory across the 16 hex buckets
   const hexBuckets = '0123456789abcdef'.split('');
   const entries: ScannedLazerEntry[] = [];
 
@@ -397,11 +560,14 @@ export async function readLocalLazerBatch(
 
         const resolvedHash = (item.hash || path.basename(item.osuPath).replace(/\.osu$/i, '')).toLowerCase();
         const setAssets = fileMap.osuToFiles.get(resolvedHash);
+        const setInfo = fileMap.osuToSet.get(resolvedHash);
+
+        let localAudioPath: string | undefined = setInfo?.audioPath;
+        let localBgPath: string | undefined = setInfo?.bgPath;
 
         const { audioFilename, bgFilename } = extractLazerHeaderAssetNames(text);
 
-        let localAudioPath: string | undefined;
-        if (audioFilename) {
+        if (!localAudioPath && audioFilename) {
           const cleanAudio = audioFilename.replace(/\\/g, '/').split('/').pop()?.toLowerCase();
           const audioHash = cleanAudio ? (setAssets?.get(cleanAudio) || fileMap.get(cleanAudio)) : undefined;
           if (audioHash) {
@@ -412,8 +578,7 @@ export async function readLocalLazerBatch(
           }
         }
 
-        let localBgPath: string | undefined;
-        if (bgFilename) {
+        if (!localBgPath && bgFilename) {
           const cleanBg = bgFilename.replace(/\\/g, '/').split('/').pop()?.toLowerCase();
           const bgHash = cleanBg ? (setAssets?.get(cleanBg) || fileMap.get(cleanBg)) : undefined;
           if (bgHash) {
@@ -474,8 +639,15 @@ function sendJson(res: ServerResponse, statusCode: number, data: unknown) {
 /**
  * Creates the HTTP middleware for osu!lazer detection, scanning, batch-reading and media streaming.
  */
-export function createLocalLazerMiddleware() {
+export function createLocalLazerMiddleware(initialRoots?: Set<string> | string[]) {
   const authorizedRoots = new Set<string>();
+
+  if (initialRoots) {
+    for (const r of initialRoots) {
+      authorizedRoots.add(path.resolve(r));
+      authorizedRoots.add(path.resolve(path.join(r, 'files')));
+    }
+  }
 
   detectDefaultOsuLazerDir()
     .then((info) => {
@@ -600,6 +772,12 @@ export function createLocalLazerMiddleware() {
         res.setHeader('Accept-Ranges', 'bytes');
         res.setHeader('Cache-Control', 'private, max-age=3600');
 
+        (res as any).__meta = {
+          mime,
+          range: rangeHeader,
+          bytes: totalSize,
+        };
+
         if (rangeHeader) {
           const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
           if (match) {
@@ -614,6 +792,8 @@ export function createLocalLazerMiddleware() {
             res.statusCode = 206;
             res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
             res.setHeader('Content-Length', String(end - start + 1));
+            (res as any).__meta.range = `${start}-${end}/${totalSize}`;
+            (res as any).__meta.bytes = end - start + 1;
             const stream = fs.createReadStream(targetFile, { start, end });
             stream.on('error', () => res.end());
             stream.pipe(res);
