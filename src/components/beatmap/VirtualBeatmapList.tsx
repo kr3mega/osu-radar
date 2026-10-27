@@ -18,22 +18,9 @@ interface VirtualBeatmapListProps {
 
 const ITEM_HEIGHT = 100;
 const ITEM_GAP = 10;
-const DRAWER_OVERHEAD = 16; // margin-top: 4px + padding-block: 6px * 2
-const DIFF_ROW_HEIGHT = 38;
-const DIFF_ROW_GAP = 4;
 const OVERSCAN = 8;
 const VIRTUALIZATION_THRESHOLD = 45;
 const ABOVE_THE_FOLD_COUNT = 8;
-
-function getGroupHeight(diffCount: number, isExpanded: boolean): number {
-  if (!isExpanded || diffCount <= 0) return ITEM_HEIGHT;
-  return (
-    ITEM_HEIGHT +
-    DRAWER_OVERHEAD +
-    diffCount * DIFF_ROW_HEIGHT +
-    Math.max(0, diffCount - 1) * DIFF_ROW_GAP
-  );
-}
 
 function findOffsetIndex(offsets: number[], targetY: number): number {
   let lo = 0;
@@ -84,17 +71,16 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
 
   const isVirtualized = effectiveGroups.length > VIRTUALIZATION_THRESHOLD;
 
-  // Prefix-sum vertical offsets for O(log N) variable-height virtualization
+  // Prefix-sum vertical offsets for fixed-height virtualization
   const offsets = useMemo(() => {
     const arr = new Array<number>(effectiveGroups.length + 1);
     arr[0] = 0;
+    const stride = ITEM_HEIGHT + ITEM_GAP;
     for (let i = 0; i < effectiveGroups.length; i++) {
-      const grp = effectiveGroups[i];
-      const h = getGroupHeight(grp.difficulties.length, isGroupExpanded(grp.groupKey));
-      arr[i + 1] = arr[i] + h + ITEM_GAP;
+      arr[i + 1] = arr[i] + stride;
     }
     return arr;
-  }, [effectiveGroups, isGroupExpanded]);
+  }, [effectiveGroups.length]);
 
   const totalContentHeight =
     effectiveGroups.length > 0 ? Math.max(0, offsets[effectiveGroups.length] - ITEM_GAP) : 0;

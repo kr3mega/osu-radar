@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BeatmapAnalysisResult, SkillAttributes } from '../../engine/types';
 import {
   getStarRatingColor,
@@ -43,7 +43,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   selectedMapId,
   isExpanded = false,
   onSelect,
-  onToggleExpand,
+  onToggleExpand: _onToggleExpand,
   onSelectDifficulty,
   onRemove,
   onRemoveDifficulty,
@@ -64,38 +64,16 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   const [audioState, setAudioState] = useState<PreviewAudioState>('stopped');
   const [audioProgress, setAudioProgress] = useState<number>(0);
   const [isDotsHovered, setIsDotsHovered] = useState(false);
-  const [isPopupHovered, setIsPopupHovered] = useState(false);
-  const hoverTimeoutRef = useRef<number | null>(null);
 
   const handleDotsMouseEnter = () => {
-    if (hoverTimeoutRef.current) {
-      window.clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
     setIsDotsHovered(true);
   };
 
   const handleDotsMouseLeave = () => {
-    hoverTimeoutRef.current = window.setTimeout(() => {
-      setIsDotsHovered(false);
-    }, 180);
+    setIsDotsHovered(false);
   };
 
-  const handlePopupMouseEnter = () => {
-    if (hoverTimeoutRef.current) {
-      window.clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setIsPopupHovered(true);
-  };
-
-  const handlePopupMouseLeave = () => {
-    hoverTimeoutRef.current = window.setTimeout(() => {
-      setIsPopupHovered(false);
-    }, 180);
-  };
-
-  const showPopup = isDotsHovered || isPopupHovered;
+  const showPopup = isDotsHovered;
 
   useEffect(() => {
     return previewAudioManager.subscribe((snap) => {
@@ -128,9 +106,6 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
     : TOURNAMENT_MOD_COLORS[modPrefix] || TOURNAMENT_MOD_COLORS.NM;
   const badgeLabel = isLazerSong ? 'LAZER' : isLocalSong ? 'OSU!' : modSlot || 'NM1';
 
-  const minSr = difficulties[0]?.stats.starRating ?? stats.starRating;
-  const maxSr = difficulties[difficulties.length - 1]?.stats.starRating ?? stats.starRating;
-
   const displaySynergy =
     prioritizedSkills.length >= 2
       ? computeMultiSkillSynergy(displayMap.skills, prioritizedSkills)
@@ -147,15 +122,9 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   };
 
   const handleCardClick = () => {
-    if (group && onToggleExpand) {
-      onToggleExpand();
-      if (!activeDiffInGroup) {
-        if (onSelectDifficulty) {
-          onSelectDifficulty(displayMap.id);
-        } else {
-          onSelect();
-        }
-      }
+    const targetMap = group ? group.representative : displayMap;
+    if (onSelectDifficulty) {
+      onSelectDifficulty(targetMap.id);
     } else {
       onSelect();
     }
@@ -309,7 +278,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
               </span>
             </div>
 
-            {/* Row 3: Mapper & Version / Range */}
+            {/* Row 3: Mapper & Version */}
             <div className="beatmapset-panel__info-row beatmapset-panel__info-row--mapper">
               <div className="u-ellipsis-overflow">
                 mapeado por{' '}
@@ -317,16 +286,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                   {metadata.creator}
                 </span>
                 {' · '}
-                {difficulties.length > 1 ? (
-                  <span style={{ color: '#fff' }}>
-                    [{metadata.version}]
-                    <span style={{ color: 'hsl(var(--hsl-l2))', marginLeft: '5px', fontSize: '10px' }}>
-                      ({minSr.toFixed(2).replace('.', ',')}★–{maxSr.toFixed(2).replace('.', ',')}★)
-                    </span>
-                  </span>
-                ) : (
-                  <span style={{ color: '#fff' }}>[{metadata.version}]</span>
-                )}
+                <span style={{ color: '#fff' }}>[{metadata.version}]</span>
               </div>
             </div>
 
@@ -519,21 +479,34 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
             </div>
           </div>
 
-          {/* Dropdown popup for difficulty preview on hovering dots */}
+          {/* Dropdown popup for difficulty preview on hovering dots (ghost element, no hitbox, closes immediately on mouse leave) */}
           {showPopup && difficulties.length > 0 && (
             <div
               className="beatmaps-popup"
-              style={{ zIndex: 10000, boxShadow: '0 8px 24px rgba(0,0,0,0.65)' }}
-              onMouseEnter={handlePopupMouseEnter}
-              onMouseLeave={handlePopupMouseLeave}
-              onClick={(e) => e.stopPropagation()}
+              style={{
+                zIndex: 10000,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.65)',
+                pointerEvents: 'none',
+              }}
             >
-              <div className="beatmaps-popup__content">
-                <div className="beatmaps-popup__group">
+              <div className="beatmaps-popup__content" style={{ pointerEvents: 'none' }}>
+                <div className="beatmaps-popup__group" style={{ pointerEvents: 'none' }}>
                   {difficulties.map((diffItem) => {
                     const dStarColor = getStarRatingColor(diffItem.stats.starRating);
                     const dStarTextColor = getStarRatingTextColor(diffItem.stats.starRating);
-                    const isDiffSelected = diffItem.id === selectedMapId;
+                    const isDiffSelected = diffItem.id === displayMap.id;
+                    const diffSkills =
+                      prioritizedSkills.length > 0
+                        ? prioritizedSkills.slice(0, 3)
+                        : diffItem.topSkills.slice(0, 2);
+                    const diffSynergy =
+                      prioritizedSkills.length >= 2
+                        ? computeMultiSkillSynergy(diffItem.skills, prioritizedSkills)
+                        : 0;
+                    const diffModPrefix = (diffItem.modSlot || 'NM').slice(0, 2).toUpperCase();
+                    const diffModColors =
+                      TOURNAMENT_MOD_COLORS[diffModPrefix] || TOURNAMENT_MOD_COLORS.NM;
+
                     return (
                       <div
                         key={diffItem.id}
@@ -542,21 +515,17 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
-                          padding: '4px 6px',
+                          padding: '4px 8px',
                           borderRadius: '4px',
-                          cursor: 'pointer',
+                          pointerEvents: 'none',
+                          width: '100%',
+                          boxSizing: 'border-box',
                           backgroundColor: isDiffSelected ? 'hsla(var(--hsl-h1), 0.18)' : 'transparent',
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onSelectDifficulty) {
-                            onSelectDifficulty(diffItem.id);
-                          }
                         }}
                       >
                         <span
                           className="beatmapset-panel__beatmap-icon"
-                          style={{ color: dStarColor, fontSize: '11px' }}
+                          style={{ color: dStarColor, fontSize: '11px', flexShrink: 0 }}
                         >
                           <i className="fal fa-extra-mode-osu" />
                         </span>
@@ -566,6 +535,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                             {
                               '--bg': dStarColor,
                               color: dStarTextColor,
+                              flexShrink: 0,
                             } as React.CSSProperties
                           }
                         >
@@ -576,8 +546,48 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                             {diffItem.stats.starRating.toFixed(2).replace('.', ',')}
                           </span>
                         </div>
-                        <span style={{ fontSize: '12px', color: '#fff', fontWeight: 600 }}>
+
+                        {diffItem.origin !== 'local_songs' && diffItem.modSlot && (
+                          <span
+                            className="osu-skills-mod-pill"
+                            style={{
+                              backgroundColor: diffModColors.bg,
+                              color: diffModColors.text,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {diffItem.modSlot}
+                          </span>
+                        )}
+
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            color: '#fff',
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            maxWidth: '220px',
+                          }}
+                        >
                           [{diffItem.metadata.version}]
+                        </span>
+
+                        <span
+                          className="osu-skills-diff-row__skills"
+                          style={{ marginLeft: 'auto', flexShrink: 0, display: 'inline-flex', gap: '4px' }}
+                        >
+                          {prioritizedSkills.length >= 2 && (
+                            <span className="osu-skills-diff-row__skill osu-skills-diff-row__skill--synergy">
+                              {diffSynergy.toFixed(0)}%
+                            </span>
+                          )}
+                          {diffSkills.map((sk) => (
+                            <span key={sk} className="osu-skills-diff-row__skill">
+                              {SKILL_SHORT_LABELS[sk]} {diffItem.skills[sk].toFixed(0)}%
+                            </span>
+                          ))}
                         </span>
                       </div>
                     );
@@ -588,126 +598,6 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
           )}
         </div>
       </div>
-
-      {/* Expandable Difficulties Drawer (shown when song is clicked) */}
-      {group && isExpanded && (
-        <div className="osu-skills-diff-drawer" role="group" aria-label={`Dificuldades de ${metadata.title}`}>
-          {difficulties.map((diffItem) => {
-            const isDiffSelected = diffItem.id === selectedMapId;
-            const diffStarBg = getStarRatingColor(diffItem.stats.starRating);
-            const diffStarText = getStarRatingTextColor(diffItem.stats.starRating);
-            const diffSkills =
-              prioritizedSkills.length > 0
-                ? prioritizedSkills.slice(0, 3)
-                : diffItem.topSkills.slice(0, 2);
-            const diffSynergy =
-              prioritizedSkills.length >= 2
-                ? computeMultiSkillSynergy(diffItem.skills, prioritizedSkills)
-                : 0;
-            const diffModPrefix = (diffItem.modSlot || 'NM').slice(0, 2).toUpperCase();
-            const diffModColors =
-              TOURNAMENT_MOD_COLORS[diffModPrefix] || TOURNAMENT_MOD_COLORS.NM;
-
-            return (
-              <div
-                key={diffItem.id}
-                role="button"
-                tabIndex={0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onSelectDifficulty) {
-                    onSelectDifficulty(diffItem.id);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (onSelectDifficulty) {
-                      onSelectDifficulty(diffItem.id);
-                    }
-                  }
-                }}
-                className={`osu-skills-diff-row ${
-                  isDiffSelected ? 'osu-skills-diff-row--selected' : ''
-                }`}
-              >
-                <span
-                  className="osu-skills-diff-row__star"
-                  style={{ backgroundColor: diffStarBg, color: diffStarText }}
-                >
-                  ★ {diffItem.stats.starRating.toFixed(2).replace('.', ',')}
-                </span>
-
-                {diffItem.origin !== 'local_songs' && diffItem.modSlot && (
-                  <span
-                    className="osu-skills-mod-pill"
-                    style={{
-                      backgroundColor: diffModColors.bg,
-                      color: diffModColors.text,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {diffItem.modSlot}
-                  </span>
-                )}
-
-                <span className="osu-skills-diff-row__version u-ellipsis-overflow">
-                  [{diffItem.metadata.version}]
-                </span>
-
-                <span className="osu-skills-diff-row__skills">
-                  {prioritizedSkills.length >= 2 && (
-                    <span className="osu-skills-diff-row__skill osu-skills-diff-row__skill--synergy">
-                      {diffSynergy.toFixed(0)}%
-                    </span>
-                  )}
-                  {diffSkills.map((sk) => (
-                    <span key={sk} className="osu-skills-diff-row__skill">
-                      {SKILL_SHORT_LABELS[sk]} {diffItem.skills[sk].toFixed(0)}%
-                    </span>
-                  ))}
-                </span>
-
-                <span className="osu-skills-diff-row__stats">
-                  {diffItem.stats.bpmMode} BPM · CS {diffItem.difficulty.cs.toFixed(1)} · AR{' '}
-                  {diffItem.difficulty.ar.toFixed(1)} · OD {diffItem.difficulty.od.toFixed(1)}
-                </span>
-
-                <span className="osu-skills-diff-row__actions">
-                  {(diffItem.metadata.beatmapId || diffItem.metadata.beatmapSetId) && (
-                    <a
-                      href={
-                        diffItem.metadata.beatmapId
-                          ? `osu://b/${diffItem.metadata.beatmapId}`
-                          : `osu://s/${diffItem.metadata.beatmapSetId}`
-                      }
-                      onClick={(e) => e.stopPropagation()}
-                      title="Abrir esta dificuldade no osu!"
-                      className="osu-skills-diff-row__action-btn"
-                    >
-                      <i className="fas fa-gamepad" />
-                    </a>
-                  )}
-                  {onRemoveDifficulty && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRemoveDifficulty(diffItem.id);
-                      }}
-                      title="Remover dificuldade"
-                      className="osu-skills-diff-row__action-btn"
-                    >
-                      <i className="fas fa-trash" />
-                    </button>
-                  )}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 };

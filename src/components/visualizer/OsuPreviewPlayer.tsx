@@ -616,16 +616,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               <div className="osu-skills-player__play-circle">
                 <i className="fas fa-play" style={{ marginLeft: '2px' }} />
               </div>
-              <span
-                className="osu-skills-mod-pill"
-                style={{
-                  backgroundColor: 'rgba(0,0,0,0.75)',
-                  color: '#fff',
-                  padding: '3px 10px',
-                }}
-              >
-                Clique para Jogar
-              </span>
             </div>
           )}
         </div>

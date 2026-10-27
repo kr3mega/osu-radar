@@ -210,8 +210,11 @@ export const App: React.FC = () => {
         if (foundAny) return foundAny;
       }
     }
+    if (groupedSets.length > 0 && groupedSets[0].representative) {
+      return groupedSets[0].representative;
+    }
     return filteredMaps[0] || maps[0] || null;
-  }, [maps, filteredMaps, selectedMapId]);
+  }, [maps, filteredMaps, selectedMapId, groupedSets]);
 
   const activeSiblingDifficulties = useMemo(() => {
     if (!activeMap) return undefined;

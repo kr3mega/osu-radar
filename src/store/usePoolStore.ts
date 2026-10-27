@@ -1333,6 +1333,16 @@ export function groupBeatmapsBySong(
 
   for (let i = 0; i < groups.length; i++) {
     groups[i].difficulties.sort((a, b) => a.stats.starRating - b.stats.starRating);
+    const highest = groups[i].difficulties[groups[i].difficulties.length - 1];
+    if (highest) {
+      groups[i].representative = highest;
+      groups[i].title = highest.metadata.title;
+      groups[i].artist = highest.metadata.artist;
+      groups[i].creator = highest.metadata.creator;
+      if (prioritizedSkills.length > 0) {
+        groups[i].synergyScore = computeMultiSkillSynergy(highest.skills, prioritizedSkills);
+      }
+    }
   }
 
   return groups;
