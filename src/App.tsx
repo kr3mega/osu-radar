@@ -60,6 +60,7 @@ export const App: React.FC = () => {
     filterTournament,
     filterStage,
     trainingFilters,
+    activeTrainingPreset,
     prioritizedSkills,
     expandedSetKeys,
     searchQuery,
@@ -201,8 +202,38 @@ export const App: React.FC = () => {
     [filteredMaps, prioritizedSkills]
   );
 
+  // Monitora alterações nos filtros para selecionar automaticamente o primeiro mapa da lista geral
+  const filterKey = useMemo(() => {
+    return JSON.stringify({
+      origin: filterOrigin,
+      mod: filterMod,
+      tournament: filterTournament,
+      stage: filterStage,
+      training: trainingFilters,
+      preset: activeTrainingPreset,
+      skills: prioritizedSkills,
+      search: searchQuery,
+    });
+  }, [
+    filterOrigin,
+    filterMod,
+    filterTournament,
+    filterStage,
+    trainingFilters,
+    activeTrainingPreset,
+    prioritizedSkills,
+    searchQuery,
+  ]);
+
+  const prevFilterKeyRef = useRef<string>(filterKey);
+  const isInitialFilterMountRef = useRef<boolean>(true);
+
+  // Detecta se filtros acabaram de ser alterados nesta passagem de renderização
+  const isFilterChange = !isInitialFilterMountRef.current && prevFilterKeyRef.current !== filterKey;
+
   const activeMap = useMemo(() => {
-    if (selectedMapId) {
+    // Quando um filtro for selecionado ou removido, prioriza o primeiro mapa da nova lista filtrada
+    if (!isFilterChange && selectedMapId) {
       const inFiltered = filteredMaps.find((m) => m.id === selectedMapId);
       if (inFiltered) return inFiltered;
       if (filteredMaps.length === 0) {
@@ -214,7 +245,22 @@ export const App: React.FC = () => {
       return groupedSets[0].representative;
     }
     return filteredMaps[0] || maps[0] || null;
-  }, [maps, filteredMaps, selectedMapId, groupedSets]);
+  }, [maps, filteredMaps, selectedMapId, groupedSets, isFilterChange]);
+
+  // Sincroniza o selectedMapId na store sempre que um filtro for selecionado ou removido
+  useEffect(() => {
+    if (isInitialFilterMountRef.current) {
+      isInitialFilterMountRef.current = false;
+      prevFilterKeyRef.current = filterKey;
+      return;
+    }
+
+    if (prevFilterKeyRef.current !== filterKey) {
+      prevFilterKeyRef.current = filterKey;
+      const firstMap = groupedSets[0]?.representative || filteredMaps[0] || null;
+      selectMap(firstMap ? firstMap.id : null);
+    }
+  }, [filterKey, groupedSets, filteredMaps, selectMap]);
 
   const activeSiblingDifficulties = useMemo(() => {
     if (!activeMap) return undefined;
