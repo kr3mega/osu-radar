@@ -6,6 +6,7 @@ import { LazerCarouselItem } from './LazerCarouselItem';
 interface VirtualBeatmapListProps {
   maps: BeatmapAnalysisResult[];
   groups?: BeatmapSetGroup[];
+  resetScrollKey?: string;
   expandedSetKeys?: Record<string, boolean>;
   onToggleExpandSet?: (groupKey: string) => void;
   prioritizedSkills?: Array<keyof SkillAttributes>;
@@ -43,6 +44,7 @@ function findOffsetIndex(offsets: number[], targetY: number): number {
 export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
   maps,
   groups: providedGroups,
+  resetScrollKey,
   expandedSetKeys = {},
   onToggleExpandSet,
   prioritizedSkills = [],
@@ -102,38 +104,20 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
     }
   }, [maxHeightPx]);
 
-  const scrollToMap = useCallback(
-    (mapId: string, smooth: boolean = true) => {
+  const scrollIntoViewIfNeeded = useCallback(
+    (grpIdx: number) => {
       const el = containerRef.current;
-      if (!el || effectiveGroups.length === 0) return;
-
-      const grpIdx = effectiveGroups.findIndex((g) =>
-        g.difficulties.some((d) => d.id === mapId)
-      );
-      if (grpIdx === -1) return;
-
-      const grp = effectiveGroups[grpIdx];
-      const activeEl = document.getElementById(`beatmapset-group-${grp.groupKey}`);
-
-      let targetTop = offsets[grpIdx];
-      if (activeEl) {
-        const containerRect = el.getBoundingClientRect();
-        const activeRect = activeEl.getBoundingClientRect();
-        const relativeTop = activeRect.top - containerRect.top + el.scrollTop;
-        targetTop = Math.max(0, relativeTop - 12);
-      }
-
-      if (Math.abs(el.scrollTop - targetTop) > 4) {
-        el.scrollTo({
-          top: targetTop,
-          behavior: smooth ? 'smooth' : 'auto',
-        });
+      if (!el || grpIdx < 0 || grpIdx >= effectiveGroups.length) return;
+      const itemTop = offsets[grpIdx];
+      const itemBottom = itemTop + ITEM_HEIGHT;
+      if (itemTop < el.scrollTop) {
+        el.scrollTo({ top: itemTop, behavior: 'smooth' });
+      } else if (itemBottom > el.scrollTop + viewportHeight) {
+        el.scrollTo({ top: itemBottom - viewportHeight, behavior: 'smooth' });
       }
     },
-    [effectiveGroups, offsets]
+    [effectiveGroups.length, offsets, viewportHeight]
   );
-
-  const lastScrolledGroupKeyRef = useRef<string | null>(null);
 
   const handleToggleExpand = useCallback(
     (groupKey: string) => {
@@ -142,55 +126,44 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
       } else {
         setLocalExpanded((prev) => (prev[groupKey] ? {} : { [groupKey]: true }));
       }
-      const grp = effectiveGroups.find((g) => g.groupKey === groupKey);
-      if (grp) {
-        lastScrolledGroupKeyRef.current = groupKey;
-        scrollToMap(grp.representative.id, true);
-      }
     },
-    [onToggleExpandSet, effectiveGroups, scrollToMap]
+    [onToggleExpandSet]
   );
 
   const handleSelectGroup = useCallback(
-    (mapId: string, groupKey: string) => {
+    (mapId: string) => {
       onSelectMap(mapId);
-      lastScrolledGroupKeyRef.current = groupKey;
-      scrollToMap(mapId, true);
     },
-    [onSelectMap, scrollToMap]
+    [onSelectMap]
   );
 
   const handleSelectDifficulty = useCallback(
-    (diffId: string, groupKey: string) => {
+    (diffId: string) => {
       onSelectMap(diffId);
-      lastScrolledGroupKeyRef.current = groupKey;
-      scrollToMap(diffId, true);
     },
-    [onSelectMap, scrollToMap]
+    [onSelectMap]
   );
 
-  // Auto-scroll list: Puts the active selected song card in the 1st position (top of the queue)
+  // Mova o scroll para o topo da página selecionando o primeiro mapa da lista APENAS se houver alterações de filtros
+  const prevScrollKeyRef = useRef<string | undefined>(resetScrollKey);
+  const isInitialScrollMountRef = useRef<boolean>(true);
+
   useEffect(() => {
-    if (!selectedMapId || effectiveGroups.length === 0) return;
-
-    const grp = effectiveGroups.find((g) =>
-      g.difficulties.some((d) => d.id === selectedMapId)
-    );
-    if (!grp) return;
-
-    const el = containerRef.current;
-    if (el) {
-      const grpIdx = effectiveGroups.indexOf(grp);
-      const targetTop = offsets[grpIdx];
-      const isAlreadyAtTop = Math.abs(el.scrollTop - targetTop) <= 6;
-      if (lastScrolledGroupKeyRef.current === grp.groupKey && isAlreadyAtTop) {
-        return;
-      }
+    if (isInitialScrollMountRef.current) {
+      isInitialScrollMountRef.current = false;
+      prevScrollKeyRef.current = resetScrollKey;
+      return;
     }
 
-    lastScrolledGroupKeyRef.current = grp.groupKey;
-    scrollToMap(selectedMapId, true);
-  }, [selectedMapId, effectiveGroups, offsets, scrollToMap]);
+    if (prevScrollKeyRef.current !== resetScrollKey) {
+      prevScrollKeyRef.current = resetScrollKey;
+      const el = containerRef.current;
+      if (el) {
+        el.scrollTo({ top: 0, behavior: 'smooth' });
+        setScrollTop(0);
+      }
+    }
+  }, [resetScrollKey]);
 
   // Reset scroll to top when filtered list shrinks past current scroll offset
   useEffect(() => {
@@ -214,32 +187,33 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
       const nextIdx = Math.min(effectiveGroups.length - 1, currentIdx + 1);
       const nextId = effectiveGroups[nextIdx].representative.id;
       onSelectMap(nextId);
-      scrollToMap(nextId, true);
+      scrollIntoViewIfNeeded(nextIdx);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       const prevIdx = Math.max(0, currentIdx <= 0 ? 0 : currentIdx - 1);
       const prevId = effectiveGroups[prevIdx].representative.id;
       onSelectMap(prevId);
-      scrollToMap(prevId, true);
+      scrollIntoViewIfNeeded(prevIdx);
     } else if (e.key === 'Home') {
       e.preventDefault();
       const homeId = effectiveGroups[0].representative.id;
       onSelectMap(homeId);
-      scrollToMap(homeId, true);
+      if (containerRef.current) {
+        containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } else if (e.key === 'End') {
       e.preventDefault();
       const lastId = effectiveGroups[effectiveGroups.length - 1].representative.id;
       onSelectMap(lastId);
-      scrollToMap(lastId, true);
+      if (containerRef.current) {
+        containerRef.current.scrollTo({ top: totalContentHeight, behavior: 'smooth' });
+      }
     }
   };
 
   const containerStyle: React.CSSProperties = {
     maxHeight: maxHeightPx && maxHeightPx > 0 ? `${Math.max(460, maxHeightPx)}px` : undefined,
   };
-
-  const extraBottomSpacerHeight =
-    totalContentHeight > viewportHeight ? Math.max(0, viewportHeight - ITEM_HEIGHT - 24) : 0;
 
   if (effectiveGroups.length === 0) {
     return (
@@ -269,18 +243,15 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
               isSelected={isSelected}
               selectedMapId={selectedMapId}
               isExpanded={isGroupExpanded(grp.groupKey)}
-              onSelect={() => handleSelectGroup(grp.representative.id, grp.groupKey)}
+              onSelect={() => handleSelectGroup(grp.representative.id)}
               onToggleExpand={() => handleToggleExpand(grp.groupKey)}
-              onSelectDifficulty={(id) => handleSelectDifficulty(id, grp.groupKey)}
+              onSelectDifficulty={(id) => handleSelectDifficulty(id)}
               onRemove={() => onRemoveMap(grp.representative.id)}
               onRemoveDifficulty={(id) => onRemoveMap(id)}
               prioritizedSkills={prioritizedSkills}
             />
           );
         })}
-        {extraBottomSpacerHeight > 0 && (
-          <div aria-hidden="true" style={{ height: `${extraBottomSpacerHeight}px`, flexShrink: 0 }} />
-        )}
       </div>
     );
   }
@@ -323,9 +294,9 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
             isSelected={isSelected}
             selectedMapId={selectedMapId}
             isExpanded={isGroupExpanded(grp.groupKey)}
-            onSelect={() => handleSelectGroup(grp.representative.id, grp.groupKey)}
+            onSelect={() => handleSelectGroup(grp.representative.id)}
             onToggleExpand={() => handleToggleExpand(grp.groupKey)}
-            onSelectDifficulty={(id) => handleSelectDifficulty(id, grp.groupKey)}
+            onSelectDifficulty={(id) => handleSelectDifficulty(id)}
             onRemove={() => onRemoveMap(grp.representative.id)}
             onRemoveDifficulty={(id) => onRemoveMap(id)}
             prioritizedSkills={prioritizedSkills}
@@ -334,9 +305,6 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
       })}
       {bottomSpacerHeight > 0 && (
         <div aria-hidden="true" style={{ height: `${bottomSpacerHeight}px`, flexShrink: 0 }} />
-      )}
-      {extraBottomSpacerHeight > 0 && (
-        <div aria-hidden="true" style={{ height: `${extraBottomSpacerHeight}px`, flexShrink: 0 }} />
       )}
     </div>
   );

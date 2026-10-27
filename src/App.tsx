@@ -671,6 +671,7 @@ export const App: React.FC = () => {
                   <VirtualBeatmapList
                     maps={filteredMaps}
                     groups={groupedSets}
+                    resetScrollKey={filterKey}
                     expandedSetKeys={expandedSetKeys}
                     onToggleExpandSet={toggleExpandedSet}
                     prioritizedSkills={prioritizedSkills}
