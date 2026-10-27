@@ -63,34 +63,42 @@ export function processHitsoundTick({
   }
 
   // 2. Foreground immediate window [safeMinTimeMs, curTimeMs]:
-  // Play at most 1 immediate hitsound per frame (the latest note in the window) to guarantee zero headphone bursts.
-  let immediateCandidate: PreviewHitObject | null = null;
+  // Collect notes arriving in this tick. Stream notes and chords are all preserved up to a safe batch cap (8),
+  // preventing dropped notes in fast 1/4 streams while protecting against headphone bursts on large lag spikes.
+  const immediateNotes: PreviewHitObject[] = [];
   for (let i = nextLastIndex + 1; i < hitObjects.length; i++) {
     const obj = hitObjects[i];
     if (obj.time > curTimeMs) break;
     if (obj.time >= safeMinTimeMs) {
-      immediateCandidate = obj;
+      immediateNotes.push(obj);
       nextLastIndex = i;
     }
   }
 
-  if (immediateCandidate) {
-    onPlayHit(immediateCandidate, 0);
+  const maxImmediateBatch = 8;
+  const notesToPlay =
+    immediateNotes.length > maxImmediateBatch
+      ? immediateNotes.slice(-maxImmediateBatch)
+      : immediateNotes;
+
+  for (const obj of notesToPlay) {
+    onPlayHit(obj, 0);
   }
 
-  // 3. Background tab Web Audio lookahead scheduling:
-  // When the document is hidden, browser timers may be throttled to ~1000ms.
-  // Schedule upcoming notes within the next 1150ms directly on the AudioContext hardware clock.
-  if (isBackgroundTab) {
-    const lookaheadHorizonMs = curTimeMs + 1150 * rate;
-    for (let i = nextLastIndex + 1; i < hitObjects.length; i++) {
-      const obj = hitObjects[i];
-      if (obj.time > lookaheadHorizonMs) break;
-      if (obj.time > curTimeMs) {
-        const delaySec = (obj.time - curTimeMs) / (1000 * rate);
-        onPlayHit(obj, delaySec);
-        nextLastIndex = i;
-      }
+  // 3. Web Audio lookahead scheduling:
+  // - In foreground: schedule upcoming notes within a 45ms window onto the Web Audio hardware clock
+  //   for sample-accurate timing and zero DAC buffer latency.
+  // - In background tab: timer is throttled (~1000ms), so schedule upcoming notes within 1150ms horizon.
+  const lookaheadMs = isBackgroundTab ? 1150 * rate : 45 * rate;
+  const lookaheadHorizonMs = curTimeMs + lookaheadMs;
+
+  for (let i = nextLastIndex + 1; i < hitObjects.length; i++) {
+    const obj = hitObjects[i];
+    if (obj.time > lookaheadHorizonMs) break;
+    if (obj.time > curTimeMs) {
+      const delaySec = (obj.time - curTimeMs) / (1000 * rate);
+      onPlayHit(obj, delaySec);
+      nextLastIndex = i;
     }
   }
 

@@ -17,6 +17,8 @@ export class MusicPlayer {
   private _isMuted: boolean = false;
   private _duration: number = 0;
   private _hasRealAudio: boolean = false;
+  private lastAudioReportedTime: number = 0;
+  private lastAudioPerfTime: number = 0;
 
   constructor() {}
 
@@ -140,6 +142,9 @@ export class MusicPlayer {
           });
 
           if (this._hasRealAudio) {
+            this.lastAudioReportedTime = 0;
+            this.lastAudioPerfTime = performance.now();
+            this.pauseTime = 0;
             return true;
           }
         } catch (err) {
@@ -198,6 +203,8 @@ export class MusicPlayer {
       this.audio.preservesPitch = true;
       (this.audio as any).webkitPreservesPitch = true;
       (this.audio as any).mozPreservesPitch = true;
+      this.lastAudioReportedTime = this.audio.currentTime;
+      this.lastAudioPerfTime = performance.now();
       this.audio.play().catch(() => {});
     } else if (this.buffer) {
       this.startSource(this.pauseTime);
@@ -212,6 +219,8 @@ export class MusicPlayer {
         this.audio.pause();
         this.pauseTime = this.audio.currentTime;
       } catch {}
+      this.lastAudioReportedTime = this.pauseTime;
+      this.lastAudioPerfTime = performance.now();
     } else {
       this.pauseTime = this.currentTimeSec;
       this.stopSource();
@@ -227,6 +236,8 @@ export class MusicPlayer {
       try {
         this.audio.currentTime = targetSec;
       } catch {}
+      this.lastAudioReportedTime = targetSec;
+      this.lastAudioPerfTime = performance.now();
     } else if (this.buffer) {
       if (this._isPlaying) {
         this.startSource(targetSec);
@@ -245,6 +256,8 @@ export class MusicPlayer {
       this.audio.preservesPitch = true;
       (this.audio as any).webkitPreservesPitch = true;
       (this.audio as any).mozPreservesPitch = true;
+      this.lastAudioReportedTime = curSec;
+      this.lastAudioPerfTime = performance.now();
     }
 
     if (!this.audio && this._isPlaying) {
@@ -281,7 +294,32 @@ export class MusicPlayer {
 
   public get currentTimeSec(): number {
     if (this.audio && this._hasRealAudio) {
-      return this.audio.currentTime;
+      if (!this._isPlaying || this.audio.paused) {
+        return this.audio.currentTime;
+      }
+      const rawAudioTime = this.audio.currentTime;
+      const nowPerf = performance.now();
+
+      // If the underlying audio element advanced its clock, update anchor
+      if (rawAudioTime > this.lastAudioReportedTime) {
+        this.lastAudioReportedTime = rawAudioTime;
+        this.lastAudioPerfTime = nowPerf;
+        return Math.min(rawAudioTime, this._duration);
+      } else if (rawAudioTime < this.lastAudioReportedTime - 0.5) {
+        // Audio jumped backward by more than 500ms (unhandled external seek or loop)
+        this.lastAudioReportedTime = rawAudioTime;
+        this.lastAudioPerfTime = nowPerf;
+        return Math.min(rawAudioTime, this._duration);
+      }
+
+      // If audio.currentTime hasn't updated yet (Chromium's stepped 20-40ms update interval),
+      // extrapolate continuously using high-resolution performance.now():
+      const elapsedSec = ((nowPerf - this.lastAudioPerfTime) / 1000) * this._playbackRate;
+      // Drift protection: do not allow extrapolation beyond 150ms without an audio tick
+      const maxExtrapolateSec = 0.15 * this._playbackRate;
+      const extrapolatedSec = this.lastAudioReportedTime + Math.min(elapsedSec, maxExtrapolateSec);
+
+      return Math.min(extrapolatedSec, this._duration);
     }
     if (!this._isPlaying || !this.ctx) {
       return this.pauseTime;

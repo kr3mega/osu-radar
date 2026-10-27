@@ -200,4 +200,173 @@ describe('Background Tab Hitsound Scheduling & Anti-Burst Protection', () => {
       (globalThis as any).Audio = originalAudio;
     }
   });
+
+  it('extrapola o relógio contínuo em microssegundos sem congelamento por stepped ticks do Chromium', async () => {
+    class MockAudio {
+      public src: string = '';
+      public volume: number = 1.0;
+      public preload: string = 'auto';
+      public playbackRate: number = 1.0;
+      public preservesPitch: boolean = true;
+      public webkitPreservesPitch: boolean = true;
+      public mozPreservesPitch: boolean = true;
+      public currentTime: number = 10.0;
+      public duration: number = 120;
+      public readyState: number = 4;
+      public paused: boolean = false;
+      public play = vi.fn().mockResolvedValue(undefined);
+      public pause = vi.fn();
+      public load = vi.fn();
+      public removeAttribute = vi.fn();
+      public addEventListener = vi.fn((event, cb) => {
+        if (event === 'canplay' || event === 'loadedmetadata') cb();
+      });
+      public removeEventListener = vi.fn();
+      public onended: (() => void) | null = null;
+    }
+
+    const originalAudio = (globalThis as any).Audio;
+    (globalThis as any).Audio = MockAudio;
+
+    let mockedPerf = 1000.0;
+    const perfSpy = vi.spyOn(performance, 'now').mockImplementation(() => mockedPerf);
+
+    try {
+      const player = new MusicPlayer();
+      player.init();
+      await player.loadAudio('http://localhost:4173/test.mp3');
+      player.play();
+
+      // Frame 1: tempo base 10.0s
+      const t1 = player.currentTimeSec;
+      expect(t1).toBeCloseTo(10.0, 3);
+
+      // Frame 2: Chromium ainda não atualizou audio.currentTime (permanece 10.0s),
+      // mas 16.6ms de RAF se passaram no monitor
+      mockedPerf += 16.666;
+      const t2 = player.currentTimeSec;
+      expect(t2).toBeGreaterThan(t1);
+      expect(t2).toBeCloseTo(10.0166, 3);
+
+      // Frame 3: outro frame a 60fps (total 33.3ms) sem atualização do audio.currentTime
+      mockedPerf += 16.666;
+      const t3 = player.currentTimeSec;
+      expect(t3).toBeGreaterThan(t2);
+      expect(t3).toBeCloseTo(10.0333, 3);
+
+      player.destroy();
+    } finally {
+      perfSpy.mockRestore();
+      (globalThis as any).Audio = originalAudio;
+    }
+  });
+
+  it('preserva todas as notas de streams rápidos sem descartar hitsounds em ticks consecutivos', () => {
+    // Stream de 4 notas espaçadas a 25ms: 1000ms, 1025ms, 1050ms, 1075ms
+    const hitObjects = makeHitObjects([1000, 1025, 1050, 1075]);
+    const played: Array<{ time: number; delaySec: number }> = [];
+
+    // Tick abrange [990, 1060] (3 notas no imediato) e lookahead 45ms alcança 1075ms
+    const nextIdx = processHitsoundTick({
+      hitObjects,
+      lastPlayedNoteIndex: -1,
+      prevTimeMs: 990,
+      curTimeMs: 1060,
+      effectivePlaybackRate: 1.0,
+      isBackgroundTab: false,
+      onPlayHit: (obj, delaySec) => {
+        played.push({ time: obj.time, delaySec });
+      },
+    });
+
+    // Todas as 4 notas devem ter sido executadas (nenhuma descartada no stream)
+    expect(played.length).toBe(4);
+    expect(played.map((p) => p.time)).toEqual([1000, 1025, 1050, 1075]);
+    // 3 notas imediatas com delaySec = 0
+    expect(played[0].delaySec).toBe(0);
+    expect(played[1].delaySec).toBe(0);
+    expect(played[2].delaySec).toBe(0);
+    // 1 nota futura agendada com lookahead delaySec = 15ms (1075 - 1060)
+    expect(played[3].delaySec).toBeCloseTo(0.015, 3);
+    expect(nextIdx).toBe(3);
+  });
+
+  it('agenda notas futuras no relógio do Web Audio no modo foreground para eliminar latência de saída DAC', () => {
+    const hitObjects = makeHitObjects([1030]);
+    const scheduled: Array<{ time: number; delaySec: number }> = [];
+
+    const nextIdx = processHitsoundTick({
+      hitObjects,
+      lastPlayedNoteIndex: -1,
+      prevTimeMs: 990,
+      curTimeMs: 1000,
+      effectivePlaybackRate: 1.0,
+      isBackgroundTab: false,
+      onPlayHit: (obj, delaySec) => {
+        scheduled.push({ time: obj.time, delaySec });
+      },
+    });
+
+    // Nota em 1030ms está dentro da janela lookahead [1000, 1045]
+    expect(scheduled.length).toBe(1);
+    expect(scheduled[0].time).toBe(1030);
+    expect(scheduled[0].delaySec).toBeCloseTo(0.03, 3);
+    expect(nextIdx).toBe(0);
+
+    // No tick subsequente quando curTimeMs chega a 1030ms, ela não deve disparar novamente
+    const afterPlayed: number[] = [];
+    processHitsoundTick({
+      hitObjects,
+      lastPlayedNoteIndex: nextIdx,
+      prevTimeMs: 1000,
+      curTimeMs: 1030,
+      effectivePlaybackRate: 1.0,
+      isBackgroundTab: false,
+      onPlayHit: (obj) => {
+        afterPlayed.push(obj.time);
+      },
+    });
+
+    expect(afterPlayed).toEqual([]);
+  });
+
+  it('reconhece arquivos CAS do Lazer sem extensão com UTF-8 BOM, WAV RIFF e FLAC', () => {
+    function detectMime(buf: Buffer): string {
+      const headStr = buf.toString('utf8').replace(/^\ufeff/, '');
+      if (headStr.startsWith('osu file format')) {
+        return 'text/plain; charset=utf-8';
+      } else if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+        return 'image/png';
+      } else if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+        return 'image/jpeg';
+      } else if (buf.toString('ascii', 0, 4) === 'OggS') {
+        return 'audio/ogg';
+      } else if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WAVE') {
+        return 'audio/wav';
+      } else if (buf.toString('ascii', 0, 4) === 'fLaC') {
+        return 'audio/flac';
+      } else if (
+        buf.toString('ascii', 0, 3) === 'ID3' ||
+        (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0)
+      ) {
+        return 'audio/mpeg';
+      }
+      return 'application/octet-stream';
+    }
+
+    // 1. Arquivo .osu com UTF-8 BOM (\ufeff)
+    const bomOsu = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('osu file format v14\r\n')]);
+    expect(detectMime(bomOsu)).toBe('text/plain; charset=utf-8');
+
+    // 2. Arquivo de áudio RIFF WAVE
+    const wavBuf = Buffer.alloc(32);
+    wavBuf.write('RIFF', 0, 'ascii');
+    wavBuf.write('WAVE', 8, 'ascii');
+    expect(detectMime(wavBuf)).toBe('audio/wav');
+
+    // 3. Arquivo de áudio FLAC
+    const flacBuf = Buffer.alloc(32);
+    flacBuf.write('fLaC', 0, 'ascii');
+    expect(detectMime(flacBuf)).toBe('audio/flac');
+  });
 });

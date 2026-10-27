@@ -188,8 +188,8 @@ export function parseLazerRealmFileMap(realmPath: string): LazerRealmFileMap {
             if (fs.existsSync(osuFilePath)) {
               try {
                 const fd = fs.openSync(osuFilePath, 'r');
-                const headBuf = Buffer.alloc(4096);
-                const readBytes = fs.readSync(fd, headBuf, 0, 4096, 0);
+                const headBuf = Buffer.alloc(16384);
+                const readBytes = fs.readSync(fd, headBuf, 0, 16384, 0);
                 fs.closeSync(fd);
                 const headStr = headBuf.toString('utf8', 0, readBytes);
 
@@ -745,13 +745,14 @@ export function createLocalLazerMiddleware(initialRoots?: Set<string> | string[]
         // In lazer CAS, files often have no extension; detect or fallback to octet-stream/audio/image
         let mime = MIME_TYPES[ext] || 'application/octet-stream';
         if (ext === '') {
-          // Detect by header
+          // Detect by header with support for UTF-8 BOM, OGG, WAV, MP3 and images
           try {
             const fd = await fs.promises.open(targetFile, 'r');
-            const headBuf = Buffer.alloc(16);
-            await fd.read(headBuf, 0, 16, 0);
+            const headBuf = Buffer.alloc(64);
+            await fd.read(headBuf, 0, 64, 0);
             await fd.close();
-            if (headBuf.toString('utf8').startsWith('osu file format')) {
+            const headStr = headBuf.toString('utf8').replace(/^\ufeff/, '');
+            if (headStr.startsWith('osu file format')) {
               mime = 'text/plain; charset=utf-8';
             } else if (headBuf[0] === 0x89 && headBuf[1] === 0x50 && headBuf[2] === 0x4e && headBuf[3] === 0x47) {
               mime = 'image/png';
@@ -759,7 +760,14 @@ export function createLocalLazerMiddleware(initialRoots?: Set<string> | string[]
               mime = 'image/jpeg';
             } else if (headBuf.toString('ascii', 0, 4) === 'OggS') {
               mime = 'audio/ogg';
-            } else if (headBuf.toString('ascii', 0, 3) === 'ID3' || (headBuf[0] === 0xff && (headBuf[1] & 0xe0) === 0xe0)) {
+            } else if (headBuf.toString('ascii', 0, 4) === 'RIFF' && headBuf.toString('ascii', 8, 12) === 'WAVE') {
+              mime = 'audio/wav';
+            } else if (headBuf.toString('ascii', 0, 4) === 'fLaC') {
+              mime = 'audio/flac';
+            } else if (
+              headBuf.toString('ascii', 0, 3) === 'ID3' ||
+              (headBuf[0] === 0xff && (headBuf[1] & 0xe0) === 0xe0)
+            ) {
               mime = 'audio/mpeg';
             }
           } catch {}

@@ -9,6 +9,7 @@ import {
   AudioResolveStatus,
   getModFromSlot,
   previewAudioManager,
+  getLocalSongFileUrl,
 } from '../../lib/osu-preview';
 import {
   DetectedPattern,
@@ -300,6 +301,19 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
       controller.setVolume(getEffectiveVolume());
       controller.setMuted(isMuted);
       controller.setBackgroundDim(bgDim);
+
+      // Fast path: if localAudioPath exists, stream directly via disk bridge HTTP 206 without waiting for full blob fetch
+      if (map.localAudioPath) {
+        const localUrl = getLocalSongFileUrl(map.localAudioPath);
+        if (localUrl) {
+          setAudioStatus({ state: 'loading', message: 'Transmitindo áudio local...' });
+          const loaded = await controller.loadAudioTrack(localUrl);
+          if (loaded && !isCancelled && controllerRef.current === controller) {
+            setAudioStatus({ state: 'ready', message: 'Música pronta (local)' });
+            return;
+          }
+        }
+      }
 
       const blob = await resolveBeatmapAudio(map, (status) => {
         if (!isCancelled) setAudioStatus(status);
