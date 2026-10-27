@@ -29,6 +29,16 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(false);
   const [hoveredDiffId, setHoveredDiffId] = useState<string | null>(null);
 
+  const topTwoSkills = useMemo(() => {
+    if (!map || !map.skills) return [];
+    const scored = ALL_SKILL_KEYS.map((k) => ({
+      key: k,
+      val: getSkillValue(map.skills, k),
+    }));
+    scored.sort((a, b) => b.val - a.val);
+    return scored.slice(0, 2);
+  }, [map]);
+
   if (!map) {
     return (
       <div
@@ -80,16 +90,6 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
     { key: 'ar', label: 'AR', val: map.difficulty.ar, max: 10, isStar: false },
     { key: 'sr', label: 'SR', val: stats.starRating, max: 10, isStar: true },
   ];
-
-  const topTwoSkills = useMemo(() => {
-    if (!map || !map.skills) return [];
-    const scored = ALL_SKILL_KEYS.map((k) => ({
-      key: k,
-      val: getSkillValue(map.skills, k),
-    }));
-    scored.sort((a, b) => b.val - a.val);
-    return scored.slice(0, 2);
-  }, [map]);
 
   return (
     <div className="osu-skills-wedge-container">

@@ -272,15 +272,13 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
               </span>
             </div>
 
-            {/* Row 3: Mapper & Version */}
+            {/* Row 3: Mapper */}
             <div className="beatmapset-panel__info-row beatmapset-panel__info-row--mapper">
               <div className="u-ellipsis-overflow">
                 mapeado por{' '}
                 <span className="beatmapset-panel__mapper-link" style={{ color: 'hsl(var(--hsl-l1))' }}>
                   {metadata.creator}
                 </span>
-                {' · '}
-                <span style={{ color: '#fff' }}>[{metadata.version}]</span>
               </div>
             </div>
 
