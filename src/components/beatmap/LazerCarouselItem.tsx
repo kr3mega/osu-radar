@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { BeatmapAnalysisResult, SkillAttributes } from '../../engine/types';
 import {
   getStarRatingColor,
@@ -63,6 +63,39 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
 
   const [audioState, setAudioState] = useState<PreviewAudioState>('stopped');
   const [audioProgress, setAudioProgress] = useState<number>(0);
+  const [isDotsHovered, setIsDotsHovered] = useState(false);
+  const [isPopupHovered, setIsPopupHovered] = useState(false);
+  const hoverTimeoutRef = useRef<number | null>(null);
+
+  const handleDotsMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      window.clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsDotsHovered(true);
+  };
+
+  const handleDotsMouseLeave = () => {
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      setIsDotsHovered(false);
+    }, 180);
+  };
+
+  const handlePopupMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      window.clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsPopupHovered(true);
+  };
+
+  const handlePopupMouseLeave = () => {
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      setIsPopupHovered(false);
+    }, 180);
+  };
+
+  const showPopup = isDotsHovered || isPopupHovered;
 
   useEffect(() => {
     return previewAudioManager.subscribe((snap) => {
@@ -149,10 +182,15 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
         aria-expanded={group ? isExpanded : undefined}
         data-audio-state={audioState}
         data-audio-over50={audioProgress > 0.5 ? '1' : '0'}
-        style={{ '--progress': audioProgress } as React.CSSProperties}
+        style={
+          {
+            '--progress': audioProgress,
+            zIndex: showPopup ? 25 : undefined,
+          } as React.CSSProperties
+        }
         className={`beatmapset-panel beatmapset-panel--size-normal ${
           isSelected ? 'beatmapset-panel--selected' : ''
-        }`}
+        } ${showPopup ? 'beatmapset-panel--beatmaps-popup-visible' : ''}`}
       >
         {/* Dual-Column Cover Container (exact osu-web structure) */}
         <div className="beatmapset-panel__cover-container">
@@ -304,7 +342,11 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                 </div>
               </div>
 
-              <div className="beatmapset-panel__extra-item beatmapset-panel__extra-item--dots">
+              <div
+                className="beatmapset-panel__extra-item beatmapset-panel__extra-item--dots"
+                onMouseEnter={handleDotsMouseEnter}
+                onMouseLeave={handleDotsMouseLeave}
+              >
                 <div
                   className="beatmapset-panel__beatmap-icon"
                   style={{ color: starColor }}
@@ -473,6 +515,73 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
               )}
             </div>
           </div>
+
+          {/* Dropdown popup for difficulty preview on hovering dots */}
+          {showPopup && difficulties.length > 0 && (
+            <div
+              className="beatmaps-popup"
+              onMouseEnter={handlePopupMouseEnter}
+              onMouseLeave={handlePopupMouseLeave}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="beatmaps-popup__content">
+                <div className="beatmaps-popup__group">
+                  {difficulties.map((diffItem) => {
+                    const dStarColor = getStarRatingColor(diffItem.stats.starRating);
+                    const dStarTextColor = getStarRatingTextColor(diffItem.stats.starRating);
+                    const isDiffSelected = diffItem.id === selectedMapId;
+                    return (
+                      <div
+                        key={diffItem.id}
+                        className="beatmaps-popup-item"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '4px 6px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          backgroundColor: isDiffSelected ? 'hsla(var(--hsl-h1), 0.18)' : 'transparent',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onSelectDifficulty) {
+                            onSelectDifficulty(diffItem.id);
+                          }
+                        }}
+                      >
+                        <span
+                          className="beatmapset-panel__beatmap-icon"
+                          style={{ color: dStarColor, fontSize: '11px' }}
+                        >
+                          <i className="fal fa-extra-mode-osu" />
+                        </span>
+                        <div
+                          className="difficulty-badge"
+                          style={
+                            {
+                              '--bg': dStarColor,
+                              color: dStarTextColor,
+                            } as React.CSSProperties
+                          }
+                        >
+                          <span className="difficulty-badge__icon">
+                            <span className="fas fa-star" />
+                          </span>
+                          <span className="difficulty-badge__rating">
+                            {diffItem.stats.starRating.toFixed(2).replace('.', ',')}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#fff', fontWeight: 600 }}>
+                          [{diffItem.metadata.version}]
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -543,11 +652,6 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                   [{diffItem.metadata.version}]
                 </span>
 
-                <span className="osu-skills-diff-row__stats">
-                  {diffItem.stats.bpmMode} BPM · CS {diffItem.difficulty.cs.toFixed(1)} · AR{' '}
-                  {diffItem.difficulty.ar.toFixed(1)} · OD {diffItem.difficulty.od.toFixed(1)}
-                </span>
-
                 <span className="osu-skills-diff-row__skills">
                   {prioritizedSkills.length >= 2 && (
                     <span className="osu-skills-diff-row__skill osu-skills-diff-row__skill--synergy">
@@ -559,6 +663,11 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                       {SKILL_SHORT_LABELS[sk]} {diffItem.skills[sk].toFixed(0)}%
                     </span>
                   ))}
+                </span>
+
+                <span className="osu-skills-diff-row__stats">
+                  {diffItem.stats.bpmMode} BPM · CS {diffItem.difficulty.cs.toFixed(1)} · AR{' '}
+                  {diffItem.difficulty.ar.toFixed(1)} · OD {diffItem.difficulty.od.toFixed(1)}
                 </span>
 
                 <span className="osu-skills-diff-row__actions">

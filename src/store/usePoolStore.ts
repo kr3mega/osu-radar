@@ -238,6 +238,7 @@ interface PoolState {
   setPrioritizedSkills: (skills: Array<keyof SkillAttributes>) => void;
   clearPrioritizedSkills: () => void;
   resetTrainingFilters: () => void;
+  resetAllFilters: () => void;
   setSearchQuery: (query: string) => void;
   setSortBy: (sort: SortOption) => void;
   setSortDirection: (dir: SortDirection) => void;
@@ -606,6 +607,24 @@ export const usePoolStore = create<PoolState>((set, get) => ({
             : 'slot'
           : state.sortBy,
     }));
+  },
+  resetAllFilters: () => {
+    console.log('[PoolStore] Reset completo de todos os filtros e barra de pesquisa');
+    set({
+      searchQuery: '',
+      filterOrigin: 'ALL',
+      filterMod: 'ALL',
+      filterTournament: 'ALL',
+      filterStage: 'ALL',
+      trainingFilters: { ...DEFAULT_TRAINING_FILTERS },
+      activeTrainingPreset: null,
+      prioritizedSkills: [],
+      sortBy: 'slot',
+      sortDirection: 'asc',
+      activeTournamentFilter: null,
+      expandedSetKey: null,
+      expandedSetKeys: {},
+    });
   },
   setSearchQuery: (searchQuery) => {
     if (searchQuery.trim()) {
@@ -1211,6 +1230,53 @@ export function getBeatmapSetGroupKey(map: BeatmapAnalysisResult): string {
 }
 
 /**
+ * Checks whether two beatmap analysis results represent the exact same difficulty
+ * pulled from different osu! clients (e.g. osu!stable and osu!lazer).
+ */
+export function isSameDifficultyAcrossClients(
+  a: BeatmapAnalysisResult,
+  b: BeatmapAnalysisResult
+): boolean {
+  if (a.id === b.id) return true;
+
+  const aClient = a.localClient || (a.origin === 'lazer' ? 'lazer' : 'stable');
+  const bClient = b.localClient || (b.origin === 'lazer' ? 'lazer' : 'stable');
+  if (aClient === bClient) return false;
+
+  if (a.metadata.beatmapId && b.metadata.beatmapId && a.metadata.beatmapId > 0) {
+    return a.metadata.beatmapId === b.metadata.beatmapId;
+  }
+
+  const vA = (a.metadata.version || '').trim().toLowerCase();
+  const vB = (b.metadata.version || '').trim().toLowerCase();
+  if (!vA || !vB || vA !== vB) return false;
+
+  if (a.metadata.beatmapSetId && b.metadata.beatmapSetId && a.metadata.beatmapSetId > 0) {
+    return a.metadata.beatmapSetId === b.metadata.beatmapSetId;
+  }
+
+  const tA = (a.metadata.title || '').trim().toLowerCase();
+  const tB = (b.metadata.title || '').trim().toLowerCase();
+  const artA = (a.metadata.artist || '').trim().toLowerCase();
+  const artB = (b.metadata.artist || '').trim().toLowerCase();
+  return Boolean(tA && tB && tA === tB && artA && artB && artA === artB);
+}
+
+/**
+ * Canonical deduplication key for a difficulty within a beatmapset/song.
+ * If beatmapId is present and > 0, it uniquely identifies the difficulty worldwide.
+ * Otherwise, combines the song group key and trimmed version name.
+ */
+export function getDifficultyDeduplicationKey(map: BeatmapAnalysisResult): string {
+  if (map.metadata.beatmapId && map.metadata.beatmapId > 0) {
+    return `b:${map.metadata.beatmapId}`;
+  }
+  const groupKey = getBeatmapSetGroupKey(map);
+  const cleanVersion = (map.metadata.version || '').trim().toLowerCase();
+  return cleanVersion ? `${groupKey}::v:${cleanVersion}` : `id:${map.id}`;
+}
+
+/**
  * Groups an already-filtered and sorted list of beatmaps by song (beatmapset).
  * - Group order preserves the position of each song's highest-ranked qualifying difficulty (`representative`).
  * - Inside each group, `difficulties` are ordered ascending by Star Rating (`★`) like osu!lazer.
@@ -1245,6 +1311,22 @@ export function groupBeatmapsBySong(
       groupMap.set(key, group);
       groups.push(group);
     } else {
+      const existing = group.difficulties.find(
+        (d) =>
+          isSameDifficultyAcrossClients(d, map) ||
+          Boolean(
+            map.metadata.beatmapId &&
+              d.metadata.beatmapId &&
+              map.metadata.beatmapId > 0 &&
+              map.metadata.beatmapId === d.metadata.beatmapId
+          )
+      );
+      if (existing) {
+        if (!existing.localAudioPath && map.localAudioPath) existing.localAudioPath = map.localAudioPath;
+        if (!existing.localBgPath && map.localBgPath) existing.localBgPath = map.localBgPath;
+        if (!existing.audioUrl && map.audioUrl) existing.audioUrl = map.audioUrl;
+        continue;
+      }
       group.difficulties.push(map);
     }
   }

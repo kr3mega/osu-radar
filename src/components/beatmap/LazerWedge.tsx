@@ -54,10 +54,10 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   const coverCss = buildBeatmapCoverCss(map, 'cover');
 
   // Preview difficulty on hover over picker circles (snaps back to selected map on mouse leave)
+  // Only the diff name and star badge preview on hover; statistics table stays with the selected map.
   const previewDiff =
     (hoveredDiffId && siblingDifficulties?.find((d) => d.id === hoveredDiffId)) || map;
   const previewStats = previewDiff.stats;
-  const previewDifficulty = previewDiff.difficulty;
   const previewStarColor = getStarRatingColor(previewStats.starRating);
   const previewStarTextColor = getStarRatingTextColor(previewStats.starRating);
 
@@ -69,11 +69,10 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
     : TOURNAMENT_MOD_COLORS[modPrefix] || TOURNAMENT_MOD_COLORS.NM;
 
   const statRows = [
-    { key: 'cs', label: 'Tam. Círculo (CS)', val: previewDifficulty.cs, max: 10, isStar: false },
-    { key: 'hp', label: 'Drenagem HP (HP)', val: previewDifficulty.hp, max: 10, isStar: false },
-    { key: 'od', label: 'Precisão (OD)', val: previewDifficulty.od, max: 10, isStar: false },
-    { key: 'ar', label: 'Aproximação (AR)', val: previewDifficulty.ar, max: 10, isStar: false },
-    { key: 'sr', label: 'Dificuldade (★)', val: previewStats.starRating, max: 10, isStar: true },
+    { key: 'cs', label: 'CS', val: map.difficulty.cs, max: 10, isStar: false },
+    { key: 'hp', label: 'HP', val: map.difficulty.hp, max: 10, isStar: false },
+    { key: 'ar', label: 'AR', val: map.difficulty.ar, max: 10, isStar: false },
+    { key: 'sr', label: 'SR', val: stats.starRating, max: 10, isStar: true },
   ];
 
   return (
