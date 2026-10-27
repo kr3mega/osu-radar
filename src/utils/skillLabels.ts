@@ -36,7 +36,7 @@ export const SKILL_SHORT_LABELS: Record<keyof SkillAttributes, string> = {
   stream: 'Stream',
   burst: 'Burst',
   fingerControl: 'Finger Control',
-  accuracy: 'Acc',
+  accuracy: 'Accuracy',
   readingTech: 'Tech',
 };
 

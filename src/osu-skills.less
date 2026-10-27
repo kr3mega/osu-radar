@@ -1192,9 +1192,7 @@
       background: none;
 
       &:hover {
-        transform: scale(1.04);
-        border-color: @osu-colour-h1;
-        color: #ffffff;
+        // Sem efeito de borda rosa ou escala ao passar o mouse
       }
     }
 
@@ -1969,11 +1967,14 @@
   }
 
   &__version {
-    flex: 1;
-    min-inline-size: 80px;
+    flex-shrink: 0;
+    max-width: 160px;
     color: #ffffff;
     font-size: 12px;
     font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   &__stats {
@@ -2016,6 +2017,16 @@
     align-items: center;
     gap: 4px;
     flex-shrink: 0;
+    margin-left: auto;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+
+  &:hover &__actions,
+  &:focus-within &__actions {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   &__action-btn {

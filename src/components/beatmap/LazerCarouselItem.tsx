@@ -5,16 +5,12 @@ import {
   getStarRatingTextColor,
   TOURNAMENT_MOD_COLORS,
 } from '../../utils/osuColors';
-import { formatTimestamp } from '../../engine/strains';
 import {
   buildBeatmapCoverCss,
   previewAudioManager,
   PreviewAudioState,
 } from '../../lib/osu-preview';
-import {
-  BeatmapSetGroup,
-  getEffectivePatternCounts,
-} from '../../store/usePoolStore';
+import { BeatmapSetGroup } from '../../store/usePoolStore';
 import {
   computeMultiSkillSynergy,
   formatSkillLabel,
@@ -61,10 +57,9 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
       : undefined;
   const displayMap = activeDiffInGroup || (group ? group.representative : map);
 
-  const { metadata, stats, difficulty, modSlot, topSkills, skills } = displayMap;
+  const { metadata, stats, modSlot, topSkills, skills } = displayMap;
   const isLazerSong = displayMap.origin === 'lazer' || displayMap.localClient === 'lazer';
   const isLocalSong = displayMap.origin === 'local_songs' || isLazerSong;
-  const patternCounts = getEffectivePatternCounts(displayMap);
 
   const [audioState, setAudioState] = useState<PreviewAudioState>('stopped');
   const [audioProgress, setAudioProgress] = useState<number>(0);
@@ -238,7 +233,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
 
           {/* Center Info Area */}
           <div className="beatmapset-panel__info">
-            {/* Row 1: Title + Difficulty Count Expand Pill + Star Rating Badge */}
+            {/* Row 1: Title + Star Rating Badge */}
             <div className="beatmapset-panel__info-row beatmapset-panel__info-row--title">
               <span className="beatmapset-panel__main-link u-ellipsis-overflow">
                 {metadata.title}
@@ -247,27 +242,6 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                 className="beatmapset-panel__badge-container"
                 style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
               >
-                {group && (
-                  <span
-                    className={`osu-skills-diff-count-pill ${
-                      isExpanded ? 'osu-skills-diff-count-pill--open' : ''
-                    }`}
-                    title={
-                      isExpanded
-                        ? 'Clique para recolher as dificuldades desta música'
-                        : 'Clique para expandir todas as dificuldades qualificadas desta música'
-                    }
-                  >
-                    <span>
-                      {difficulties.length}{' '}
-                      {difficulties.length === 1 ? 'diff' : 'diffs'}
-                    </span>
-                    <i
-                      className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}
-                      style={{ fontSize: '8px' }}
-                    />
-                  </span>
-                )}
                 <div
                   className="difficulty-badge"
                   style={
@@ -315,44 +289,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
               </div>
             </div>
 
-            {/* Row 4: Hover Stats (BPM, Drain Time, CS/AR/OD) */}
-            <div className="beatmapset-panel__info-row beatmapset-panel__info-row--stats">
-              <div
-                className="beatmapset-panel__stats-item beatmapset-panel__stats-item--play-count"
-                title="BPM"
-              >
-                <span className="beatmapset-panel__stats-item-icon">
-                  <i className="fa-fw fas fa-tachometer-alt" />
-                </span>
-                <span>{stats.bpmMode} BPM</span>
-              </div>
-
-              <div
-                className="beatmapset-panel__stats-item beatmapset-panel__stats-item--favourite-count"
-                title="Duração"
-              >
-                <span className="beatmapset-panel__stats-item-icon">
-                  <i className="fa-fw fas fa-clock" />
-                </span>
-                <span>{formatTimestamp(stats.drainTimeMs)}</span>
-              </div>
-
-              <div
-                className="beatmapset-panel__stats-item beatmapset-panel__stats-item--date"
-                title="Atributos Físicos"
-              >
-                <span className="beatmapset-panel__stats-item-icon">
-                  <i className="fa-fw fas fa-sliders-h" />
-                </span>
-                <span>
-                  CS {difficulty.cs.toFixed(1).replace('.', ',')} · AR{' '}
-                  {difficulty.ar.toFixed(1).replace('.', ',')} · OD{' '}
-                  {difficulty.od.toFixed(1).replace('.', ',')}
-                </span>
-              </div>
-            </div>
-
-            {/* Row 5: Status Pill + All Qualifying Difficulty Dots + Synergy / Dominant Skills */}
+            {/* Row 4: Status Pill + All Qualifying Difficulty Dots + Right-aligned Synergy / Dominant Skills */}
             <div className="beatmapset-panel__info-row beatmapset-panel__info-row--extra">
               <div className="beatmapset-panel__extra-item">
                 <div
@@ -396,39 +333,6 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                 )}
               </div>
 
-              {prioritizedSkills.length >= 2 && (
-                <div className="beatmapset-panel__extra-item">
-                  <div
-                    className="beatmapset-status beatmapset-status--panel"
-                    style={{
-                      backgroundColor: 'hsl(var(--hsl-h1))',
-                      color: 'hsl(var(--hsl-b6))',
-                      fontWeight: 800,
-                    }}
-                    title="Pontuação de sinergia combinando todas as skills priorizadas"
-                  >
-                    Sinergia: {displaySynergy.toFixed(1).replace('.', ',')}%
-                  </div>
-                </div>
-              )}
-
-              {prioritizedSkills.length === 0 &&
-                isLocalSong &&
-                (patternCounts.streams > 0 || patternCounts.jumps > 0) && (
-                  <div className="beatmapset-panel__extra-item">
-                    <div
-                      className="beatmapset-status beatmapset-status--panel"
-                      style={{
-                        backgroundColor: 'hsl(var(--hsl-b4))',
-                        color: 'hsl(var(--hsl-l1))',
-                      }}
-                      title={`Streams: ${patternCounts.streams} (${patternCounts.streamNotes} notas) • Jumps: ${patternCounts.jumps} • Bursts: ${patternCounts.bursts} • Tech: ${patternCounts.tech}`}
-                    >
-                      S:{patternCounts.streams} · J:{patternCounts.jumps} · B:{patternCounts.bursts}
-                    </div>
-                  </div>
-                )}
-
               {displayMap.stageName && (
                 <div className="beatmapset-panel__extra-item">
                   <div
@@ -469,21 +373,45 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                 </div>
               )}
 
-              {skillsToHighlight.map((skillKey) => (
-                <div key={skillKey} className="beatmapset-panel__extra-item">
-                  <div
-                    className="beatmapset-status beatmapset-status--panel"
-                    style={
-                      {
-                        '--bg-hsl': 'var(--hsl-b5)',
-                        '--colour': 'hsl(var(--hsl-c1))',
-                      } as React.CSSProperties
-                    }
-                  >
-                    {formatSkillLabel(skillKey)}: {skills[skillKey].toFixed(1).replace('.', ',')}%
-                  </div>
+              {/* Synergy & Highlighted Skills: right-aligned */}
+              {(prioritizedSkills.length >= 2 || skillsToHighlight.length > 0) && (
+                <div
+                  className="beatmapset-panel__extra-skills"
+                  style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  {prioritizedSkills.length >= 2 && (
+                    <div className="beatmapset-panel__extra-item">
+                      <div
+                        className="beatmapset-status beatmapset-status--panel"
+                        style={{
+                          backgroundColor: 'hsl(var(--hsl-h1))',
+                          color: 'hsl(var(--hsl-b6))',
+                          fontWeight: 800,
+                        }}
+                        title="Pontuação de sinergia combinando todas as skills priorizadas"
+                      >
+                        Sinergia: {displaySynergy.toFixed(1).replace('.', ',')}%
+                      </div>
+                    </div>
+                  )}
+
+                  {skillsToHighlight.map((skillKey) => (
+                    <div key={skillKey} className="beatmapset-panel__extra-item">
+                      <div
+                        className="beatmapset-status beatmapset-status--panel"
+                        style={
+                          {
+                            '--bg-hsl': 'var(--hsl-b5)',
+                            '--colour': 'hsl(var(--hsl-c1))',
+                          } as React.CSSProperties
+                        }
+                      >
+                        {formatSkillLabel(skillKey)}: {skills[skillKey].toFixed(1).replace('.', ',')}%
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           </div>
 

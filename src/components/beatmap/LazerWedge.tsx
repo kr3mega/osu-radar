@@ -21,6 +21,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   onSelectDifficulty,
 }) => {
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(false);
+  const [hoveredDiffId, setHoveredDiffId] = useState<string | null>(null);
 
   if (!map) {
     return (
@@ -48,9 +49,17 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
     );
   }
 
-  const { metadata, stats, difficulty, patterns = [], modSlot } = map;
+  const { metadata, stats, patterns = [], modSlot } = map;
   const isLocalSong = map.origin === 'local_songs';
   const coverCss = buildBeatmapCoverCss(map, 'cover');
+
+  // Preview difficulty on hover over picker circles (snaps back to selected map on mouse leave)
+  const previewDiff =
+    (hoveredDiffId && siblingDifficulties?.find((d) => d.id === hoveredDiffId)) || map;
+  const previewStats = previewDiff.stats;
+  const previewDifficulty = previewDiff.difficulty;
+  const previewStarColor = getStarRatingColor(previewStats.starRating);
+  const previewStarTextColor = getStarRatingTextColor(previewStats.starRating);
 
   const starColor = getStarRatingColor(stats.starRating);
   const starTextColor = getStarRatingTextColor(stats.starRating);
@@ -60,11 +69,11 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
     : TOURNAMENT_MOD_COLORS[modPrefix] || TOURNAMENT_MOD_COLORS.NM;
 
   const statRows = [
-    { key: 'cs', label: 'Tam. Círculo (CS)', val: difficulty.cs, max: 10, isStar: false },
-    { key: 'hp', label: 'Drenagem HP (HP)', val: difficulty.hp, max: 10, isStar: false },
-    { key: 'od', label: 'Precisão (OD)', val: difficulty.od, max: 10, isStar: false },
-    { key: 'ar', label: 'Aproximação (AR)', val: difficulty.ar, max: 10, isStar: false },
-    { key: 'sr', label: 'Dificuldade (★)', val: stats.starRating, max: 10, isStar: true },
+    { key: 'cs', label: 'Tam. Círculo (CS)', val: previewDifficulty.cs, max: 10, isStar: false },
+    { key: 'hp', label: 'Drenagem HP (HP)', val: previewDifficulty.hp, max: 10, isStar: false },
+    { key: 'od', label: 'Precisão (OD)', val: previewDifficulty.od, max: 10, isStar: false },
+    { key: 'ar', label: 'Aproximação (AR)', val: previewDifficulty.ar, max: 10, isStar: false },
+    { key: 'sr', label: 'Dificuldade (★)', val: previewStats.starRating, max: 10, isStar: true },
   ];
 
   return (
@@ -155,7 +164,10 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
           <div className="beatmapset-header__box beatmapset-header__box--main">
             {/* 1. Difficulty picker circles */}
             <div className="beatmapset-header__beatmap-picker-box">
-              <div className="beatmapset-beatmap-picker">
+              <div
+                className="beatmapset-beatmap-picker"
+                onMouseLeave={() => setHoveredDiffId(null)}
+              >
                 {(siblingDifficulties && siblingDifficulties.length > 0
                   ? siblingDifficulties
                   : [map]
@@ -166,6 +178,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                     <a
                       key={diffMap.id}
                       href={`#diff-${diffMap.id}`}
+                      onMouseEnter={() => setHoveredDiffId(diffMap.id)}
                       onClick={(e) => {
                         e.preventDefault();
                         onSelectDifficulty?.(diffMap.id);
@@ -195,8 +208,8 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                 className="difficulty-badge difficulty-badge--beatmapset"
                 style={
                   {
-                    '--bg': starColor,
-                    color: starTextColor,
+                    '--bg': previewStarColor,
+                    color: previewStarTextColor,
                   } as React.CSSProperties
                 }
               >
@@ -204,10 +217,10 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                   <span className="fas fa-star" />
                 </span>
                 <span className="difficulty-badge__rating">
-                  {stats.starRating.toFixed(2).replace('.', ',')}
+                  {previewStats.starRating.toFixed(2).replace('.', ',')}
                 </span>
               </div>
-              <span>{metadata.version}</span>
+              <span>{previewDiff.metadata.version}</span>
             </div>
 
             {/* 3. Title */}
