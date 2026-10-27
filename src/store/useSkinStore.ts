@@ -56,7 +56,7 @@ interface SkinStoreState {
 
 const DEFAULT_SKIN_OPTION: AvailableSkinOption = {
   id: 'default',
-  name: 'osu!skills (Padrão)',
+  name: 'Osu!Skills (Padrão)',
   source: 'default',
 };
 

@@ -34,7 +34,7 @@ export const PoolExportBar: React.FC = () => {
     const text = await file.text();
     const success = await importPoolJson(text);
     if (!success) {
-      alert('Arquivo JSON inválido para formato de mappool do osu!Skills.');
+      alert('Arquivo JSON inválido para formato de mappool do Osu!Skills.');
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };

@@ -65,7 +65,7 @@ export function generateDiscordMappoolSummary(
   }
 
   text += `\`\`\`\n`;
-  text += `*Gerado automaticamente pelo osu!Skills — Inteligência Competitiva de Beatmaps*\n`;
+  text += `*Gerado automaticamente pelo Osu!Skills — Inteligência Competitiva de Beatmaps*\n`;
 
   return text;
 }

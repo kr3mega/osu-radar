@@ -321,7 +321,7 @@ export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_so
                   <span style={{ color: 'hsl(var(--hsl-c1))' }}>.osu</span> ou pastas aqui
                 </span>
                 <span style={{ fontSize: '12px', color: 'hsl(var(--hsl-l2))', marginTop: '4px', display: 'block' }}>
-                  Processamento instantâneo no osu!skills com cálculo de strain, cinemática e padrões rítmicos
+                  Processamento instantâneo no Osu!Skills com cálculo de strain, cinemática e padrões rítmicos
                 </span>
               </div>
 
@@ -538,7 +538,7 @@ export const PoolUploader: React.FC<PoolUploaderProps> = ({ initialTab = 'osu_so
                     alignItems: 'center',
                   }}
                 >
-                  <span>Compatível com backups gerados pelo osu!skills (formato Mappool Schema v1).</span>
+                  <span>Compatível com backups gerados pelo Osu!Skills (formato Mappool Schema v1).</span>
                 </div>
 
                 <button

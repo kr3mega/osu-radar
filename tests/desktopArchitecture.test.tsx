@@ -39,7 +39,7 @@ describe('Arquitetura 100% Electron Desktop Exclusiva (Sem Navegador & Sem Tags 
 
     // Barra de título deve existir
     expect(html).toContain('osu-skills-titlebar');
-    expect(html).toContain('osu!skills');
+    expect(html).toContain('Osu!Skills');
     expect(html).toContain('Teste de Subtítulo');
 
     // Não deve conter badge "desktop"
@@ -67,8 +67,8 @@ describe('Arquitetura 100% Electron Desktop Exclusiva (Sem Navegador & Sem Tags 
   it('PoolUploader refere-se ao processamento nativo no osu!skills e não no navegador', () => {
     const html = renderToString(<PoolUploader initialTab="files" />);
 
-    // Deve indicar processamento instantâneo no osu!skills
-    expect(html).toContain('Processamento instantâneo no osu!skills');
+    // Deve indicar processamento instantâneo no Osu!Skills
+    expect(html).toContain('Processamento instantâneo no Osu!Skills');
     expect(html).not.toContain('Processamento instantâneo no navegador');
   });
 

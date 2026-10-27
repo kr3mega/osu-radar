@@ -7,7 +7,7 @@ import './osu-skills.less';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ErrorBoundary fallbackTitle="Erro inesperado na aplicação osu!skills">
+    <ErrorBoundary fallbackTitle="Erro inesperado na aplicação Osu!Skills">
       <App />
     </ErrorBoundary>
   </React.StrictMode>

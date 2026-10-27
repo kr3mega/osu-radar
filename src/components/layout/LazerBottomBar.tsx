@@ -52,7 +52,7 @@ export const LazerBottomBar: React.FC<LazerBottomBarProps> = ({
           ppy/osu-web
         </a>
       </div>
-      <div className="footer__row">ppy powered · osu!skills mappool intelligence</div>
+      <div className="footer__row">ppy powered · Osu!Skills mappool intelligence</div>
     </footer>
   );
 };

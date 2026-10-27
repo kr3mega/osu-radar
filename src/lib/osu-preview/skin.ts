@@ -291,7 +291,7 @@ export async function loadDefaultSkin(basePath: string = '/skin/default'): Promi
 
     const skin: OsuSkin = {
       id: 'default',
-      name: 'osu!skills (Padrão)',
+      name: 'Osu!Skills (Padrão)',
       ini,
       isOldSpinner: false,
       isLongerCursorTrail: false,
@@ -325,7 +325,7 @@ export async function loadDefaultSkin(basePath: string = '/skin/default'): Promi
 /**
  * Loads a custom osu! skin (either from `/api/local-skins` or an imported `.osk` archive)
  * using an asset resolver map so missing @2x or optional sprites never cause 404 requests
- * and cleanly fall back to the built-in osu!skills default skin per element.
+ * and cleanly fall back to the built-in Osu!Skills default skin per element.
  */
 export async function loadSkinFromAssetResolver(options: {
   id: string;

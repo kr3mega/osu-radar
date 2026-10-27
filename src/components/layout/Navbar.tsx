@@ -24,7 +24,7 @@ export const Navbar: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-extrabold text-lg tracking-tight text-white flex items-center gap-1.5">
-                osu!Skills
+                Osu!Skills
                 <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-osu-pink/20 text-osu-pink border border-osu-pink/30">
                   Analytics
                 </span>
