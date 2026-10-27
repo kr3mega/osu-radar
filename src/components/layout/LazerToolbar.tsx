@@ -58,7 +58,7 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
     const text = await file.text();
     const ok = await importPoolJson(text);
     if (!ok) {
-      alert('Arquivo JSON inválido para osu!skills.');
+      alert('Arquivo JSON inválido para Osu!Skills.');
     }
     if (jsonInputRef.current) jsonInputRef.current.value = '';
   };
@@ -83,7 +83,7 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
           <div className="osu-page">
             <div className="nav2">
               <div className="nav2__colgroup nav2__colgroup--menu">
-                {/* Official osu!lazer Logo */}
+                {/* Official osu! Cookie Logo */}
                 <div className="nav2__col nav2__col--logo">
                   <a
                     href="#select"
@@ -91,11 +91,14 @@ export const LazerToolbar: React.FC<LazerToolbarProps> = ({
                       e.preventDefault();
                       onTabChange('select');
                     }}
-                    className="nav2__logo-link"
-                    title="osu!skills"
+                    className="nav2__logo-link nav2__logo-link--custom"
+                    title="Osu!Skills"
                   >
-                    <div className="nav2__logo nav2__logo--bg" />
-                    <div className="nav2__logo" />
+                    <img
+                      src="/images/layout/osu-cookie-official.png"
+                      alt="Osu!Skills"
+                      className="nav2__custom-logo"
+                    />
                   </a>
                 </div>
 

@@ -42,14 +42,14 @@ export const ElectronTitlebar: React.FC<ElectronTitlebarProps> = ({ activeSubtit
   }
 
   return (
-    <header className="osu-skills-titlebar" role="banner" aria-label="Barra de janela osu!skills">
+    <header className="osu-skills-titlebar" role="banner" aria-label="Barra de janela Osu!Skills">
       <div className="osu-skills-titlebar__brand">
         <img
-          src="/images/layout/osu-logo.png"
+          src="/images/layout/osu-cookie-official.png"
           alt=""
           className="osu-skills-titlebar__logo"
         />
-        <span className="osu-skills-titlebar__title">osu!skills</span>
+        <span className="osu-skills-titlebar__title">Osu!Skills</span>
         {activeSubtitle && (
           <span className="osu-skills-titlebar__subtitle u-ellipsis-overflow">
             {activeSubtitle}
@@ -108,7 +108,7 @@ export const ElectronTitlebar: React.FC<ElectronTitlebarProps> = ({ activeSubtit
           type="button"
           onClick={() => bridge.close()}
           className="osu-skills-titlebar__btn osu-skills-titlebar__btn--close"
-          aria-label="Fechar osu!skills"
+          aria-label="Fechar Osu!Skills"
           title="Fechar"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">

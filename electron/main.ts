@@ -35,7 +35,7 @@ const DEFAULT_WINDOW_STATE: PersistedWindowState = {
 
 const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'osu:', 'osulazer:']);
 
-app.setName('osu!skills');
+app.setName('Osu!Skills');
 if (process.platform === 'win32') {
   app.setAppUserModelId('com.osuskills.desktop');
 }
@@ -224,6 +224,24 @@ function saveWindowState(win: BrowserWindow): void {
 
 function resolveAppIcon(targetRoot: string): string | undefined {
   const candidates = [
+    path.join(targetRoot, 'public', 'osu-cookie-official.ico'),
+    path.join(targetRoot, 'dist', 'osu-cookie-official.ico'),
+    path.join(targetRoot, 'public', 'osu-skills-pink-white.ico'),
+    path.join(targetRoot, 'dist', 'osu-skills-pink-white.ico'),
+    path.join(targetRoot, 'public', 'osu-skills-pink.ico'),
+    path.join(targetRoot, 'dist', 'osu-skills-pink.ico'),
+    path.join(targetRoot, 'public', 'osu-skills-opal.ico'),
+    path.join(targetRoot, 'dist', 'osu-skills-opal.ico'),
+    path.join(targetRoot, 'public', 'osu-skills-kda.ico'),
+    path.join(targetRoot, 'dist', 'osu-skills-kda.ico'),
+    path.join(targetRoot, 'public', 'osu-skills-py.ico'),
+    path.join(targetRoot, 'dist', 'osu-skills-py.ico'),
+    path.join(targetRoot, 'public', 'osu-skills-clean.ico'),
+    path.join(targetRoot, 'dist', 'osu-skills-clean.ico'),
+    path.join(targetRoot, 'public', 'osu-skills.ico'),
+    path.join(targetRoot, 'dist', 'osu-skills.ico'),
+    path.join(targetRoot, 'public', 'app.ico'),
+    path.join(targetRoot, 'dist', 'app.ico'),
     path.join(targetRoot, 'dist', 'images', 'layout', 'osu-logo@2x.png'),
     path.join(targetRoot, 'public', 'images', 'layout', 'osu-logo@2x.png'),
   ];
@@ -492,7 +510,7 @@ async function createMainWindow(appLogger: DesktopLogger): Promise<void> {
     titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
     autoHideMenuBar: true,
     backgroundColor: '#171316',
-    title: 'osu!skills',
+    title: 'Osu!Skills',
     icon: resolveAppIcon(appRoot),
     webPreferences: {
       preload: preloadPath,
@@ -779,11 +797,11 @@ const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!hasSingleInstanceLock) {
   logger.warn('Main', '================================================================================');
-  logger.warn('Main', '[AVISO DE INSTÂNCIA DUPLICADA] Outra instância do osu!skills já está ativa no sistema.');
+  logger.warn('Main', '[AVISO DE INSTÂNCIA DUPLICADA] Outra instância do Osu!Skills já está ativa no sistema.');
   logger.warn('Main', 'Sinalizando restauração e foco para a janela já em execução.');
   logger.warn('Main', 'Encerrando esta nova instância para prevenir colisões de portas e bancos IndexedDB.');
   logger.warn('Main', '================================================================================');
-  console.log('\n[osu!skills] O aplicativo já está em execução! Trazendo a janela principal para o primeiro plano...\n');
+  console.log('\n[Osu!Skills] O aplicativo já está em execução! Trazendo a janela principal para o primeiro plano...\n');
   app.quit();
 } else {
   logSystemDiagnostics(logger, appRoot);
@@ -824,7 +842,7 @@ if (!hasSingleInstanceLock) {
   app.on('window-all-closed', () => {
     logger.info('Main', 'Todas as janelas foram fechadas pelo usuário.');
     if (process.platform !== 'darwin') {
-      logger.info('Main', 'Encerrando ciclo de vida do osu!skills Desktop...');
+      logger.info('Main', 'Encerrando ciclo de vida do Osu!Skills Desktop...');
       app.quit();
     }
   });

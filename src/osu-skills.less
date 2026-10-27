@@ -1866,7 +1866,10 @@
     height: 16px;
     object-fit: contain;
     flex-shrink: 0;
-    filter: drop-shadow(0 0 4px rgba(255, 102, 170, 0.55));
+    border-radius: 50%;
+    pointer-events: none;
+    transition: none;
+    transform: none;
   }
 
   &__title {
@@ -1934,5 +1937,34 @@ body.osu-skills-is-electron {
 
   .osu-skills-modal-backdrop {
     top: @osu-electron-titlebar-height;
+  }
+}
+
+.nav2__logo-link--custom {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+
+  &:hover {
+    transform: none !important;
+  }
+}
+
+.nav2__custom-logo {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  border-radius: 50% !important;
+  pointer-events: none !important;
+  transition: none !important;
+  transform: none !important;
+
+  .nav2__logo-link:hover &,
+  .nav2__logo-link--custom:hover & {
+    transform: none !important;
+    opacity: 1 !important;
+    filter: none !important;
   }
 }
