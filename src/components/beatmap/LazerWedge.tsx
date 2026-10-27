@@ -130,8 +130,8 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
             className="osu-skills-minimize-header-btn"
             title="Expandir informações da música"
           >
-            <i className="fas fa-chevron-down" />
             <span>Expandir</span>
+            <i className="fas fa-chevron-down" />
           </button>
         </div>
       ) : (
@@ -153,6 +153,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
 
           {/* Left Box: Picker, Version, Title, Artist, Mapper, Actions */}
           <div className="beatmapset-header__box beatmapset-header__box--main">
+            {/* 1. Difficulty picker circles */}
             <div className="beatmapset-header__beatmap-picker-box">
               <div className="beatmapset-beatmap-picker">
                 {(siblingDifficulties && siblingDifficulties.length > 0
@@ -186,38 +187,41 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                   );
                 })}
               </div>
-
-              <span className="beatmapset-header__diff-name">
-                <div
-                  className="difficulty-badge difficulty-badge--beatmapset"
-                  style={
-                    {
-                      '--bg': starColor,
-                      color: starTextColor,
-                    } as React.CSSProperties
-                  }
-                >
-                  <span className="difficulty-badge__icon">
-                    <span className="fas fa-star" />
-                  </span>
-                  <span className="difficulty-badge__rating">
-                    {stats.starRating.toFixed(2).replace('.', ',')}
-                  </span>
-                </div>{' '}
-                {metadata.version}
-              </span>
             </div>
 
+            {/* 2. Star Rating badge + Diff name (strictly below the circles, directly above Title) */}
+            <div className="beatmapset-header__diff-name">
+              <div
+                className="difficulty-badge difficulty-badge--beatmapset"
+                style={
+                  {
+                    '--bg': starColor,
+                    color: starTextColor,
+                  } as React.CSSProperties
+                }
+              >
+                <span className="difficulty-badge__icon">
+                  <span className="fas fa-star" />
+                </span>
+                <span className="difficulty-badge__rating">
+                  {stats.starRating.toFixed(2).replace('.', ',')}
+                </span>
+              </div>
+              <span>{metadata.version}</span>
+            </div>
+
+            {/* 3. Title */}
             <span className="beatmapset-header__details-text beatmapset-header__details-text--title">
               <span className="beatmapset-header__details-text-link">{metadata.title}</span>
             </span>
 
+            {/* 4. Artist */}
             <span className="beatmapset-header__details-text beatmapset-header__details-text--artist">
               <span className="beatmapset-header__details-text-link">{metadata.artist}</span>
             </span>
 
-            {/* Action Buttons: Página Oficial first, Abrir no osu! second */}
-            <div className="beatmapset-header__buttons" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+            {/* 5. Action Buttons: Página Oficial first, Abrir no Jogo to its right */}
+            <div className="beatmapset-header__buttons">
               {(metadata.beatmapId || metadata.beatmapSetId) && (
                 <a
                   href={
@@ -228,13 +232,11 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-osu-big btn-osu-big--beatmapset-header"
+                  title="Abrir página oficial do beatmap no osu.ppy.sh"
                 >
                   <div className="btn-osu-big__content">
                     <div className="btn-osu-big__left">
                       <span className="btn-osu-big__text-top">Página Oficial</span>
-                      <span className="btn-osu-big__text-bottom">
-                        osu.ppy.sh #{metadata.beatmapId || metadata.beatmapSetId}
-                      </span>
                     </div>
                     <div className="btn-osu-big__icon">
                       <span className="fas fa-external-link-alt" />
@@ -274,8 +276,8 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
             className="osu-skills-minimize-header-btn"
             title="Minimizar informações da música"
           >
-            <i className="fas fa-chevron-up" />
             <span>Minimizar</span>
+            <i className="fas fa-chevron-up" />
           </button>
 
           {/* Right Box: Status Pill & Official .beatmapset-stats Table (resources/js/beatmapsets-show/stats.tsx) */}

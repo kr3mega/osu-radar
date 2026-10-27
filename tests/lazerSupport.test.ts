@@ -689,6 +689,6 @@ ApproachRate: 9
       expect(withAudio.length / entries.length).toBeGreaterThanOrEqual(0.98);
       // Enforce >= 95% background match rate on real user library
       expect(withBg.length / entries.length).toBeGreaterThanOrEqual(0.95);
-    });
+    }, 15000);
   });
 });

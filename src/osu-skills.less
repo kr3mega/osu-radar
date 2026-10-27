@@ -157,7 +157,7 @@
   }
 
   .beatmapset-header__box--stats {
-    margin-top: 28px;
+    margin-top: 30px;
     min-width: 0;
     justify-content: flex-start;
   }
@@ -169,7 +169,7 @@
     gap: 5px;
     width: fit-content;
     max-width: 100%;
-    margin: 0 0 12px 0;
+    margin: 0 0 8px 0;
     padding: 6px 10px;
     background-color: hsla(var(--hsl-b3), 70%);
     border-radius: @border-radius--large;
@@ -202,14 +202,45 @@
     }
   }
 
+  .beatmapset-header__diff-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2px;
+    margin-bottom: 2px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    width: 100%;
+    line-height: 1.2;
+  }
+
+  .beatmapset-header__buttons {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-top: 12px;
+    width: 100%;
+
+    .btn-osu-big--beatmapset-header {
+      flex: 1 1 0 !important;
+      min-width: 0 !important;
+      height: 42px !important;
+      margin: 0 !important;
+    }
+  }
+
   .beatmapset-stats {
     width: 100%;
     box-sizing: border-box;
+    border-radius: 0 !important;
 
     &__row {
       padding: 8px 16px;
       box-sizing: border-box;
-      border-radius: 6px;
+      border-radius: 0 !important;
     }
   }
 
@@ -349,37 +380,35 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   height: 22px;
-  padding: 0 8px;
-  border-radius: 4px;
-  background-color: hsla(var(--hsl-b6), 0.7);
-  border: 1px solid hsla(var(--hsl-b2), 0.5);
-  color: hsl(var(--hsl-l1));
+  padding: 0 10px;
+  border-radius: 10000px;
+  background-color: @osu-colour-b6;
+  border: none;
+  color: @osu-colour-l2;
+  font-family: inherit;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
   flex-shrink: 0;
   line-height: 1;
   transition: all 120ms ease;
 
   &:hover {
-    background-color: hsl(var(--hsl-b6));
+    background-color: @osu-colour-b3;
     color: #fff;
-    border-color: hsl(var(--hsl-h1));
   }
 
   i {
-    font-size: 9px;
-    color: hsl(var(--hsl-h1));
+    font-size: 8px;
     display: inline-flex;
     align-items: center;
     line-height: 1;
   }
 
   span {
-    display: inline-flex;
-    align-items: center;
+    letter-spacing: 0.3px;
     line-height: 1;
   }
 }
