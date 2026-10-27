@@ -109,7 +109,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
   const [selectedPatternId, setSelectedPatternId] = useState<string | undefined>(initialPatternId);
   const [_hasAudioTrack, setHasAudioTrack] = useState<boolean>(false);
   const [patternCategory, setPatternCategory] = useState<PatternCategory>('TODOS');
-  const [activeBottomTab, setActiveBottomTab] = useState<'patterns' | 'skills'>('patterns');
+  const [activeBottomTab, setActiveBottomTab] = useState<'patterns' | 'skills'>('skills');
   const [audioStatus, setAudioStatus] = useState<AudioResolveStatus>({
     state: 'idle',
     message: '',
