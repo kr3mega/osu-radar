@@ -405,51 +405,67 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                     })}
                   </tbody>
                 </table>
+
+                {/* Last line: Top 2 skills integrated discreetly into the stats panel */}
+                {topTwoSkills.length > 0 && (
+                  <div
+                    className="beatmapset-stats__skills-row"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      gap: '6px',
+                      marginTop: '6px',
+                      paddingTop: '6px',
+                      borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                    }}
+                  >
+                    {topTwoSkills.map((sk) => {
+                      const label = (SKILL_SHORT_LABELS[sk.key] || formatSkillLabel(sk.key)).toUpperCase();
+                      return (
+                        <div
+                          key={sk.key}
+                          className="beatmapset-stats__skill-pill"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '2px 8px',
+                            borderRadius: '9999px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            fontSize: '10.5px',
+                            lineHeight: '15px',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <span
+                            className="beatmapset-stats__skill-label"
+                            style={{
+                              color: 'hsl(var(--hsl-l1))',
+                              fontWeight: 700,
+                              letterSpacing: '0.03em',
+                            }}
+                          >
+                            {label}:
+                          </span>
+                          <span
+                            className="beatmapset-stats__skill-value"
+                            style={{
+                              color: '#ffffff',
+                              fontWeight: 800,
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {sk.val.toFixed(1).replace('.', ',')}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
-
-            {/* Top 2 skills of the selected difficulty positioned in the bottom-right corner */}
-            {topTwoSkills.length > 0 && (
-              <div
-                className="osu-skills-wedge-skills-corner"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  gap: '8px',
-                  marginTop: 'auto',
-                  paddingTop: '14px',
-                  paddingBottom: '2px',
-                }}
-              >
-                {topTwoSkills.map((sk) => {
-                  const label = (SKILL_SHORT_LABELS[sk.key] || formatSkillLabel(sk.key)).toUpperCase();
-                  return (
-                    <span
-                      key={sk.key}
-                      className="osu-skills-wedge-skill-pill"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        padding: '3px 10px',
-                        borderRadius: '999px',
-                        backgroundColor: 'rgba(15, 20, 28, 0.88)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        color: '#ffffff',
-                        fontSize: '11px',
-                        fontWeight: 800,
-                        letterSpacing: '0.04em',
-                        lineHeight: '16px',
-                        whiteSpace: 'nowrap',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.45)',
-                      }}
-                    >
-                      {label}: {sk.val.toFixed(1).replace('.', ',')}%
-                    </span>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
       )}
