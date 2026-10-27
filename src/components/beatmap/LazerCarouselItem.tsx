@@ -164,9 +164,12 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   return (
     <div
       id={group ? `beatmapset-group-${group.groupKey}` : `beatmap-item-${map.id}`}
+      style={{ zIndex: showPopup ? 9999 : undefined }}
       className={`osu-skills-song-group ${
         isExpanded ? 'osu-skills-song-group--expanded' : ''
-      } ${deferred && !isExpanded ? 'osu-skills-card-deferred' : ''}`}
+      } ${deferred && !isExpanded ? 'osu-skills-card-deferred' : ''} ${
+        showPopup ? 'osu-skills-song-group--popup-visible' : ''
+      }`}
     >
       <div
         onClick={handleCardClick}
@@ -520,6 +523,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
           {showPopup && difficulties.length > 0 && (
             <div
               className="beatmaps-popup"
+              style={{ zIndex: 10000, boxShadow: '0 8px 24px rgba(0,0,0,0.65)' }}
               onMouseEnter={handlePopupMouseEnter}
               onMouseLeave={handlePopupMouseLeave}
               onClick={(e) => e.stopPropagation()}

@@ -1581,33 +1581,42 @@
   }
 
   &__footer {
-    padding: 5px;
+    display: flex;
+    justify-content: center;
+    padding: 8px 10px;
     background-color: @osu-colour-b5;
     border-top: 1px solid @osu-colour-b3;
   }
 
   &__upload-action {
     .reset-input();
-    width: 100%;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 6px 10px;
-    border-radius: 5px;
-    border: 1px dashed @osu-colour-b2;
+    height: 22px;
+    padding: 0 12px;
+    border-radius: 10000px;
     background-color: @osu-colour-b6;
-    color: hsl(var(--hsl-h1));
+    border: none;
+    color: @osu-colour-l2;
     font-family: inherit;
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 800;
     cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
     transition: all 120ms ease;
 
     &:hover {
-      background-color: hsla(var(--hsl-h1), 0.15);
-      border-color: hsl(var(--hsl-h1));
+      background-color: @osu-colour-b3;
       color: #ffffff;
+    }
+
+    i {
+      font-size: 9px;
+      display: inline-flex;
+      align-items: center;
     }
   }
 }
@@ -1889,9 +1898,14 @@
    Grouped Song Cards & Expandable Difficulty Drawer
    ========================================================================== */
 .osu-skills-song-group {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+
+  &--popup-visible {
+    z-index: 9999 !important;
+  }
 }
 
 .osu-skills-diff-count-pill {

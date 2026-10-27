@@ -726,18 +726,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
 
             {isSkinDropdownOpen && (
               <div className="osu-skills-skin-dropdown osu-skills-skin-dropdown--upward" role="listbox">
-                <div className="osu-skills-skin-dropdown__header">
-                  <span>Skins Disponíveis ({availableSkins.length})</span>
-                  <button
-                    type="button"
-                    className="osu-skills-skin-dropdown__refresh-btn"
-                    onClick={() => refreshSkins()}
-                    title="Recarregar skins da pasta do osu!"
-                  >
-                    <i className="fas fa-sync-alt" />
-                  </button>
-                </div>
-
                 <div className="osu-skills-skin-dropdown__list">
                   {/* Skin Padrão */}
                   <div className="osu-skills-skin-dropdown__section-title">Padrão</div>
@@ -767,14 +755,25 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                       </button>
                     ))}
 
-                  {/* Skins Locais do osu! */}
-                  {availableSkins.filter((s) => s.source === 'local_osu').length > 0 && (
+                  {/* Skins Importadas (locais do osu! e .osk) */}
+                  {availableSkins.filter((s) => s.source !== 'default').length > 0 && (
                     <>
-                      <div className="osu-skills-skin-dropdown__section-title">
-                        Skins do seu osu! ({availableSkins.filter((s) => s.source === 'local_osu').length})
+                      <div
+                        className="osu-skills-skin-dropdown__section-title"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                      >
+                        <span>Skins importadas</span>
+                        <button
+                          type="button"
+                          className="osu-skills-skin-dropdown__refresh-btn"
+                          onClick={() => refreshSkins()}
+                          title="Recarregar skins da pasta do osu!"
+                        >
+                          <i className="fas fa-sync-alt" />
+                        </button>
                       </div>
                       {availableSkins
-                        .filter((s) => s.source === 'local_osu')
+                        .filter((s) => s.source !== 'default')
                         .map((s) => (
                           <button
                             key={s.id}
@@ -791,42 +790,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                             title={s.name}
                           >
                             <div className="osu-skills-skin-item__info">
-                              <span className="osu-skills-skin-tag osu-skills-skin-tag--osu">osu!</span>
-                              <span className="osu-skills-skin-item__name">{s.name}</span>
-                            </div>
-                            {s.id === selectedSkinId && (
-                              <i className="fas fa-check osu-skills-skin-item__check" />
-                            )}
-                          </button>
-                        ))}
-                    </>
-                  )}
-
-                  {/* Skins Importadas */}
-                  {availableSkins.filter((s) => s.source === 'imported').length > 0 && (
-                    <>
-                      <div className="osu-skills-skin-dropdown__section-title">
-                        Skins Importadas ({availableSkins.filter((s) => s.source === 'imported').length})
-                      </div>
-                      {availableSkins
-                        .filter((s) => s.source === 'imported')
-                        .map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            role="option"
-                            aria-selected={s.id === selectedSkinId}
-                            className={`osu-skills-skin-item ${
-                              s.id === selectedSkinId ? 'osu-skills-skin-item--active' : ''
-                            }`}
-                            onClick={() => {
-                              selectSkin(s.id);
-                              setIsSkinDropdownOpen(false);
-                            }}
-                            title={s.name}
-                          >
-                            <div className="osu-skills-skin-item__info">
-                              <span className="osu-skills-skin-tag osu-skills-skin-tag--imported">.osk</span>
                               <span className="osu-skills-skin-item__name">{s.name}</span>
                             </div>
                             {s.id === selectedSkinId && (
