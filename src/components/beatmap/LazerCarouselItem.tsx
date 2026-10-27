@@ -29,7 +29,6 @@ interface LazerCarouselItemProps {
   onRemove?: () => void;
   onRemoveDifficulty?: (id: string) => void;
   prioritizedSkills?: Array<keyof SkillAttributes>;
-  deferred?: boolean;
 }
 
 /**
@@ -48,7 +47,6 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   onRemove,
   onRemoveDifficulty,
   prioritizedSkills = [],
-  deferred = false,
 }) => {
   const difficulties = group ? group.difficulties : [map];
   const activeDiffInGroup =
@@ -133,10 +131,10 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   return (
     <div
       id={group ? `beatmapset-group-${group.groupKey}` : `beatmap-item-${map.id}`}
-      style={{ zIndex: showPopup ? 9999 : undefined }}
+      style={{ zIndex: showPopup ? 999999 : undefined }}
       className={`osu-skills-song-group ${
         isExpanded ? 'osu-skills-song-group--expanded' : ''
-      } ${deferred && !isExpanded ? 'osu-skills-card-deferred' : ''} ${
+      } ${
         showPopup ? 'osu-skills-song-group--popup-visible' : ''
       }`}
     >
@@ -157,7 +155,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
         style={
           {
             '--progress': audioProgress,
-            zIndex: showPopup ? 25 : undefined,
+            zIndex: showPopup ? 999999 : undefined,
           } as React.CSSProperties
         }
         className={`beatmapset-panel beatmapset-panel--size-normal ${
@@ -484,7 +482,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
             <div
               className="beatmaps-popup"
               style={{
-                zIndex: 10000,
+                zIndex: 999999,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.65)',
                 pointerEvents: 'none',
               }}
@@ -494,7 +492,6 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                   {difficulties.map((diffItem) => {
                     const dStarColor = getStarRatingColor(diffItem.stats.starRating);
                     const dStarTextColor = getStarRatingTextColor(diffItem.stats.starRating);
-                    const isDiffSelected = diffItem.id === displayMap.id;
                     const diffSkills =
                       prioritizedSkills.length > 0
                         ? prioritizedSkills.slice(0, 3)
@@ -518,9 +515,11 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                           padding: '4px 8px',
                           borderRadius: '4px',
                           pointerEvents: 'none',
+                          cursor: 'default',
+                          userSelect: 'none',
                           width: '100%',
                           boxSizing: 'border-box',
-                          backgroundColor: isDiffSelected ? 'hsla(var(--hsl-h1), 0.18)' : 'transparent',
+                          backgroundColor: 'transparent',
                         }}
                       >
                         <span

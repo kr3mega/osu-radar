@@ -854,12 +854,6 @@
   }
 }
 
-// Deferred rendering ONLY for beatmapset cards strictly below the initial viewport fold
-.osu-skills-card-deferred {
-  content-visibility: auto;
-  contain-intrinsic-size: auto none auto 100px;
-}
-
 // Brand-consistent Training Assistant & Local Songs Sync Form Controls
 :root {
   --osu-brand-accent: #ff66ab;
@@ -1904,15 +1898,31 @@
   flex-shrink: 0;
 
   &--popup-visible {
-    z-index: 9999 !important;
+    z-index: 999999 !important;
+    isolation: isolate;
+
+    .beatmapset-panel {
+      z-index: 999999 !important;
+      transform: translateZ(50px) !important;
+    }
+
+    .beatmaps-popup {
+      z-index: 999999 !important;
+      transform: translateZ(100px) !important;
+    }
   }
 }
 
 .beatmaps-popup {
+  z-index: 999999 !important;
   pointer-events: none !important;
+  user-select: none !important;
 
   * {
     pointer-events: none !important;
+    cursor: default !important;
+    user-select: none !important;
+    text-decoration: none !important;
   }
 }
 

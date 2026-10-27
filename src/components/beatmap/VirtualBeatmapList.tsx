@@ -20,7 +20,6 @@ const ITEM_HEIGHT = 100;
 const ITEM_GAP = 10;
 const OVERSCAN = 8;
 const VIRTUALIZATION_THRESHOLD = 45;
-const ABOVE_THE_FOLD_COUNT = 8;
 
 function findOffsetIndex(offsets: number[], targetY: number): number {
   let lo = 0;
@@ -260,7 +259,7 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
         style={containerStyle}
         className="osu-skills-beatmapsets-list"
       >
-        {effectiveGroups.map((grp, idx) => {
+        {effectiveGroups.map((grp) => {
           const isSelected = grp.difficulties.some((d) => d.id === selectedMapId);
           return (
             <LazerCarouselItem
@@ -276,7 +275,6 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
               onRemove={() => onRemoveMap(grp.representative.id)}
               onRemoveDifficulty={(id) => onRemoveMap(id)}
               prioritizedSkills={prioritizedSkills}
-              deferred={idx >= ABOVE_THE_FOLD_COUNT}
             />
           );
         })}
@@ -315,8 +313,7 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
           style={{ height: `${topSpacerHeight}px`, flexShrink: 0 }}
         />
       )}
-      {visibleGroups.map((grp, localIdx) => {
-        const absoluteIdx = startIdx + localIdx;
+      {visibleGroups.map((grp) => {
         const isSelected = grp.difficulties.some((d) => d.id === selectedMapId);
         return (
           <LazerCarouselItem
@@ -332,7 +329,6 @@ export const VirtualBeatmapList: React.FC<VirtualBeatmapListProps> = ({
             onRemove={() => onRemoveMap(grp.representative.id)}
             onRemoveDifficulty={(id) => onRemoveMap(id)}
             prioritizedSkills={prioritizedSkills}
-            deferred={absoluteIdx >= ABOVE_THE_FOLD_COUNT}
           />
         );
       })}
