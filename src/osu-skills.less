@@ -147,13 +147,126 @@
     }
 
     @media (min-width: 640px) {
-      grid-template-columns: 1fr 245px;
+      grid-template-columns: 1fr 280px;
     }
   }
 
   .beatmapset-header__box--main {
     padding-bottom: 5px;
     min-width: 0;
+  }
+
+  .beatmapset-header__box--stats {
+    margin-top: 28px;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .beatmapset-beatmap-picker {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 0 12px 0;
+    padding: 6px 10px;
+    background-color: hsla(var(--hsl-b3), 70%);
+    border-radius: @border-radius--large;
+    box-sizing: border-box;
+
+    &__beatmap {
+      margin: 0;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      position: relative;
+      flex-shrink: 0;
+
+      &::before {
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        border-radius: 6px;
+      }
+
+      .beatmap-icon--beatmapset {
+        font-size: 20px;
+      }
+    }
+  }
+
+  .beatmapset-stats {
+    width: 100%;
+    box-sizing: border-box;
+
+    &__row {
+      padding: 8px 16px;
+      box-sizing: border-box;
+      border-radius: 6px;
+    }
+  }
+
+  .beatmap-stats-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    &__label {
+      text-align: left;
+      white-space: nowrap;
+      font-weight: 500;
+      padding: 2.5px 0;
+      font-size: 11px;
+    }
+
+    &__bar {
+      width: 100%;
+      padding: 0 10px;
+    }
+
+    &__value {
+      text-align: right;
+      min-width: 44px;
+      padding-left: 6px;
+      padding-right: 0;
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+  }
+
+  .beatmap-basic-stats {
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+
+    &__entry {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    &__entry-icon {
+      width: 18px;
+      height: 18px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      flex-shrink: 0;
+    }
   }
 
   .beatmapset-header__details-text--title {
@@ -231,7 +344,7 @@
   .reset-input();
   position: absolute;
   top: 13px;
-  right: 16px;
+  right: 20px;
   z-index: 10;
   display: inline-flex;
   align-items: center;
