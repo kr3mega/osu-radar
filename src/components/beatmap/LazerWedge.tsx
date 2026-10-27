@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BeatmapAnalysisResult, SkillAttributes } from '../../engine/types';
 import { getStarRatingColor, getStarRatingTextColor, TOURNAMENT_MOD_COLORS } from '../../utils/osuColors';
 import { OsuPreviewPlayer } from '../visualizer/OsuPreviewPlayer';
 import { formatTimestamp } from '../../engine/strains';
 import { buildBeatmapCoverCss } from '../../lib/osu-preview';
+import {
+  ALL_SKILL_KEYS,
+  formatSkillLabel,
+  getSkillValue,
+  SKILL_SHORT_LABELS,
+} from '../../utils/skillLabels';
 
 interface LazerWedgeProps {
   map: BeatmapAnalysisResult | null;
@@ -74,6 +80,16 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
     { key: 'ar', label: 'AR', val: map.difficulty.ar, max: 10, isStar: false },
     { key: 'sr', label: 'SR', val: stats.starRating, max: 10, isStar: true },
   ];
+
+  const topTwoSkills = useMemo(() => {
+    if (!map || !map.skills) return [];
+    const scored = ALL_SKILL_KEYS.map((k) => ({
+      key: k,
+      val: getSkillValue(map.skills, k),
+    }));
+    scored.sort((a, b) => b.val - a.val);
+    return scored.slice(0, 2);
+  }, [map]);
 
   return (
     <div className="osu-skills-wedge-container">
@@ -391,6 +407,49 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                 </table>
               </div>
             </div>
+
+            {/* Top 2 skills of the selected difficulty positioned in the bottom-right corner */}
+            {topTwoSkills.length > 0 && (
+              <div
+                className="osu-skills-wedge-skills-corner"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: '8px',
+                  marginTop: 'auto',
+                  paddingTop: '14px',
+                  paddingBottom: '2px',
+                }}
+              >
+                {topTwoSkills.map((sk) => {
+                  const label = (SKILL_SHORT_LABELS[sk.key] || formatSkillLabel(sk.key)).toUpperCase();
+                  return (
+                    <span
+                      key={sk.key}
+                      className="osu-skills-wedge-skill-pill"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '3px 10px',
+                        borderRadius: '999px',
+                        backgroundColor: 'rgba(15, 20, 28, 0.88)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#ffffff',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        letterSpacing: '0.04em',
+                        lineHeight: '16px',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.45)',
+                      }}
+                    >
+                      {label}: {sk.val.toFixed(1).replace('.', ',')}%
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
