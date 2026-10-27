@@ -135,6 +135,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
 
   return (
     <div
+      id={group ? `beatmapset-group-${group.groupKey}` : `beatmap-item-${map.id}`}
       className={`osu-skills-song-group ${
         isExpanded ? 'osu-skills-song-group--expanded' : ''
       } ${deferred && !isExpanded ? 'osu-skills-card-deferred' : ''}`}
