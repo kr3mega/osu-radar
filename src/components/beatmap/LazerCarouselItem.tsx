@@ -39,7 +39,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   map,
   group,
   isSelected,
-  selectedMapId,
+  selectedMapId: _selectedMapId,
   isExpanded = false,
   onSelect,
   onToggleExpand: _onToggleExpand,
@@ -49,11 +49,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
   prioritizedSkills = [],
 }) => {
   const difficulties = group ? group.difficulties : [map];
-  const activeDiffInGroup =
-    selectedMapId && group
-      ? group.difficulties.find((d) => d.id === selectedMapId)
-      : undefined;
-  const displayMap = activeDiffInGroup || (group ? group.representative : map);
+  const displayMap = group ? group.representative : map;
 
   const { metadata, stats, modSlot, topSkills, skills } = displayMap;
   const isLazerSong = displayMap.origin === 'lazer' || displayMap.localClient === 'lazer';
@@ -526,7 +522,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                       >
                         <span
                           className="beatmapset-panel__beatmap-icon"
-                          style={{ color: dStarColor, fontSize: '11px', flexShrink: 0 }}
+                          style={{ color: '#ffffff', fontSize: '11px', flexShrink: 0 }}
                         >
                           <i className="fal fa-extra-mode-osu" />
                         </span>

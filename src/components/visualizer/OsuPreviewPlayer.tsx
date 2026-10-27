@@ -667,7 +667,7 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
               type="button"
               onClick={handleTogglePlay}
               title={isPlaying ? 'Pausar' : 'Reproduzir'}
-              className="btn-osu-big btn-osu-big--pink btn-osu-big--rounded-small osu-skills-player__play-btn"
+              className="btn-osu-big btn-osu-big--rounded-small osu-skills-player__play-btn"
             >
               <i className={`fas fa-${isPlaying ? 'pause' : 'play'}`} />
             </button>
@@ -700,9 +700,6 @@ export const OsuPreviewPlayer: React.FC<OsuPreviewPlayerProps> = ({
                 {currentSkin ? currentSkin.name : 'Selecionar Skin'}
               </span>
               <div className="osu-skills-skin-trigger__meta">
-                {currentSkin?.source === 'local_osu' && (
-                  <span className="osu-skills-skin-tag osu-skills-skin-tag--osu">osu!</span>
-                )}
                 {currentSkin?.source === 'imported' && (
                   <span className="osu-skills-skin-tag osu-skills-skin-tag--imported">.osk</span>
                 )}
