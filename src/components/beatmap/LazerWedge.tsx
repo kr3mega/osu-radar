@@ -431,7 +431,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
                             alignItems: 'center',
                             gap: '4px',
                             padding: '2px 8px',
-                            borderRadius: '0px',
+                            borderRadius: '4px',
                             backgroundColor: 'rgba(0, 0, 0, 0.25)',
                             border: '1px solid rgba(255, 255, 255, 0.08)',
                             fontSize: '10.5px',

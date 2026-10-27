@@ -390,6 +390,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                           backgroundColor: 'hsl(var(--hsl-h1))',
                           color: 'hsl(var(--hsl-b6))',
                           fontWeight: 800,
+                          borderRadius: '4px',
                         }}
                         title="Pontuação de sinergia combinando todas as skills priorizadas"
                       >
@@ -406,6 +407,7 @@ export const LazerCarouselItem: React.FC<LazerCarouselItemProps> = ({
                           {
                             '--bg-hsl': 'var(--hsl-b5)',
                             '--colour': 'hsl(var(--hsl-c1))',
+                            borderRadius: '4px',
                           } as React.CSSProperties
                         }
                       >
