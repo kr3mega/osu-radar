@@ -25,11 +25,14 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   if (!map) {
     return (
       <div
+        className="osu-skills-empty-wedge"
         style={{
           padding: '40px 20px',
           textAlign: 'center',
           backgroundColor: 'hsl(var(--hsl-b4))',
           color: 'hsl(var(--hsl-l1))',
+          borderRadius: 'var(--border-radius--large, 10px)',
+          border: '1px solid hsl(var(--hsl-b3))',
         }}
       >
         <div style={{ fontSize: '32px', color: 'hsl(var(--hsl-h1))', marginBottom: '10px' }}>
@@ -65,7 +68,7 @@ export const LazerWedge: React.FC<LazerWedgeProps> = ({
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: '1 1 auto' }}>
+    <div className="osu-skills-wedge-container">
       {/* Minimizable Song Information Card */}
       {isHeaderCollapsed ? (
         <div className="osu-skills-collapsed-header">
